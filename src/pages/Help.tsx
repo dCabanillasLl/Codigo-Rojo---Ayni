@@ -15,7 +15,7 @@ export default function Help({ onAsk, detailId }: { onAsk: () => void; detailId?
   if (tab === 'aportes') params.set('participando','1');
   const requests = useRemote<HelpRequest[]>(tab === 'recursos' ? null : `/solicitudes?${params}`, user?.id || 'public');
   function selectTab(value: string) { if ((value === 'mios' || value === 'aportes') && !requireUser()) return; setTab(value); }
-  return <section>
+  return <section data-tour="tour-help">
     <PageHeading eyebrow="NOS APOYAMOS" title="Ayuda vecinal" text="Pequeñas acciones que hacen un barrio más fuerte."><button className="record-button" onClick={onAsk}><Icon name="plus"/>Pedir ayuda</button></PageHeading>
     <div className="section-tabs" aria-label="Filtrar ayuda">{[['todos','En mi barrio'],['mios','Mis pedidos'],['aportes','Mis aportes'],['recursos','Recursos compartidos']].map(([value,label]) => <button key={value} aria-pressed={tab === value} className={tab === value ? 'active' : ''} onClick={() => selectTab(value)}>{label}</button>)}</div>
     {pending.length > 0 && <div className="pending-panel"><div className="action-row justify-between"><h2 className="font-bold">Pendientes de envío ({pending.length})</h2><button className="text-action" disabled={syncing} onClick={() => void sync()}>{syncing ? 'Enviando…' : 'Reintentar envío'}</button></div>{pending.map(item => <div key={item.id} className="pending-item"><b>{item.body.titulo}</b><p>Aún no tenemos confirmación del servidor.</p>{item.error && <p className="text-sm">{item.error}</p>}{item.blocked && <p className="text-sm">Este pedido necesita revisión; no se volverá a enviar automáticamente.</p>}</div>)}</div>}
