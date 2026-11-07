@@ -1,0 +1,14 @@
+export type User = { id: string; nombres: string; apellidos: string; correo: string; telefono: string | null; telefonoPublico: boolean | number; sectorId: string | null; sectorNombre: string | null };
+export type Sector = { id: string; nombre: string; distrito: string; ciudad: string };
+export type Category = { id: string; nombre: string };
+export type Catalogs = { publicaciones: Category[]; ayuda: Category[]; avisos: Category[] };
+export type Publication = { id: string; propietarioId: string; propietario: string; telefonoContacto?: string | null; categoriaId: string; categoria: string; tipo: 'producto' | 'servicio'; titulo: string; descripcion: string | null; modalidadPrecio: 'gratis' | 'fijo' | 'desde' | 'cotizar'; precio: number | string | null; moneda: string; estado: string; sectorId: string; sectorNombre: string; distanciaMetros: number | null; promedioResenas: number | string | null; totalResenas: number };
+export type HelpRequest = { id: string; solicitanteId: string; solicitante: string; categoriaId: string; categoria: string; sectorId: string; sectorNombre: string; titulo: string; descripcion: string; urgencia: 'normal' | 'urgente'; estado: 'abierta' | 'en_curso' | 'completada' | 'cancelada' | 'vencida'; creadoEn: string; distanciaMetros: number | null; clientRequestId: string };
+export type RequestInput = { clientRequestId: string; categoriaId: string; sectorId: string; titulo: string; descripcion: string; urgencia: 'normal' | 'urgente' };
+export type Review = { id: string; calificacion: number; comentario: string | null; autor?: string; creadoEn?: string };
+export type Offer = { id: string; solicitudId: string; voluntarioId: string; voluntario: string; mensaje: string; estado: 'pendiente' | 'aceptada' | 'rechazada' | 'retirada' | 'completada'; entregaPendiente: boolean; confirmadaEn: string | null; resena?: Review | null };
+export type Notice = { id: string; autorId: string; autor: string; categoriaId: string; categoria: string; titulo: string; contenido: string; imagenUrl: string | null; estado: string; sectorId: string; sectorNombre: string; distanciaMetros: number | null; fechaEvento: string | null; venceEn: string | null; creadoEn: string };
+export type Resource = { id: string; propietarioId: string; propietario: string; titulo: string; unidad: string; cantidadTotal: number; reservada: number; entregada: number; disponible: number; sectorId: string; sectorNombre: string; distanciaMetros: number | null; actualizadoEn: string };
+export type Reservation = { id: string; recursoId: string; solicitanteId: string; solicitante: string; cantidad: number; estado: 'pendiente' | 'reservada' | 'entregada' | 'cancelada'; creadoEn: string };
+export type Reputation = { colaboracionesConfirmadas: number; vistosBuenos: number; promedio: number | null; resenas: Review[] };
+export type Area = { sectorId: string; coordinates: { latitude: number; longitude: number } | null; radius: number };

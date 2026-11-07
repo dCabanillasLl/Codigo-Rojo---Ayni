@@ -1,10 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { AppProvider } from "./AppContext";
+import { LanguageProvider } from "./lib/language";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider><AppProvider><App /></AppProvider></LanguageProvider>
   </React.StrictMode>,
 );
