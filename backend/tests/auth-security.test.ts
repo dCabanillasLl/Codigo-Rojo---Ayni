@@ -25,7 +25,7 @@ test("mutaciones requieren encabezado propio y contenido JSON", async () => {
   assert.equal((await request(app).post("/action").set("Origin", origin).set("X-AYNI-Client", "web").send({})).status, 200);
 });
 test("registro no acepta contraseñas truncadas por bcrypt ni coordenadas incompletas", () => {
-  const base = { nombres: "Milagros", apellidos: "Vecina", correo: "MILA@example.com", contrasena: "contraseña-segura", sectorId: "1" };
+  const base = { nombres: "Milagros", apellidos: "Vecina", correo: "MILA@example.com", contrasena: "contraseña-segura", sectorId: "1", direccion: "Referencia de prueba", dni: "00000000", consentimientoDni: true, dniProof: "prueba-sintetica-no-es-un-token-real" };
   assert.equal(registerSchema.parse(base).correo, "mila@example.com");
   assert.equal(registerSchema.safeParse({ ...base, contrasena: "ñ".repeat(40) }).success, false);
   assert.equal(registerSchema.safeParse({ ...base, latitud: -12 }).success, false);

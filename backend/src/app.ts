@@ -9,12 +9,14 @@ import { AppError, asyncHandler } from "./lib/http.js";
 import { optionalAuth } from "./middlewares/auth.js";
 import { protectMutations } from "./middlewares/security.js";
 import { errorHandler } from "./middlewares/errors.js";
+import { defaultJson } from "./middlewares/json.js";
 import auth from "./routes/auth.js";
 import catalog from "./routes/catalog.js";
 import publications from "./routes/publications.js";
 import notices from "./routes/notices.js";
 import community from "./routes/community.js";
 import identity from "./routes/identity.js";
+import locations from "./routes/locations.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -31,7 +33,7 @@ app.use(cors({
 }));
 app.get("/api/version", (_req, res) => res.json({ data: { api: "ayni-api", build: "dni-apiperu-v1" } }));
 app.use("/api", protectMutations(config.origins));
-app.use(express.json({ limit: "64kb" }));
+app.use(defaultJson);
 app.use(cookieParser());
 app.use("/api", rateLimit({ windowMs: 60 * 1000, limit: 180, standardHeaders: "draft-7", legacyHeaders: false,
   message: { error: { code: "RATE_LIMITED", message: "Has realizado muchas solicitudes. Espera un momento." } } }));
@@ -41,11 +43,12 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
   await query("SELECT entregada_en, confirmada_en FROM ofertas_ayuda LIMIT 0");
   await query("SELECT imagen_url FROM avisos LIMIT 0");
   await query("SELECT telefono_publico FROM usuarios LIMIT 0");
+  await query("SELECT imagen, imagen_hash FROM publicaciones LIMIT 0");
   if (!config.jwtSecret) throw new AppError(503, "AUTH_NOT_CONFIGURED", "La autenticación todavía no está configurada.");
   res.json({ data: { estado: "ok", baseDeDatos: "conectada" } });
 }));
 app.use("/api", (req, res, next) => req.path === "/auth/logout" ? next() : optionalAuth(req, res, next));
-app.use("/api", identity, auth, catalog, publications, notices, community);
+app.use("/api", identity, auth, catalog, publications, notices, community, locations);
 app.use((_req, _res, next) => next(new AppError(404, "NOT_FOUND", "La ruta solicitada no existe.")));
 app.use(errorHandler);
 export default app;

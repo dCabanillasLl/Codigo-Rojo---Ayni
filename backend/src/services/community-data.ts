@@ -1,6 +1,7 @@
 import type { PoolConnection, ResultSetHeader } from 'mysql2/promise';
 import { z } from 'zod';
 import { AppError } from '../lib/http.js';
+import { resolveLocation, type LocationInput } from '../lib/location.js';
 
 export const idSchema = z.string().regex(/^[1-9]\d{0,19}$/, 'Identificador inválido');
 export const uuidSchema = z.string().uuid().transform((id) => id.toLowerCase());
@@ -36,15 +37,8 @@ export async function insert(connection: PoolConnection, sql: string, params: un
   return id!.id;
 }
 
-export async function createLocation(connection: PoolConnection, userId: string, sectorId: string): Promise<string> {
-  const sector = await row(connection, 'SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?', [sectorId]);
-  if (!sector) throw new AppError(400, 'UNKNOWN_SECTOR', 'Selecciona un sector disponible.');
-  // Reuse the chosen sector, never publish or return the private address/coordinates.
-  const existing = await row<{ ubicacion_id: string }>(connection,
-    'SELECT CAST(l.ubicacion_id AS CHAR) AS ubicacion_id FROM usuarios u JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id WHERE u.usuario_id = ? AND l.sector_id = ?',
-    [userId, sectorId]);
-  if (existing) return existing.ubicacion_id;
-  return insert(connection, 'INSERT INTO ubicaciones (sector_id, etiqueta) VALUES (?, ?)', [sectorId, 'Zona del pedido']);
+export async function createLocation(connection: PoolConnection, userId: string, sectorId: string, point?: LocationInput): Promise<string> {
+  return resolveLocation(connection, userId, sectorId, point);
 }
 
 export function publicName(alias: string): string {

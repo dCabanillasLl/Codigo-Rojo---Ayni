@@ -27,11 +27,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const online = useOnline();
   const sectors = useRemote<Sector[]>('/sectores');
   const catalogs = useRemote<Catalogs>('/catalogos');
-  const [area, setArea] = useState<Area>({ sectorId: user?.sectorId || '', coordinates: null, radius: 1000 });
+  const [area, setArea] = useState<Area>({ sectorId: user?.sectorId || '', coordinates: user?.latitud != null && user.longitud != null ? { latitude: Number(user.latitud), longitude: Number(user.longitud) } : null, radius: 1000 });
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [syncing, setSyncing] = useState(false);
   const syncingRef = useRef(false);
-  const setUser = useCallback((value: User | null) => { updateUser(value); userRef.current = value; storeUser(value); setSessionError(''); if (value) setArea(current => ({ ...current, sectorId: value.sectorId ?? current.sectorId, coordinates: value.latitud != null && value.longitud != null ? { latitude: Number(value.latitud), longitude: Number(value.longitud) } : current.coordinates })); }, []);
+  const setUser = useCallback((value: User | null) => {
+    const previous = userRef.current;
+    updateUser(value); userRef.current = value; storeUser(value); setSessionError('');
+    if (value && (previous?.id !== value.id || previous.sectorId !== value.sectorId || previous.latitud !== value.latitud || previous.longitud !== value.longitud)) {
+      setArea(current => ({ ...current, sectorId: value.sectorId ?? '', coordinates: value.latitud != null && value.longitud != null ? { latitude: Number(value.latitud), longitude: Number(value.longitud) } : null }));
+    } else if (!value && previous) setArea({ sectorId: '', coordinates: null, radius: 1000 });
+  }, []);
   useEffect(() => {
     let active = true;
     setSessionLoading(true);

@@ -3,22 +3,25 @@ import { z } from "zod";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { one, query, transaction } from "../db/index.js";
 import { AppError, asyncHandler } from "../lib/http.js";
-import { geoFilter, resolveLocation } from "../lib/location.js";
-import { idSchema, listSchema } from "../lib/validation.js";
+import { geoFilter, publicMapColumns, resolveLocation } from "../lib/location.js";
+import { idSchema, listSchema, locationSchema } from "../lib/validation.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { publicationJson } from "../middlewares/json.js";
+import { photoSchema, preparePhoto } from "../lib/photos.js";
 
 const router = Router();
 const baseSelect = `SELECT CAST(p.publicacion_id AS CHAR) AS id, CAST(p.propietario_id AS CHAR) AS propietarioId,
   u.nombres AS propietario, CASE WHEN u.telefono_publico = 1 THEN u.telefono ELSE NULL END AS telefonoContacto,
   CAST(p.categoria_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   p.tipo, p.titulo, p.descripcion, p.modalidad_precio AS modalidadPrecio, p.precio, p.moneda, p.estado,
-  CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
+  CASE WHEN p.imagen_hash IS NULL THEN NULL ELSE CONCAT('/api/publicaciones/', CAST(p.publicacion_id AS CHAR), '/imagen?v=', p.imagen_hash) END AS imagenUrl,
+  CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre, ${publicMapColumns},
   (SELECT ROUND(AVG(r.calificacion), 1) FROM resenas r WHERE r.publicacion_id = p.publicacion_id) AS promedioResenas,
   (SELECT COUNT(*) FROM resenas r WHERE r.publicacion_id = p.publicacion_id) AS totalResenas`;
 const joins = ` FROM publicaciones p JOIN usuarios u ON u.usuario_id = p.propietario_id
   JOIN ubicaciones l ON l.ubicacion_id = p.ubicacion_id JOIN sectores_vecinales s ON s.sector_id = l.sector_id
   JOIN categorias_publicacion c ON c.categoria_id = p.categoria_id`;
-const publicationFields = z.object({
+export const publicationFields = z.object({
   categoriaId: idSchema,
   tipo: z.enum(["producto", "servicio"]),
   titulo: z.string().trim().min(3).max(160),
@@ -26,6 +29,8 @@ const publicationFields = z.object({
   modalidadPrecio: z.enum(["gratis", "fijo", "desde", "cotizar"]),
   precio: z.number().finite().min(0).max(99999999.99).nullable().optional(),
   sectorId: idSchema,
+  ubicacion: locationSchema.optional(),
+  foto: photoSchema,
   estado: z.enum(["borrador", "publicada", "pausada", "archivada"]).optional(),
 }).strict();
 
@@ -64,33 +69,48 @@ router.get("/publicaciones/:id", asyncHandler(async (req, res) => {
   res.json({ data: item });
 }));
 
-router.post("/publicaciones", requireAuth, asyncHandler(async (req, res) => {
+router.get("/publicaciones/:id/imagen", asyncHandler(async (req, res) => {
+  const id = idSchema.parse(req.params.id);
+  const { v } = z.object({ v: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().parse(req.query);
+  const item = await one<{ imagen: Buffer | null; imagen_hash: string | null; propietarioId: string; estado: string }>(
+    `SELECT p.imagen, p.imagen_hash, CAST(p.propietario_id AS CHAR) AS propietarioId, p.estado FROM publicaciones p JOIN usuarios u ON u.usuario_id = p.propietario_id
+     WHERE p.publicacion_id = ? AND u.estado_cuenta = 'activo' AND (p.estado = 'publicada' OR p.propietario_id = ?)`, [id, req.userId ?? null]);
+  if (!item?.imagen || !item.imagen_hash || (item.estado !== 'publicada' && item.propietarioId !== req.userId) || (v && v !== item.imagen_hash)) throw new AppError(404, 'PHOTO_NOT_FOUND', 'Esta foto no está disponible.');
+  res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=0, must-revalidate', 'Cross-Origin-Resource-Policy': 'cross-origin', ETag: `"${item.imagen_hash}"` });
+  res.send(item.imagen);
+}));
+
+router.post("/publicaciones", requireAuth, publicationJson, asyncHandler(async (req, res) => {
   const body = publicationFields.parse(req.body);
   validatePrice(body.modalidadPrecio, body.precio);
+  const photo = await preparePhoto(body.foto);
   const id = await transaction(async (connection) => {
-    const locationId = await resolveLocation(connection, req.userId, body.sectorId);
+    const locationId = await resolveLocation(connection, req.userId, body.sectorId, body.ubicacion);
     const [result] = await connection.execute<ResultSetHeader>(
-      "INSERT INTO publicaciones (propietario_id, ubicacion_id, categoria_id, tipo, titulo, descripcion, modalidad_precio, precio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.userId, locationId, body.categoriaId, body.tipo, body.titulo, body.descripcion ?? null, body.modalidadPrecio, body.precio ?? null, body.estado ?? "publicada"],
+      "INSERT INTO publicaciones (propietario_id, ubicacion_id, categoria_id, tipo, titulo, descripcion, modalidad_precio, precio, estado, imagen, imagen_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [req.userId, locationId, body.categoriaId, body.tipo, body.titulo, body.descripcion ?? null, body.modalidadPrecio, body.precio ?? null, body.estado ?? "publicada", photo?.buffer ?? null, photo?.hash ?? null],
     );
     return String(result.insertId);
   });
   res.status(201).json({ data: await one(`${baseSelect}, NULL AS distanciaMetros${joins} WHERE p.publicacion_id = ?`, [id]) });
 }));
 
-router.patch("/publicaciones/:id", requireAuth, asyncHandler(async (req, res) => {
+router.patch("/publicaciones/:id", requireAuth, publicationJson, asyncHandler(async (req, res) => {
   const id = idSchema.parse(req.params.id);
   const body = publicationFields.partial().refine((value) => Object.keys(value).length > 0, "Indica qué deseas modificar").parse(req.body);
   await transaction(async (connection) => {
-    const [rows] = await connection.execute<RowDataPacket[]>("SELECT propietario_id, modalidad_precio, precio FROM publicaciones WHERE publicacion_id = ? FOR UPDATE", [id]);
+    const [rows] = await connection.execute<RowDataPacket[]>("SELECT p.propietario_id, p.modalidad_precio, p.precio, CAST(l.sector_id AS CHAR) AS sector_id FROM publicaciones p JOIN ubicaciones l ON l.ubicacion_id = p.ubicacion_id WHERE p.publicacion_id = ? FOR UPDATE", [id]);
     const existing = rows[0];
     if (!existing) throw new AppError(404, "NOT_FOUND", "No encontramos esta publicación.");
     if (String(existing.propietario_id) !== req.userId) throw new AppError(403, "FORBIDDEN", "Solo puedes modificar tus publicaciones.");
     validatePrice(body.modalidadPrecio ?? existing.modalidad_precio, body.precio !== undefined ? body.precio : existing.precio);
+    const photo = await preparePhoto(body.foto);
     const map = { categoriaId: "categoria_id", tipo: "tipo", titulo: "titulo", descripcion: "descripcion", modalidadPrecio: "modalidad_precio", precio: "precio", estado: "estado" } as const;
     const fields: string[] = [], params: unknown[] = [];
     for (const key of Object.keys(map) as (keyof typeof map)[]) if (body[key] !== undefined) { fields.push(`${map[key]} = ?`); params.push(body[key]); }
-    if (body.sectorId) { fields.push("ubicacion_id = ?"); params.push(await resolveLocation(connection, req.userId, body.sectorId)); }
+    if (photo !== undefined) { fields.push('imagen = ?', 'imagen_hash = ?'); params.push(photo?.buffer ?? null, photo?.hash ?? null); }
+    if (body.ubicacion || (body.sectorId && body.sectorId !== existing.sector_id)) { fields.push("ubicacion_id = ?"); params.push(await resolveLocation(connection, req.userId, body.sectorId ?? existing.sector_id, body.ubicacion)); }
+    if (!fields.length) return;
     await connection.execute(`UPDATE publicaciones SET ${fields.join(", ")} WHERE publicacion_id = ?`, [...params, id] as never[]);
   });
   res.json({ data: await one(`${baseSelect}, NULL AS distanciaMetros${joins} WHERE p.publicacion_id = ?`, [id]) });

@@ -1,0 +1,126 @@
+import { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import type { Coordinates } from '../types';
+import { COMMUNITY_CENTER } from '../lib/location';
+import { spreadMapPoints } from '../lib/map-layout';
+import { kindLabels, markerHtml, mapSymbols, type MapKind, type MapSymbol } from '../lib/map-symbols';
+
+export type MapPin = { id: string; point: Coordinates; title: string; label: string; kind?: MapKind; symbol?: MapSymbol; category?: string };
+type Props = {
+  center?: Coordinates | null; reference?: Coordinates | null; pins?: MapPin[]; selectedId?: string;
+  onSelect?: (id: string) => void; onPick?: (point: Coordinates) => void;
+  picked?: Coordinates | null; radius?: number; accuracy?: number | null;
+  online: boolean; label: string; compact?: boolean; fitAll?: boolean; zoomPosition?: L.ControlPosition;
+};
+
+export default function CommunityMap({ center, reference, pins = [], selectedId, onSelect, onPick, picked, radius, accuracy, online, label, compact, fitAll = true, zoomPosition = 'topleft' }: Props) {
+  const host = useRef<HTMLDivElement>(null);
+  const map = useRef<L.Map | null>(null);
+  const tiles = useRef<L.TileLayer | null>(null);
+  const layers = useRef<L.LayerGroup | null>(null);
+  const callbacks = useRef({ onPick, onSelect }); callbacks.current = { onPick, onSelect };
+  const initialCenter = useRef(center || picked || COMMUNITY_CENTER);
+  const fitView = useRef<() => void>(() => undefined);
+  const geometryKey = pins.map(pin => `${pin.id}:${pin.point.latitude},${pin.point.longitude}`).sort().join('|');
+  const sharedPoints = new Map<string, number>();
+  pins.forEach(pin => { const key = `${pin.point.latitude},${pin.point.longitude}`; sharedPoints.set(key, (sharedPoints.get(key) || 0) + 1); });
+  const sharedCount = Math.max(0, ...sharedPoints.values());
+  const [tileError, setTileError] = useState(false);
+
+  fitView.current = () => {
+    const instance = map.current; if (!instance) return;
+    if (!instance.getSize().x || !instance.getSize().y) return;
+    const origin = picked || reference;
+    if (!fitAll) {
+      const point = picked || center || COMMUNITY_CENTER;
+      instance.panTo([point.latitude, point.longitude], { animate: false }); return;
+    }
+    const bounds = L.latLngBounds(pins.map(pin => [pin.point.latitude, pin.point.longitude] as L.LatLngTuple));
+    if (origin) {
+      bounds.extend([origin.latitude, origin.longitude]);
+      if (radius) bounds.extend(L.latLng(origin.latitude, origin.longitude).toBounds(radius * 2));
+    }
+    if (!bounds.isValid()) { const point = center || COMMUNITY_CENTER; instance.setView([point.latitude, point.longitude], 14); return; }
+    const layout = spreadMapPoints(pins.map(pin => ({ id: pin.id, ...instance.latLngToContainerPoint([pin.point.latitude, pin.point.longitude]) })));
+    const extraX = Math.max(0, ...layout.map(point => Math.abs(point.x - point.anchorX)));
+    const extraY = Math.max(0, ...layout.map(point => Math.abs(point.y - point.anchorY)));
+    const size = instance.getSize();
+    instance.fitBounds(bounds, { padding: [Math.min(size.x / 3, 48 + extraX), Math.min(size.y / 3, 60 + extraY)], maxZoom: 16, animate: false });
+  };
+
+  useEffect(() => {
+    if (!host.current || !online) return;
+    const start = initialCenter.current;
+    const instance = L.map(host.current, { scrollWheelZoom: false, keyboard: true, zoomControl: true })
+      .setView([start.latitude, start.longitude], compact ? 15 : 14);
+    map.current = instance;
+    instance.zoomControl.setPosition(zoomPosition);
+    tiles.current = L.tileLayer(import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: import.meta.env.VITE_MAP_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(instance);
+    tiles.current.on('tileerror', () => setTileError(true));
+    layers.current = L.layerGroup().addTo(instance);
+    instance.on('click', (event: L.LeafletMouseEvent) => callbacks.current.onPick?.({ latitude: event.latlng.lat, longitude: event.latlng.lng }));
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && event.target === host.current && callbacks.current.onPick) {
+        event.preventDefault(); const point = instance.getCenter();
+        callbacks.current.onPick({ latitude: point.lat, longitude: point.lng });
+      }
+    };
+    const container = host.current;
+    container.addEventListener('keydown', keydown);
+    const observer = new ResizeObserver(() => { instance.invalidateSize({ pan: false }); fitView.current(); });
+    observer.observe(container);
+    return () => { observer.disconnect(); container.removeEventListener('keydown', keydown); instance.remove(); map.current = null; layers.current = null; tiles.current = null; };
+  }, [online, compact, zoomPosition]);
+
+  useEffect(() => {
+    if (!map.current || !layers.current) return;
+    const instance = map.current, group = layers.current;
+    function draw() {
+    group.clearLayers();
+    const origin = picked || reference;
+    if (origin) {
+      const latlng: L.LatLngExpression = [origin.latitude, origin.longitude];
+      if (radius) L.circle(latlng, { radius, color: '#39765d', fillOpacity: 0.06, weight: 1.5, dashArray: '6 7', interactive: false }).addTo(group);
+      if (picked && accuracy) L.circle(latlng, { radius: accuracy, color: '#367fc0', fillOpacity: 0.08, weight: 1, interactive: false }).addTo(group);
+      L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#2879c7', fillOpacity: 1 })
+        .bindTooltip(picked ? 'Punto elegido' : 'Tu punto de búsqueda').addTo(group);
+    }
+    const layout = spreadMapPoints(pins.map(pin => ({ id: pin.id, ...instance.latLngToContainerPoint([pin.point.latitude, pin.point.longitude]) })));
+    const pinById = new Map(pins.map(pin => [pin.id, pin]));
+    layout.forEach(position => {
+      const pin = pinById.get(position.id)!;
+      const displayPoint = instance.containerPointToLatLng([position.x, position.y]);
+      const selected = pin.id === selectedId;
+      const kind = pin.kind || 'service', symbol = pin.symbol || kind;
+      if (position.displaced) {
+        L.polyline([[pin.point.latitude, pin.point.longitude], displayPoint], { color: '#687c70', weight: 1.5, opacity: 0.65, dashArray: '3 4', interactive: false }).addTo(group);
+        L.circleMarker([pin.point.latitude, pin.point.longitude], { radius: 3, color: '#fff', fillColor: '#687c70', fillOpacity: 1, weight: 1, interactive: false }).addTo(group);
+      }
+      const icon = L.divIcon({ className: `community-pin ${kind}-pin ${symbol === 'urgent' ? 'urgent-pin' : ''} ${selected ? 'is-selected' : ''}`, html: markerHtml(kind, symbol), iconSize: [40, 46], iconAnchor: [20, 43] });
+      const name = `${kindLabels[kind]} · ${pin.category || mapSymbols[symbol].label}: ${pin.title}`;
+      const marker = L.marker(displayPoint, { icon, title: name, alt: name, keyboard: true, riseOnHover: true, zIndexOffset: selected ? 500 : 0 });
+      const text = document.createElement('span'); text.textContent = name;
+      marker.bindTooltip(text).on('click', (event: L.LeafletMouseEvent) => { L.DomEvent.stopPropagation(event); callbacks.current.onSelect?.(pin.id); }).addTo(group);
+      if (selected) L.circle([pin.point.latitude, pin.point.longitude], { radius: 150, color: kind === 'help' ? '#bd6946' : '#39765d', fillOpacity: 0.1, weight: 1, interactive: false }).addTo(group);
+    });
+    }
+    draw();
+    instance.on('zoomend moveend', draw);
+    return () => { instance.off('zoomend moveend', draw); };
+  }, [online, reference, picked, pins, selectedId, radius, accuracy]);
+
+  useEffect(() => {
+    fitView.current();
+  }, [online, geometryKey, center?.latitude, center?.longitude, reference?.latitude, reference?.longitude, picked?.latitude, picked?.longitude, radius, fitAll]);
+
+  if (!online) return <p className="map-offline" role="status">El mapa necesita internet. Tus publicaciones y pedidos guardados siguen disponibles.</p>;
+  return <div className={`community-map-wrap ${compact ? 'compact-map' : ''}`}>
+    <div ref={host} className="community-map" style={fitAll && sharedCount > 25 ? { minHeight: Math.ceil(Math.sqrt(sharedCount)) * 50 + 100 } : undefined} role="region" aria-label={label} tabIndex={0}/>
+    {!fitAll && <button type="button" className="map-recenter" onClick={() => fitView.current()}>Centrar punto</button>}
+    {tileError && <div className="map-tile-error" role="status">No se pudieron cargar algunas calles. <button type="button" onClick={() => { setTileError(false); tiles.current?.redraw(); }}>Reintentar mapa</button></div>}
+  </div>;
+}

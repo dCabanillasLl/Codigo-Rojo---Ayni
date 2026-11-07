@@ -1,11 +1,12 @@
 const baseUrl = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+export function apiAssetUrl(path: string) { return path.startsWith('/api/') ? `${baseUrl}${path.slice(4)}` : path; }
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
   get temporary() { return this.status === 0 || this.status >= 500 || this.status === 429; }
 }
-export async function api<T>(path: string, options: { method?: string; body?: unknown; signal?: AbortSignal; expectedUserId?: string } = {}): Promise<T> {
+export async function api<T>(path: string, options: { method?: string; body?: unknown; signal?: AbortSignal; expectedUserId?: string; timeoutMs?: number } = {}): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
   const cancel = () => controller.abort();
   options.signal?.addEventListener('abort', cancel, { once: true });
   if (options.signal?.aborted) controller.abort();

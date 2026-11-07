@@ -2,6 +2,8 @@ import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { one, query, transaction } from '../db/index.js';
 import { AppError } from '../lib/http.js';
+import { locationSchema } from '../lib/validation.js';
+import { publicMapColumns } from '../lib/location.js';
 import { assertAllowedRequestText, generateRequestTitle } from '../lib/request-policy.js';
 import { approximateDistance, createLocation, geoClause, idSchema, insert, publicName, row, rows, uuidSchema, type ListOptions } from './community-data.js';
 import { assertCanCloseRequest, assertRequestActive, contentHash, requireSameContent, transitionOffer, type OfferState, type RequestState } from './community-rules.js';
@@ -10,6 +12,7 @@ export const createRequestSchema = z.object({
   clientRequestId: uuidSchema,
   categoriaId: idSchema,
   sectorId: idSchema,
+  ubicacion: locationSchema.optional(),
   titulo: z.string().trim().min(5).max(160).optional(),
   descripcion: z.string().trim().min(5).max(5000),
   urgencia: z.enum(['normal', 'urgente']).default('normal'),
@@ -56,7 +59,8 @@ const requestColumns = `CAST(s.solicitud_id AS CHAR) AS id,
   CAST(s.categoria_ayuda_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   CAST(l.sector_id AS CHAR) AS sectorId, v.nombre AS sectorNombre,
   s.titulo, s.descripcion, s.urgencia, s.estado, s.creado_en AS creadoEn,
-  s.client_request_id AS clientRequestId, s.motivo_cancelacion AS motivoCancelacion`;
+  s.client_request_id AS clientRequestId, s.motivo_cancelacion AS motivoCancelacion,
+  ${publicMapColumns}`;
 const requestFrom = `FROM solicitudes_ayuda s
   JOIN usuarios u ON u.usuario_id = s.solicitante_id
   JOIN ubicaciones l ON l.ubicacion_id = s.ubicacion_id
@@ -109,7 +113,7 @@ export async function createRequest(userId: string, data: z.infer<typeof createR
   assertAllowedRequestText(data.descripcion);
   assertAllowedRequestText(data.titulo ?? '');
   const title = generateRequestTitle(data.descripcion);
-  const fingerprint = contentHash({ categoriaId: data.categoriaId, sectorId: data.sectorId, titulo: data.titulo ?? title, descripcion: data.descripcion, urgencia: data.urgencia });
+  const fingerprint = contentHash({ categoriaId: data.categoriaId, sectorId: data.sectorId, titulo: data.titulo ?? title, descripcion: data.descripcion, urgencia: data.urgencia, ...(data.ubicacion ? { ubicacion: data.ubicacion } : {}) });
   const result = await transaction(async (connection) => {
     // Serializes creations for one user. UNIQUE remains the final protection against races.
     await row(connection, 'SELECT usuario_id FROM usuarios WHERE usuario_id = ? FOR UPDATE', [userId]);
@@ -120,7 +124,7 @@ export async function createRequest(userId: string, data: z.infer<typeof createR
     const category = await row<{ categoria_ayuda_id: string; nombre: string }>(connection, 'SELECT categoria_ayuda_id, nombre FROM categorias_ayuda WHERE categoria_ayuda_id = ?', [data.categoriaId]);
     if (!category) throw new AppError(400, 'UNKNOWN_CATEGORY', 'Selecciona una categoría de ayuda disponible.');
     const urgency = category.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal';
-    const locationId = await createLocation(connection, userId, data.sectorId);
+    const locationId = await createLocation(connection, userId, data.sectorId, data.ubicacion);
     const id = await insert(connection, `INSERT INTO solicitudes_ayuda
       (solicitante_id, categoria_ayuda_id, ubicacion_id, titulo, descripcion, urgencia, client_request_id, request_hash)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

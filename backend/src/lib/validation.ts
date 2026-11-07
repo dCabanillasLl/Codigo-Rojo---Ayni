@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 export const idSchema = z.string().regex(/^[1-9]\d{0,19}$/, "Identificador inválido");
+export const locationSchema = z.object({
+  latitud: z.number().finite().min(-90).max(90),
+  longitud: z.number().finite().min(-180).max(180),
+  direccion: z.string().trim().max(255).optional(),
+}).strict();
 export const passwordSchema = z.string().min(8, "Usa al menos 8 caracteres").max(72)
   .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "La contraseña excede los 72 bytes permitidos");
 export const phoneSchema = z.string().trim().regex(/^\+?[0-9]{8,15}$/, "Usa entre 8 y 15 dígitos, con prefijo internacional opcional");

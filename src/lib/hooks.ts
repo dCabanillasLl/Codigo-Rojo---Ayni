@@ -43,8 +43,8 @@ export function useRemote<T>(path: string | null, scope = 'public') {
 }
 export function areaQuery(area: Area) {
   const params = new URLSearchParams();
+  if (area.sectorId) params.set('sectorId', area.sectorId);
   if (area.coordinates) { params.set('latitud', String(area.coordinates.latitude)); params.set('longitud', String(area.coordinates.longitude)); params.set('radio', String(area.radius)); }
-  else if (area.sectorId) params.set('sectorId', area.sectorId);
   return params;
 }
 export function useDebounced<T>(value: T, delay = 300) {
