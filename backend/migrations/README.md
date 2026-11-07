@@ -15,6 +15,12 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 4. `003_flyers_whatsapp.sql` añade la URL HTTPS del flyer y la preferencia explícita
    `telefono_publico`, desactivada por defecto. Aplicar también a las bases existentes
    antes de desplegar la versión que habilita esas funciones.
+5. `004_dni_hash.sql` añade una huella HMAC única para permitir acceso con DNI. El DNI
+   original nunca se guarda; configura `DNI_HASH_SECRET` y consérvalo estable para no
+   invalidar las cuentas creadas con este método.
+6. `005_registro_dni_sin_correo.sql` hace opcional el correo y añade la zona general
+   `Pueblo Libre` para registrar sin selector de sector. Respeta cuentas con correo
+   existentes; aplicar antes de habilitar el nuevo registro.
 
 MySQL hace commit implícito de DDL. Aplicar `001` una sola vez, guardar evidencia de
 éxito y, si falla parcialmente, inspeccionar el esquema antes de reintentarlo.
