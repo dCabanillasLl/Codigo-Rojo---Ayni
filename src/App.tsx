@@ -89,6 +89,6 @@ export default function App() {
     {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)} saveToProfile={route.page === 'perfil'}/>}
     {notificationsOpen && <NotificationCenter notifications={notifications} onClose={() => setNotificationsOpen(false)}/>}
     {authOpen && <AuthModal/>}
-    <GuideBot onNavigate={navigate} onAsk={() => { if (requireUser()) setHelpOpen(true); }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }}/>
+    <GuideBot onNavigate={navigate} onAsk={() => { if (requireUser()) setHelpOpen(true); }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }} onLocation={() => { if (requireUser()) setLocationOpen(true); }}/>
   </div>;
 }
