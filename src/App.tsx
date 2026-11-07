@@ -11,6 +11,7 @@ import { api, errorMessage } from './lib/api';
 import { LocationDialog } from './components/LocationDialog';
 import NotificationCenter from './components/NotificationCenter';
 import { useLanguage } from './lib/language';
+import GuideBot from './components/GuideBot';
 
 type Destination = 'cerca' | 'ayuda' | 'avisos' | 'perfil';
 const navItems: { id: Destination; label: string; icon: 'home' | 'hands' | 'megaphone' | 'user' }[] = [
@@ -88,5 +89,6 @@ export default function App() {
     {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)}/>}
     {notificationsOpen && <NotificationCenter notifications={notifications} onClose={() => setNotificationsOpen(false)}/>}
     {authOpen && <AuthModal/>}
+    <GuideBot onNavigate={navigate} onAsk={() => { if (requireUser()) setHelpOpen(true); }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }}/>
   </div>;
 }

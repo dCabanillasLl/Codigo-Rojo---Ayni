@@ -22,7 +22,8 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 | Método y ruta | Cuerpo / resultado | Éxito |
 |---|---|---|
 | POST `/api/auth/register` | `{nombres,apellidos,correo,contrasena,sectorId,telefono?,latitud?,longitud?}` → `{data: Usuario}` y cookie HttpOnly | 201 |
-| POST `/api/auth/login` | `{correo,contrasena}` → `{data: Usuario}` y cookie HttpOnly | 200 |
+| POST `/api/auth/login` | `{identificador,contrasena}` (correo o DNI) o formato antiguo `{correo,contrasena}` → `{data: Usuario}` y cookie HttpOnly | 200 |
+| POST `/api/identity/dni/lookup` | `{dni,consentimiento:true}` → `{data:{nombres,apellidos,proof,venceEnSegundos}}`; devuelve solo nombres y apellidos, no dirección ni ubigeos. Máximo 8 consultas/15 min/IP. | 200 |
 | GET `/api/auth/me` | Sin cuerpo → `{data: Usuario}` de la sesión | 200 |
 | PATCH `/api/auth/me` | `{nombres?,apellidos?,telefono?,telefonoPublico?,sectorId?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
 | POST `/api/auth/logout` | `{}` → `{data:{cerrado:true}}`, elimina cookie | 200 |
@@ -34,6 +35,14 @@ se requiere teléfono E.164 (`+` y prefijo de país). En publicaciones, `telefon
 correo/teléfono únicos. Coordenadas opcionales, siempre juntas y con sector; nunca se
 devuelven al público. Errores: `INVALID_CREDENTIALS`, `INVALID_SECTOR`, `DUPLICATE`,
 `AUTH_NOT_CONFIGURED`, `VALIDATION_ERROR`. No hay recuperación de contraseña por correo.
+La consulta DNI requiere `APIPERU_API_KEY`, `JWT_SECRET` y `DNI_HASH_SECRET` en el backend.
+El backend consulta la API DNI/RUC de API Perú mediante `GET https://dniruc.apisperu.com/api/v1/dni/{dni}` y `Authorization: Bearer ...`.
+El consentimiento del cuerpo es obligatorio para llamar a API Perú. Si se adjunta DNI al
+registro, también se requiere el comprobante temporal devuelto por la consulta; el servidor
+guarda solo HMAC-SHA256 del DNI, nunca el DNI original. Aplicar `004_dni_hash.sql` antes
+de habilitar registro/acceso por DNI. Errores adicionales: `DNI_LOOKUP_NOT_CONFIGURED`,
+`DNI_PROVIDER_UNAVAILABLE`, `DNI_PROVIDER_AUTH_FAILED`, `DNI_NOT_FOUND`,
+`DNI_PROOF_INVALID`, `INVALID_DNI`.
 
 ## Catálogos
 

@@ -16,6 +16,8 @@ const siteConfiguration = fs.existsSync(siteConfigurationPath)
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === "development";
+  const apiTarget = process.env.AYNI_API_TARGET || "http://127.0.0.1:3002";
+  console.info(`[AYNI] Proxy de API: ${apiTarget}`);
 
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : "/",
@@ -38,12 +40,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: process.env.FIGMA_DEV_SERVER_HOST || "0.0.0.0",
-      port: parseInt(process.env.PORT || "8443"),
+      host: "0.0.0.0",
+      port: parseInt(process.env.PORT || "8444"),
       strictPort: true,
       proxy: {
         "/api": {
-          target: process.env.AYNI_API_TARGET || "http://127.0.0.1:3001",
+          target: apiTarget,
           changeOrigin: false,
         },
       },
@@ -52,8 +54,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     preview: {
-      host: process.env.FIGMA_DEV_SERVER_HOST || "0.0.0.0",
-      port: parseInt(process.env.PORT || "8443"),
+      host: "0.0.0.0",
+      port: parseInt(process.env.PORT || "8444"),
     },
   };
 });

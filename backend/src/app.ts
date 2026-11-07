@@ -14,6 +14,7 @@ import catalog from "./routes/catalog.js";
 import publications from "./routes/publications.js";
 import notices from "./routes/notices.js";
 import community from "./routes/community.js";
+import identity from "./routes/identity.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -22,12 +23,13 @@ app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
     if (!origin || config.origins.includes(origin)) { callback(null, true); return; }
-    callback(new AppError(403, "INVALID_ORIGIN", "Origen no autorizado."));
+    callback(new AppError(403, "CORS_ORIGIN_REJECTED", "El navegador llegó con un origen distinto al configurado en el backend."));
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
   allowedHeaders: ["Content-Type", "X-AYNI-Client", "X-AYNI-User"],
 }));
+app.get("/api/version", (_req, res) => res.json({ data: { api: "ayni-api", build: "dni-apiperu-v1" } }));
 app.use("/api", protectMutations(config.origins));
 app.use(express.json({ limit: "64kb" }));
 app.use(cookieParser());
@@ -43,7 +45,7 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
   res.json({ data: { estado: "ok", baseDeDatos: "conectada" } });
 }));
 app.use("/api", (req, res, next) => req.path === "/auth/logout" ? next() : optionalAuth(req, res, next));
-app.use("/api", auth, catalog, publications, notices, community);
+app.use("/api", identity, auth, catalog, publications, notices, community);
 app.use((_req, _res, next) => next(new AppError(404, "NOT_FOUND", "La ruta solicitada no existe.")));
 app.use(errorHandler);
 export default app;

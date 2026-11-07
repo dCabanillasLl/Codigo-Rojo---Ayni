@@ -13,6 +13,9 @@ export const registerSchema = z.object({
   sectorId: idSchema,
   latitud: z.number().finite().min(-90).max(90).optional(),
   longitud: z.number().finite().min(-180).max(180).optional(),
+  dni: z.string().regex(/^\d{8}$/).optional(),
+  consentimientoDni: z.boolean().optional(),
+  dniProof: z.string().min(20).max(4096).optional(),
 }).strict().refine((value) => (value.latitud === undefined) === (value.longitud === undefined), { message: "Proporciona latitud y longitud juntas" });
 
 export const listSchema = z.object({
