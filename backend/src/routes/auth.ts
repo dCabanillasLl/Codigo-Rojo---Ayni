@@ -18,7 +18,8 @@ const dummyHash = bcrypt.hashSync("ayni-only-used-for-login-timing", 12);
 
 export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u.apellidos, u.correo, u.telefono,
   u.telefono_publico AS telefonoPublico,
-  CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre
+  CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
+  l.direccion AS direccion, l.latitud AS latitud, l.longitud AS longitud
   FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
   LEFT JOIN sectores_vecinales s ON s.sector_id = l.sector_id`;
 
@@ -91,14 +92,17 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     telefono: phoneSchema.nullable().optional(),
     telefonoPublico: z.boolean().optional(),
     sectorId: idSchema.optional(),
+    direccion: z.string().trim().min(3).max(255).optional(),
     latitud: z.number().finite().min(-90).max(90).optional(),
     longitud: z.number().finite().min(-180).max(180).optional(),
   }).strict().refine((value) => Object.keys(value).length > 0, "Indica qué deseas actualizar")
     .refine((value) => (value.latitud === undefined) === (value.longitud === undefined), "Proporciona ambas coordenadas")
-    .refine((value) => value.latitud === undefined || Boolean(value.sectorId), "Selecciona el sector para actualizar la ubicación")
     .parse(req.body);
   await transaction(async (connection) => {
-    const [locked] = await connection.execute<RowDataPacket[]>("SELECT usuario_id, telefono FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo' FOR UPDATE", [req.userId]);
+    const [locked] = await connection.execute<RowDataPacket[]>(`SELECT u.usuario_id, u.telefono,
+      CAST(l.sector_id AS CHAR) AS sector_id, l.direccion, l.latitud, l.longitud
+      FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
+      WHERE u.usuario_id = ? AND u.estado_cuenta = 'activo' FOR UPDATE`, [req.userId]);
     if (!locked.length) throw new AppError(401, "UNAUTHENTICATED", "Inicia sesión para continuar.");
     const resultingPhone = body.telefono !== undefined ? body.telefono : locked[0].telefono;
     if (body.telefonoPublico === true && !resultingPhone) throw new AppError(400, "PHONE_REQUIRED", "Añade un teléfono antes de mostrarlo como contacto.");
@@ -114,13 +118,16 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
       fields.push("telefono_publico = ?");
       values.push(body.telefono === null ? false : body.telefonoPublico ?? false);
     }
-    if (body.sectorId) {
-      const [sectors] = await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?", [body.sectorId]);
+    const locationChanged = body.sectorId !== undefined || body.direccion !== undefined || body.latitud !== undefined;
+    if (locationChanged) {
+      const sectorId = body.sectorId ?? String(locked[0].sector_id ?? '');
+      if (!sectorId) throw new AppError(400, "LOCATION_NOT_CONFIGURED", "No hay una zona base configurada para guardar tu ubicación.");
+      const [sectors] = await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?", [sectorId]);
       if (!sectors.length) throw new AppError(400, "INVALID_SECTOR", "Elige un sector existente.");
-      // Create an immutable location snapshot so updating a profile cannot move old requests.
+      // Create a private location snapshot; previous requests keep their original location.
       const [location] = await connection.execute<ResultSetHeader>(
-        "INSERT INTO ubicaciones (sector_id, etiqueta, latitud, longitud) VALUES (?, 'Ubicación privada del vecino', ?, ?)",
-        [body.sectorId, body.latitud ?? null, body.longitud ?? null],
+        "INSERT INTO ubicaciones (sector_id, etiqueta, direccion, latitud, longitud) VALUES (?, 'Ubicación privada del vecino', ?, ?, ?)",
+        [sectorId, body.direccion ?? locked[0].direccion ?? null, body.latitud ?? locked[0].latitud ?? null, body.longitud ?? locked[0].longitud ?? null],
       );
       fields.push("ubicacion_id = ?"); values.push(location.insertId);
     }

@@ -877,14 +877,284 @@
 }
 .request-area {
   width: 100%;
-  min-height: 110px;
+  min-height: 8.25rem;
   resize: none;
-  padding: 14px;
+  padding: 0.9rem 1rem;
   border: 1px solid #d9dfda;
-  border-radius: 12px;
-  background: white;
-  font-size: 14px;
-  line-height: 1.6;
+  border-radius: 1rem;
+  background: #fff;
+  font-size: 1rem;
+  line-height: 1.65;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.request-area:focus {
+  border-color: #6c9b7c;
+  box-shadow: 0 0 0 3px #6c9b7c24;
+  outline: none;
+}
+.request-textarea-wrap {
+  position: relative;
+}
+.request-textarea-wrap .request-area {
+  display: block;
+  padding-right: 3.25rem;
+}
+.clear-request {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  border: 1px solid #e4e8e3;
+  border-radius: 50%;
+  background: #fffef9;
+  color: #64736b;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.clear-request:hover {
+  transform: scale(1.05);
+  background: #fff0e9;
+  color: #b9472c;
+}
+.clear-request:focus-visible {
+  outline: 3px solid #e7b84f;
+  outline-offset: 2px;
+}
+.request-form {
+  display: grid;
+  gap: 1.15rem;
+}
+.request-policy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: -0.55rem 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #f0dfc3;
+  border-radius: 0.85rem;
+  background: #fff7e9;
+  color: #765b32;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.request-policy-note svg {
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+}
+.request-form .form-columns {
+  display: grid;
+  gap: 1rem;
+}
+.request-form .form-field {
+  gap: 0.65rem;
+}
+.request-form .form-field > span {
+  font-size: 0.9rem;
+}
+.request-voice-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.request-voice-tools > button {
+  flex: 1 1 8.5rem;
+  justify-content: center;
+}
+.request-voice-tools .outline-btn {
+  min-height: 48px;
+  padding: 0 1rem;
+  border-radius: 0.9rem;
+  background: #fffef9;
+  font-size: 0.88rem;
+}
+.request-voice-tools .voice-record-btn {
+  border-color: #dce7dd;
+  background: #edf3ee;
+  color: #285844;
+}
+.request-voice-tools .voice-record-btn.is-recording {
+  border-color: #e36543;
+  background: #fff0e9;
+  color: #b9472c;
+}
+.request-voice-tools .outline-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.recording-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: -0.35rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.85rem;
+  background: #fff0e9;
+  color: #8d482f;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.recording-dot {
+  flex: 0 0 auto;
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-top: 0.28rem;
+  border-radius: 50%;
+  background: #e36543;
+  box-shadow: 0 0 0 0.25rem #e3654325;
+  animation: recording-pulse 1.5s ease-in-out infinite;
+}
+.template-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.25rem;
+}
+.template-label {
+  flex: 0 0 100%;
+  color: #65726b;
+  font-size: 0.82rem;
+}
+.request-form .template-chip {
+  flex: 1 1 6.5rem;
+  min-height: 42px;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  background: #fffef9;
+  font-size: 0.8rem;
+  text-align: center;
+  white-space: normal;
+}
+.request-form .check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e8e6dc;
+  border-radius: 0.9rem;
+  background: #f8f6ef;
+  line-height: 1.45;
+}
+.request-form .check-field input {
+  width: 1rem;
+  min-height: 1rem;
+  flex: 0 0 auto;
+  margin: 0.12rem 0 0;
+  accent-color: #356e53;
+}
+.request-location-row {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem 0.55rem 1rem;
+  border: 1px solid #d9dfda;
+  border-radius: 0.95rem;
+  background: #fff;
+}
+.request-location-row > span {
+  min-width: 0;
+  overflow: hidden;
+  color: #33483d;
+  font-size: 0.94rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.request-location-row > span.is-unset {
+  color: #748179;
+  font-weight: 500;
+}
+.request-location-change {
+  min-height: 2.4rem;
+  flex: 0 0 auto;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: #edf3ee;
+  color: #285844;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.request-location-change:hover {
+  background: #dfeae1;
+}
+.request-form > .record-button {
+  width: 100%;
+  min-height: 3.25rem;
+  border-radius: 1rem;
+  box-shadow: 0 0.45rem 1rem #d8573630;
+}
+.location-form {
+  display: grid;
+  gap: 1rem;
+}
+.location-detect-button {
+  width: 100%;
+  min-height: 3.2rem;
+  border-radius: 0.95rem;
+}
+.location-accuracy,
+.location-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.8rem;
+  background: #edf3ee;
+  color: #365e48;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.location-attribution {
+  margin: 0;
+  color: #65726b;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.location-attribution a {
+  color: #285844;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.profile-location-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #e1e6df;
+  border-radius: 1rem;
+  background: #f8f7f1;
+}
+.profile-location-copy {
+  min-width: 0;
+}
+.profile-location-copy > p {
+  margin: 0.45rem 0 0.2rem;
+  color: #33483d;
+  font-size: 0.95rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.profile-location-copy > small {
+  display: block;
+  color: #65726b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.profile-location-card > .outline-btn {
+  flex: 0 0 auto;
+  justify-content: center;
+  background: #fffef9;
+}
+@keyframes recording-pulse {
+  50% { box-shadow: 0 0 0 0.45rem #e365430c; }
 }
 .template-chip {
   padding: 10px 6px;
@@ -1444,6 +1714,13 @@ textarea:disabled {
   }
   .profile-card {
     padding: clamp(1rem, 4vw, 1.5rem);
+  }
+  .profile-location-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .profile-location-card > .outline-btn {
+    width: 100%;
   }
   .request-card {
     padding: clamp(1rem, 4vw, 1.25rem);

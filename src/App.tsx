@@ -85,7 +85,7 @@ export default function App() {
       <button type="button" className="mobile-help-action" onClick={() => { if (requireUser()) setHelpOpen(true); }} aria-label="Pedir ayuda"><span className="mobile-help-icon"><Icon name="mic" size={23}/></span><span>Pedir ayuda</span></button>
       {navItems.slice(2).map(item => <button type="button" key={item.id} onClick={() => navigate(item.id)} className={route.page === item.id ? 'active' : ''} aria-current={route.page === item.id ? 'page' : undefined}><Icon name={item.icon} size={21}/><span>{t(item.id === 'avisos' ? 'notices' : 'profile')}</span></button>)}
     </nav>
-    {helpOpen && <RequestForm onClose={() => setHelpOpen(false)}/>}
+    {helpOpen && <RequestForm onClose={() => setHelpOpen(false)} onLocation={() => setLocationOpen(true)}/>}
     {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)}/>}
     {notificationsOpen && <NotificationCenter notifications={notifications} onClose={() => setNotificationsOpen(false)}/>}
     {authOpen && <AuthModal/>}
