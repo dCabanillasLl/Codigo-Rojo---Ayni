@@ -25,10 +25,10 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 | POST `/api/auth/login` | `{identificador: DNI,contrasena}` (la API mantiene compatibilidad con correo para clientes antiguos) → `{data: Usuario}` y cookie HttpOnly | 200 |
 | POST `/api/identity/dni/lookup` | `{dni,consentimiento:true}` → `{data:{nombres,apellidos,proof,venceEnSegundos}}`; devuelve solo nombres y apellidos, no dirección ni ubigeos. Máximo 8 consultas/15 min/IP. | 200 |
 | GET `/api/auth/me` | Sin cuerpo → `{data: Usuario}` de la sesión | 200 |
-| PATCH `/api/auth/me` | `{nombres?,apellidos?,telefono?,telefonoPublico?,sectorId?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
+| PATCH `/api/auth/me` | `{nombres?,apellidos?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
 | POST `/api/auth/logout` | `{}` → `{data:{cerrado:true}}`, elimina cookie | 200 |
 
-Usuario: `{id,nombres,apellidos,correo|null,telefono,telefonoPublico,sectorId,sectorNombre}`. Correo y teléfono
+Usuario: `{id,nombres,apellidos,correo|null,telefono,telefonoPublico,sectorId,sectorNombre,direccion,latitud,longitud}`. Dirección y coordenadas solo se devuelven en las respuestas autenticadas de la propia cuenta; nunca se incluyen en listados o fichas vecinales. Correo y teléfono
 solo se devuelven al propio usuario. `telefonoPublico` es consentimiento opcional; para activarlo
 se requiere teléfono E.164 (`+` y prefijo de país). En publicaciones, `telefonoContacto` será
 `null` por defecto; solo devuelve el número con consentimiento. El registro se hace con DNI validado;
@@ -87,7 +87,7 @@ Errores específicos: `PRICE_REQUIRED`, `INVALID_PRICE`, `INVALID_SECTOR`.
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
 | GET `/api/solicitudes` | Filtros comunes; `participando=1` para colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
-| POST `/api/solicitudes` | `{clientRequestId,categoriaId,sectorId,titulo,descripcion,urgencia}` → `{data: Solicitud}` | 201 o 200 si reintento |
+| POST `/api/solicitudes` | `{clientRequestId,categoriaId,sectorId,descripcion,titulo?,urgencia?}` → `{data: Solicitud}` | 201 o 200 si reintento |
 | GET `/api/solicitudes/:id` | Sin cuerpo → `{data: Solicitud}` | 200 |
 | PATCH `/api/solicitudes/:id` | `{accion:'completar'}` o `{accion:'cancelar',motivo}` → `{data: Solicitud}`; solo solicitante | 200 |
 
@@ -98,6 +98,10 @@ La creación guarda UUID + huella del contenido: mismo usuario/UUID/contenido de
 el original; distinto contenido produce 409. No se debe generar otro UUID al reintentar.
 Completar requiere resolver aportes aceptados pendientes de recepción; las propuestas
 pendientes se rechazan al cerrar. Cancelar requiere motivo.
+
+El servidor genera el título a partir de la descripción. La categoría “Apoyo urgente” asigna
+la urgencia automáticamente. Se rechazan solicitudes que mencionen drogas, alcohol, dinero
+o contenido sexual, tanto en la app como en el servidor; el servidor es la validación final.
 
 ## Colaboraciones y recomendaciones
 

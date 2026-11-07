@@ -31,7 +31,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [syncing, setSyncing] = useState(false);
   const syncingRef = useRef(false);
-  const setUser = useCallback((value: User | null) => { updateUser(value); userRef.current = value; storeUser(value); setSessionError(''); if (value?.sectorId) setArea(current => ({ ...current, sectorId: value.sectorId! })); }, []);
+  const setUser = useCallback((value: User | null) => { updateUser(value); userRef.current = value; storeUser(value); setSessionError(''); if (value) setArea(current => ({ ...current, sectorId: value.sectorId ?? current.sectorId, coordinates: value.latitud != null && value.longitud != null ? { latitude: Number(value.latitud), longitude: Number(value.longitud) } : current.coordinates })); }, []);
   useEffect(() => {
     let active = true;
     setSessionLoading(true);

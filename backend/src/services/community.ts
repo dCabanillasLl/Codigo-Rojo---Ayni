@@ -2,6 +2,7 @@ import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { one, query, transaction } from '../db/index.js';
 import { AppError } from '../lib/http.js';
+import { assertAllowedRequestText, generateRequestTitle } from '../lib/request-policy.js';
 import { approximateDistance, createLocation, geoClause, idSchema, insert, publicName, row, rows, uuidSchema, type ListOptions } from './community-data.js';
 import { assertCanCloseRequest, assertRequestActive, contentHash, requireSameContent, transitionOffer, type OfferState, type RequestState } from './community-rules.js';
 
@@ -9,7 +10,7 @@ export const createRequestSchema = z.object({
   clientRequestId: uuidSchema,
   categoriaId: idSchema,
   sectorId: idSchema,
-  titulo: z.string().trim().min(5).max(160),
+  titulo: z.string().trim().min(5).max(160).optional(),
   descripcion: z.string().trim().min(5).max(5000),
   urgencia: z.enum(['normal', 'urgente']).default('normal'),
 }).strict();
@@ -105,7 +106,10 @@ function assertNotExpired(request: RequestLock): void {
   if (Number(request.vencida) !== 0) throw new AppError(409, 'REQUEST_EXPIRED', 'Este pedido venció y ya no acepta nuevas colaboraciones.');
 }
 export async function createRequest(userId: string, data: z.infer<typeof createRequestSchema>): Promise<{ request: PublicRequest; replayed: boolean }> {
-  const fingerprint = contentHash({ categoriaId: data.categoriaId, sectorId: data.sectorId, titulo: data.titulo, descripcion: data.descripcion, urgencia: data.urgencia });
+  assertAllowedRequestText(data.descripcion);
+  assertAllowedRequestText(data.titulo ?? '');
+  const title = generateRequestTitle(data.descripcion);
+  const fingerprint = contentHash({ categoriaId: data.categoriaId, sectorId: data.sectorId, titulo: data.titulo ?? title, descripcion: data.descripcion, urgencia: data.urgencia });
   const result = await transaction(async (connection) => {
     // Serializes creations for one user. UNIQUE remains the final protection against races.
     await row(connection, 'SELECT usuario_id FROM usuarios WHERE usuario_id = ? FOR UPDATE', [userId]);
@@ -113,13 +117,14 @@ export async function createRequest(userId: string, data: z.infer<typeof createR
       'SELECT CAST(solicitud_id AS CHAR) AS id, request_hash FROM solicitudes_ayuda WHERE solicitante_id = ? AND client_request_id = ? FOR UPDATE',
       [userId, data.clientRequestId]);
     if (previous) { requireSameContent(previous.request_hash, fingerprint); return { id: previous.id, replayed: true }; }
-    const category = await row(connection, 'SELECT categoria_ayuda_id FROM categorias_ayuda WHERE categoria_ayuda_id = ?', [data.categoriaId]);
+    const category = await row<{ categoria_ayuda_id: string; nombre: string }>(connection, 'SELECT categoria_ayuda_id, nombre FROM categorias_ayuda WHERE categoria_ayuda_id = ?', [data.categoriaId]);
     if (!category) throw new AppError(400, 'UNKNOWN_CATEGORY', 'Selecciona una categoría de ayuda disponible.');
+    const urgency = category.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal';
     const locationId = await createLocation(connection, userId, data.sectorId);
     const id = await insert(connection, `INSERT INTO solicitudes_ayuda
       (solicitante_id, categoria_ayuda_id, ubicacion_id, titulo, descripcion, urgencia, client_request_id, request_hash)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, data.categoriaId, locationId, data.titulo, data.descripcion, data.urgencia, data.clientRequestId, fingerprint]);
+    [userId, data.categoriaId, locationId, title, data.descripcion, urgency, data.clientRequestId, fingerprint]);
     return { id, replayed: false };
   });
   return { request: await getRequest(result.id, userId), replayed: result.replayed };

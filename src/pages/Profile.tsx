@@ -33,7 +33,7 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
   return <section className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
     <article className="profile-card">
       <p className="eyebrow">TU CUENTA</p><h1 className="font-display mt-2 text-3xl font-bold">{user.nombres} {user.apellidos}</h1><p className="mt-2">{user.correo || 'Acceso con DNI'}</p>
-      <div className="action-row mt-4"><span>{user.sectorNombre || 'Sector sin seleccionar'}</span><button type="button" className="text-action" onClick={onLocation}>Cambiar zona</button></div>
+      <div className="profile-location-card mt-5"><div className="profile-location-copy"><span className="eyebrow">MI UBICACIÓN PRIVADA</span><p>{user.direccion || 'Agrega una dirección o detecta tu ubicación con GPS.'}</p><small>Tu dirección exacta no se comparte con otros vecinos.</small></div><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={16}/>{user.direccion ? 'Editar ubicación' : 'Configurar ubicación'}</button></div>
       <div className="mt-5"><Field label={t('language')}><select value={language} onChange={event => setLanguage(event.target.value as Language)}><option value="es">Español</option><option value="en">English</option><option value="qu">Quechua sureño</option></select></Field><p className="form-hint">{t('languageNote')}</p></div>
       <form className="form-stack mt-6" onSubmit={updateProfile}>
         <div className="form-columns"><Field label="Nombres"><input name="nombres" required minLength={2} maxLength={80} defaultValue={user.nombres}/></Field><Field label="Apellidos"><input name="apellidos" required minLength={2} maxLength={100} defaultValue={user.apellidos}/></Field></div>
