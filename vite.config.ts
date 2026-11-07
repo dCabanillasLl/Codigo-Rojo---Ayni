@@ -3,8 +3,14 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import siteConfiguration from "./.figma/make/site.json";
+// A fresh clone also works without the optional Figma workspace metadata.
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const siteConfigurationPath = path.resolve(projectRoot, ".figma/make/site.json");
+const siteConfiguration = fs.existsSync(siteConfigurationPath)
+  ? JSON.parse(fs.readFileSync(siteConfigurationPath, "utf8"))
+  : { title: "AYNI · Tu barrio responde", description: "Productos, servicios y ayuda entre vecinos.", language: "es", robots: { index: false } };
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -28,13 +34,19 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
+        "@": path.resolve(projectRoot, "./src"),
       },
     },
     server: {
       host: process.env.FIGMA_DEV_SERVER_HOST || "0.0.0.0",
       port: parseInt(process.env.PORT || "8443"),
       strictPort: true,
+      proxy: {
+        "/api": {
+          target: process.env.AYNI_API_TARGET || "http://127.0.0.1:3001",
+          changeOrigin: false,
+        },
+      },
       watch: {
         ignored: ["**/.figma/**"],
       },

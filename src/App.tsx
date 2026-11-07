@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import ServicesMap from "./ServicesMap";
+import { useEffect, useState } from "react";
+import { useApp } from "./AppContext";
+import AuthModal from "./components/AuthModal";
+import RequestForm from "./components/RequestForm";
+import Nearby from "./pages/Nearby";
+import Help from "./pages/Help";
+import Resources from "./pages/Resources";
 
 type IconName =
   | "home"
@@ -250,35 +255,16 @@ const navItems: { id: string; label: string; icon: IconName }[] = [
 ];
 
 export default function App() {
+  const { user, online, sessionLoading, sessionError, authOpen, setAuthOpen, setUser, requireUser, notify } = useApp();
   const [active, setActive] = useState("cerca");
-  const [radius, setRadius] = useState("1 km");
   const [helpOpen, setHelpOpen] = useState(false);
-  const [step, setStep] = useState(0);
-  const [recording, setRecording] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [offline, setOffline] = useState(false);
   const [toast, setToast] = useState("");
-  const [query, setQuery] = useState("");
-  const [selectedService, setSelectedService] = useState(nearbyItems[0].name);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("ayni-pending-request");
-    if (stored) setSent(true);
-  }, []);
 
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 2800);
     return () => window.clearTimeout(timer);
   }, [toast]);
-
-  const filteredItems = useMemo(
-    () =>
-      nearbyItems.filter((item) =>
-        `${item.name} ${item.owner}`.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [query],
-  );
 
   function speak(text: string) {
     if ("speechSynthesis" in window) {
@@ -288,21 +274,8 @@ export default function App() {
     } else setToast("La lectura en voz alta no está disponible");
   }
 
-  function submitHelp() {
-    const request = {
-      id: `AYNI-${Date.now()}`,
-      text: "Necesito una escalera por una hora",
-      status: offline ? "pending" : "open",
-    };
-    localStorage.setItem("ayni-pending-request", JSON.stringify(request));
-    setRecording(false);
-    setSent(true);
-    setStep(2);
-  }
-
   function resetHelp() {
     setHelpOpen(false);
-    window.setTimeout(() => setStep(sent ? 2 : 0), 200);
   }
 
   return (
@@ -335,34 +308,31 @@ export default function App() {
           </nav>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                setOffline(!offline);
-                setToast(!offline ? "Modo sin conexión activado" : "Conexión restablecida");
-              }}
-              className={`status-pill hidden sm:flex ${offline ? "offline" : ""}`}
+              onClick={() => setToast(online ? "El estado de conexión se detecta automáticamente" : "Sin conexión a internet")}
+              className={`status-pill hidden sm:flex ${!online ? "offline" : ""}`}
             >
               <span className="status-dot" />
-              {offline ? "Sin conexión" : "Con conexión"}
+              {online ? "Con conexión" : "Sin conexión"}
             </button>
             <button
               className="icon-button relative"
               aria-label="Notificaciones"
-              onClick={() => setToast("No tienes notificaciones nuevas")}
+              onClick={() => { if (requireUser()) setActive("avisos"); }}
             >
               <Icon name="bell" size={21} />
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#e76444] ring-2 ring-white" />
             </button>
-            <button className="avatar" onClick={() => setActive("perfil")}>
-              MC
+          <button className="avatar" onClick={() => user ? setActive("perfil") : setAuthOpen(true)} aria-label={user ? `Perfil de ${user.nombres}` : "Iniciar sesión"}>
+              {user ? `${user.nombres[0]}${user.apellidos[0]}` : "?"}
             </button>
           </div>
         </div>
       </header>
 
       <main className="app-main mx-auto max-w-[1240px] px-5 pt-7 lg:px-10 lg:pt-10">
-        {active === "cerca" && (
-          <>
-            <section className="mb-8 grid items-end gap-8 lg:grid-cols-[1fr_430px]">
+        {sessionError && <p className="offline-banner" role="status">{sessionError} · {sessionLoading ? 'Verificando sesión…' : 'Los datos del servidor pueden no estar disponibles.'}</p>}
+        {active === "cerca" && <Nearby onLocation={() => setToast("Elige tu sector desde el selector de zona")} onAsk={() => { if (requireUser()) setHelpOpen(true); }} />}
+            {false && <section className="mb-8 grid items-end gap-8 lg:grid-cols-[1fr_430px]">
               <div>
                 <p className="eyebrow">TU BARRIO, MÁS CERCA</p>
                 <h1 className="font-display mt-3 max-w-[680px] text-[42px] font-bold leading-[1.04] tracking-[-0.045em] text-[#173f32] sm:text-[56px]">
@@ -395,122 +365,13 @@ export default function App() {
                   className="text-[#839089] transition-transform group-hover:translate-x-1"
                 />
               </button>
-            </section>
+            </section>}
 
-            <ServicesMap
-              services={filteredItems}
-              selected={
-                filteredItems.find((item) => item.name === selectedService) ?? filteredItems[0]
-              }
-              onSelect={setSelectedService}
-              radius={parseFloat(radius) * 1000}
-            />
-
-            <section className="mt-10">
-              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-                <div>
-                  <p className="eyebrow">CONFIANZA LOCAL</p>
-                  <h2 className="font-display mt-2 text-[30px] font-bold tracking-[-.035em] text-[#173f32]">
-                    Cerca de ti
-                  </h2>
-                  <p className="mt-1 text-sm text-[#6c7872]">
-                    Productos y servicios recomendados por tus vecinos.
-                  </p>
-                </div>
-                <div className="nearby-controls flex items-center gap-2">
-                  {["1 km", "1.5 km", "2 km"].map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setRadius(item)}
-                      aria-pressed={radius === item}
-                      className={`radius-btn ${radius === item ? "active" : ""}`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                  <button
-                    className="filter-btn"
-                    aria-label="Más filtros"
-                    onClick={() => setToast("Filtros actualizados")}
-                  >
-                    <Icon name="sliders" size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="relative mt-5">
-                <Icon
-                  name="search"
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#89938e]"
-                  size={19}
-                />
-                <input
-                  className="search-input"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar productos o servicios en tu barrio"
-                />
-              </div>
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                {filteredItems.map((item) => (
-                  <article key={item.name} className="listing-card">
-                    <div className={`listing-art ${item.tone}`}>
-                      <Icon name={item.icon} size={38} />
-                      <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-[#2f473d]">
-                        {item.distance}
-                      </span>
-                    </div>
-                    <div className="p-5">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-[10px] font-extrabold tracking-[.12em] text-[#799083]">
-                          {item.kind}
-                        </span>
-                        <span className="flex items-center gap-1 text-xs font-bold">
-                          <Icon name="star" size={13} className="fill-[#efb746] text-[#efb746]" />{" "}
-                          {item.rating}{" "}
-                          <span className="font-normal text-[#8b948f]">({item.reviews})</span>
-                        </span>
-                      </div>
-                      <h3 className="mt-2 text-[17px] font-bold leading-snug text-[#263a31]">
-                        {item.name}
-                      </h3>
-                      <p className="mt-1 text-sm text-[#717d77]">{item.owner}</p>
-                      <div className="mt-4 flex items-center gap-1.5 border-t border-[#e7e9e5] pt-3 text-xs font-semibold text-[#417458]">
-                        <Icon name="shield" size={15} /> Visto Bueno Vecinal
-                      </div>
-                      <button
-                        className="view-on-map"
-                        aria-label={`Ver ${item.owner} en el mapa`}
-                        onClick={() => {
-                          setSelectedService(item.name);
-                          document.getElementById("services-map-title")?.scrollIntoView({
-                            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-                              ? "instant"
-                              : "smooth",
-                            block: "start",
-                          });
-                        }}
-                      >
-                        <span className="listing-map-number">{item.mapNumber}</span>
-                        Ver en el mapa <Icon name="pin" size={16} />
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
-        {active === "ayuda" && (
-          <HelpBoard
-            onAsk={() => setHelpOpen(true)}
-            onSpeak={speak}
-            sent={sent}
-            offline={offline}
-          />
-        )}
-        {active === "avisos" && <Notices onToast={setToast} onSpeak={speak} />}
-        {active === "perfil" && <Profile />}
+            {null}
+        {active === "ayuda" && <Help onAsk={() => { if (requireUser()) setHelpOpen(true); }} />}
+        {active === "avisos" && <section><h1 className="font-display text-3xl font-bold">Avisos del barrio</h1><p className="mt-2">Esta sección se conectará con avisos publicados por vecinos.</p></section>}
+        {active === "perfil" && <section><h1 className="font-display text-3xl font-bold">{user ? `${user.nombres} ${user.apellidos}` : 'Mi perfil'}</h1><p className="mt-2">{user?.sectorNombre || 'Inicia sesión para ver tu perfil.'}</p><button className="outline-btn mt-4" onClick={() => user ? void (async()=>{await fetch('/api/auth/logout',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-AYNI-Client':'web'}});setUser(null);notify('Sesión cerrada');})() : setAuthOpen(true)}>{user ? 'Cerrar sesión' : 'Iniciar sesión'}</button></section>}
+        {active === "recursos" && <Resources />}
       </main>
 
       <nav className="mobile-nav md:hidden" aria-label="Navegación principal">
@@ -527,10 +388,7 @@ export default function App() {
         ))}
         <button
           className="mobile-help-action"
-          onClick={() => {
-            setHelpOpen(true);
-            setStep(sent ? 2 : 0);
-          }}
+          onClick={() => { if (requireUser()) setHelpOpen(true); }}
           aria-label="Pedir ayuda"
         >
           <span className="mobile-help-icon">
@@ -551,117 +409,9 @@ export default function App() {
         ))}
       </nav>
 
-      {helpOpen && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(e) => e.target === e.currentTarget && resetHelp()}
-        >
-          <div className="help-modal">
-            <div className="flex items-center justify-between border-b border-[#e6e7e2] px-6 py-5">
-              <div>
-                <p className="eyebrow">PEDIR AYUDA</p>
-                <h2 className="font-display mt-1 text-2xl font-bold text-[#173f32]">
-                  Estamos contigo
-                </h2>
-              </div>
-              <button className="icon-button" onClick={resetHelp} aria-label="Cerrar">
-                <Icon name="close" />
-              </button>
-            </div>
-            {step === 0 && (
-              <div className="px-6 py-8 text-center sm:px-10">
-                <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#e7efe9] text-[#2d684d]">
-                  <Icon name="mic" size={34} />
-                </div>
-                <h3 className="font-display mt-6 text-2xl font-bold">¿Qué necesitas?</h3>
-                <p className="mx-auto mt-2 max-w-sm leading-6 text-[#68746e]">
-                  Presiona el botón y cuéntanos con tus propias palabras. También puedes usar una
-                  plantilla.
-                </p>
-                <button
-                  onClick={() => {
-                    setRecording(true);
-                    setStep(1);
-                  }}
-                  className="record-button mt-7"
-                >
-                  <Icon name="mic" /> Empezar a hablar
-                </button>
-                <button
-                  onClick={() => setStep(1)}
-                  className="mt-4 block w-full text-sm font-bold text-[#2f674e] underline underline-offset-4"
-                >
-                  Prefiero escribir o elegir una opción
-                </button>
-              </div>
-            )}
-            {step === 1 && (
-              <div className="px-6 py-7 sm:px-10">
-                {recording && (
-                  <div className="mb-5 flex items-center justify-center gap-1.5 text-sm font-bold text-[#d95e43]">
-                    <span className="wave w1" />
-                    <span className="wave w2" />
-                    <span className="wave w3" /> Escuchando...
-                  </div>
-                )}
-                <label className="text-sm font-bold text-[#35473f]">Tu pedido</label>
-                <textarea
-                  className="request-area mt-2"
-                  defaultValue="Necesito una escalera por una hora para cambiar un foco. Estoy cerca del parque El Carmen."
-                />
-                <p className="mt-4 text-xs font-bold uppercase tracking-[.1em] text-[#7a867f]">
-                  O elige una plantilla
-                </p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {["Pedir prestado", "Donar algo", "Un favor"].map((x) => (
-                    <button key={x} className="template-chip">
-                      {x}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-6 rounded-xl bg-[#f1f5f2] p-4 text-sm text-[#52635a]">
-                  <span className="font-bold text-[#2e4d3e]">Ubicación aproximada:</span> Pueblo
-                  Libre · Sector 3
-                </div>
-                <button onClick={submitHelp} className="record-button mt-5 w-full justify-center">
-                  <Icon name={offline ? "wifiOff" : "arrow"} />{" "}
-                  {offline ? "Guardar para enviar después" : "Publicar pedido"}
-                </button>
-              </div>
-            )}
-            {step === 2 && (
-              <div className="px-6 py-9 text-center sm:px-10">
-                <div
-                  className={`mx-auto grid h-20 w-20 place-items-center rounded-full ${offline ? "bg-[#fff0d5] text-[#a46417]" : "bg-[#e2f0e8] text-[#27704c]"}`}
-                >
-                  <Icon name={offline ? "wifiOff" : "check"} size={36} />
-                </div>
-                <h3 className="font-display mt-6 text-2xl font-bold">
-                  {offline ? "Pedido guardado" : "Tu pedido ya está visible"}
-                </h3>
-                <p className="mx-auto mt-2 max-w-sm leading-6 text-[#68746e]">
-                  {offline
-                    ? "Lo enviaremos automáticamente cuando recuperes la conexión. No tienes que volver a crearlo."
-                    : "Avisaremos a vecinos disponibles dentro de 1 km. Te contaremos cuando alguien responda."}
-                </p>
-                <div className="mt-5 flex items-center justify-center gap-2 text-sm font-semibold text-[#4c6357]">
-                  <Icon name="clock" size={17} /> Estado:{" "}
-                  {offline ? "Pendiente de envío" : "Buscando ayuda"}
-                </div>
-                <button onClick={resetHelp} className="record-button mt-7">
-                  Ver mi pedido <Icon name="arrow" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {toast && (
-        <div className="toast">
-          <Icon name="check" size={17} />
-          {toast}
-        </div>
-      )}
+      {helpOpen && <RequestForm onClose={resetHelp} />}
+      {authOpen && <AuthModal />}
+      {toast && <div className="toast" role="status"><Icon name="check" size={17}/>{toast}</div>}
     </div>
   );
 }

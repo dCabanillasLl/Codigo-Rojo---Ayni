@@ -3,6 +3,13 @@ dist/
 build/
 .cache/
 .env*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+.local-tools/
+.local-test-data/
+backend/coverage/
 .vite/
 vite.config.*.timestamp-*
 *.tsbuildinfo
