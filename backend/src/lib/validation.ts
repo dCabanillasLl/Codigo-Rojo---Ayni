@@ -7,16 +7,18 @@ export const phoneSchema = z.string().trim().regex(/^\+?[0-9]{8,15}$/, "Usa entr
 export const registerSchema = z.object({
   nombres: z.string().trim().min(2).max(80),
   apellidos: z.string().trim().min(2).max(100),
-  correo: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  correo: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable().optional(),
   contrasena: passwordSchema,
   telefono: phoneSchema.nullable().optional(),
-  sectorId: idSchema,
+  direccion: z.string().trim().min(3).max(255),
+  sectorId: idSchema.optional(),
   latitud: z.number().finite().min(-90).max(90).optional(),
   longitud: z.number().finite().min(-180).max(180).optional(),
-  dni: z.string().regex(/^\d{8}$/).optional(),
-  consentimientoDni: z.boolean().optional(),
-  dniProof: z.string().min(20).max(4096).optional(),
-}).strict().refine((value) => (value.latitud === undefined) === (value.longitud === undefined), { message: "Proporciona latitud y longitud juntas" });
+  dni: z.string().regex(/^\d{8}$/),
+  consentimientoDni: z.literal(true),
+  dniProof: z.string().min(20).max(4096),
+}).strict()
+  .refine((value) => (value.latitud === undefined) === (value.longitud === undefined), { message: "Proporciona latitud y longitud juntas" });
 
 export const listSchema = z.object({
   q: z.string().trim().max(160).optional(),

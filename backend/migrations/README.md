@@ -18,6 +18,9 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 5. `004_dni_hash.sql` añade una huella HMAC única para permitir acceso con DNI. El DNI
    original nunca se guarda; configura `DNI_HASH_SECRET` y consérvalo estable para no
    invalidar las cuentas creadas con este método.
+6. `005_registro_dni_sin_correo.sql` hace opcional el correo y añade la zona general
+   `Pueblo Libre` para registrar sin selector de sector. Respeta cuentas con correo
+   existentes; aplicar antes de habilitar el nuevo registro.
 
 MySQL hace commit implícito de DDL. Aplicar `001` una sola vez, guardar evidencia de
 éxito y, si falla parcialmente, inspeccionar el esquema antes de reintentarlo.

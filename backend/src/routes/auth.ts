@@ -25,29 +25,33 @@ export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u
 router.post("/auth/register", loginLimiter, asyncHandler(async (req, res) => {
   if (!config.jwtSecret) throw new AppError(503, "AUTH_NOT_CONFIGURED", "La autenticación todavía no está configurada.");
   const data = registerSchema.parse(req.body);
-  let dniHash: string | null = null;
-  if (data.dni !== undefined) {
-    if (!data.consentimientoDni || !data.dniProof || !config.dniHashSecret) throw new AppError(400, "DNI_LOOKUP_REQUIRED", "Consulta el DNI y confirma el consentimiento antes de registrarlo.");
-    try {
-      const proof = jwt.verify(data.dniProof, config.jwtSecret, { algorithms: ["HS256"], issuer: "ayni-api", audience: "ayni-dni-prefill" });
-      const expectedHash = createHmac("sha256", config.dniHashSecret).update(data.dni).digest("hex");
-      if (typeof proof === "string" || proof.dniHash !== expectedHash || typeof proof.nombres !== "string" || typeof proof.apellidos !== "string") throw new Error("invalid");
-      data.nombres = proof.nombres;
-      data.apellidos = proof.apellidos;
-      dniHash = expectedHash;
-    } catch { throw new AppError(400, "DNI_PROOF_INVALID", "Vuelve a consultar tu DNI antes de crear la cuenta."); }
-  }
+  if (!config.dniHashSecret) throw new AppError(503, "DNI_LOGIN_NOT_CONFIGURED", "El registro con DNI aún no está configurado.");
+  let dniHash: string;
+  try {
+    const proof = jwt.verify(data.dniProof, config.jwtSecret, { algorithms: ["HS256"], issuer: "ayni-api", audience: "ayni-dni-prefill" });
+    const expectedHash = createHmac("sha256", config.dniHashSecret).update(data.dni).digest("hex");
+    if (typeof proof === "string" || proof.dniHash !== expectedHash || typeof proof.nombres !== "string" || typeof proof.apellidos !== "string") throw new Error("invalid");
+    data.nombres = proof.nombres;
+    data.apellidos = proof.apellidos;
+    dniHash = expectedHash;
+  } catch { throw new AppError(400, "DNI_PROOF_INVALID", "Vuelve a consultar tu DNI antes de crear la cuenta."); }
   const hash = await bcrypt.hash(data.contrasena, 12);
   const userId = await transaction(async (connection) => {
-    const [sectors] = await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?", [data.sectorId]);
-    if (!sectors.length) throw new AppError(400, "INVALID_SECTOR", "Elige un sector existente.");
+    const [sectors] = data.sectorId
+      ? await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?", [data.sectorId])
+      : await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE nombre = 'Pueblo Libre' AND distrito = 'Pueblo Libre' AND ciudad = 'Lima' AND codigo_pais = 'PE' LIMIT 1");
+    if (!sectors.length) {
+      if (data.sectorId) throw new AppError(400, "INVALID_SECTOR", "Elige un sector existente.");
+      throw new AppError(503, "DEFAULT_SECTOR_NOT_CONFIGURED", "Falta aplicar la migración 005 para habilitar registros sin selector de zona.");
+    }
+    const sectorId = data.sectorId ?? String(sectors[0].sector_id);
     const [location] = await connection.execute<ResultSetHeader>(
-      "INSERT INTO ubicaciones (sector_id, etiqueta, latitud, longitud) VALUES (?, 'Ubicación privada del vecino', ?, ?)",
-      [data.sectorId, data.latitud ?? null, data.longitud ?? null],
+      "INSERT INTO ubicaciones (sector_id, etiqueta, direccion, latitud, longitud) VALUES (?, 'Ubicación privada del vecino', ?, ?, ?)",
+      [sectorId, data.direccion?.trim() || null, data.latitud ?? null, data.longitud ?? null],
     );
     const [user] = await connection.execute<ResultSetHeader>(
       "INSERT INTO usuarios (ubicacion_id, nombres, apellidos, correo, telefono, hash_contrasena, dni_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [location.insertId, data.nombres, data.apellidos, data.correo, data.telefono ?? null, hash, dniHash],
+      [location.insertId, data.nombres, data.apellidos, data.correo ?? null, data.telefono ?? null, hash, dniHash],
     );
     return String(user.insertId);
   });

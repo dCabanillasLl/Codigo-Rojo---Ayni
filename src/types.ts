@@ -1,4 +1,4 @@
-export type User = { id: string; nombres: string; apellidos: string; correo: string; telefono: string | null; telefonoPublico: boolean | number; sectorId: string | null; sectorNombre: string | null };
+export type User = { id: string; nombres: string; apellidos: string; correo: string | null; telefono: string | null; telefonoPublico: boolean | number; sectorId: string | null; sectorNombre: string | null };
 export type Sector = { id: string; nombre: string; distrito: string; ciudad: string };
 export type Category = { id: string; nombre: string };
 export type Catalogs = { publicaciones: Category[]; ayuda: Category[]; avisos: Category[] };
