@@ -9,7 +9,8 @@ import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 const baseSelect = `SELECT CAST(p.publicacion_id AS CHAR) AS id, CAST(p.propietario_id AS CHAR) AS propietarioId,
-  u.nombres AS propietario, CAST(p.categoria_id AS CHAR) AS categoriaId, c.nombre AS categoria,
+  u.nombres AS propietario, CASE WHEN u.telefono_publico = 1 THEN u.telefono ELSE NULL END AS telefonoContacto,
+  CAST(p.categoria_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   p.tipo, p.titulo, p.descripcion, p.modalidad_precio AS modalidadPrecio, p.precio, p.moneda, p.estado,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
   (SELECT ROUND(AVG(r.calificacion), 1) FROM resenas r WHERE r.publicacion_id = p.publicacion_id) AS promedioResenas,

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError, errorMessage, refreshData } from './lib/api';
-import { pendingDelete, pendingList, pendingSave, type PendingRequest } from './lib/storage';
+import { markNotificationsRead as persistNotificationsRead, notificationList, pendingDelete, pendingList, pendingSave, saveNotification, type AppNotification, type PendingRequest } from './lib/storage';
 import { useOnline, useRemote } from './lib/hooks';
 import type { Area, Catalogs, HelpRequest, RequestInput, Sector, User } from './types';
 
@@ -12,6 +12,7 @@ type AppState = {
   sectors: ReturnType<typeof useRemote<Sector[]>>; catalogs: ReturnType<typeof useRemote<Catalogs>>;
   area: Area; setArea: (area: Area) => void; notify: (text: string) => void;
   pending: PendingRequest[]; syncing: boolean; sync: () => Promise<void>; refreshPending: () => Promise<void>;
+  notifications: AppNotification[]; unreadNotifications: number; markNotificationsRead: () => void;
   submitRequest: (body: RequestInput) => Promise<'published' | 'pending'>;
 };
 const Context = createContext<AppState | null>(null);
@@ -22,6 +23,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState('');
   const [authOpen, setAuthOpen] = useState(false);
   const [toast, setToast] = useState('');
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const online = useOnline();
   const sectors = useRemote<Sector[]>('/sectores');
   const catalogs = useRemote<Catalogs>('/catalogos');
@@ -41,6 +43,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [online, setUser]);
   useEffect(() => { if (!toast) return; const timeout = window.setTimeout(() => setToast(''), 5000); return () => window.clearTimeout(timeout); }, [toast]);
+  useEffect(() => { let active = true; void notificationList().then(value => { if (active) setNotifications(value); }).catch(() => undefined); return () => { active = false; }; }, []);
+  const notify = useCallback((text: string) => {
+    setToast(text);
+    const notification: AppNotification = { id: crypto.randomUUID(), text, createdAt: new Date().toISOString(), read: false };
+    setNotifications(current => [notification, ...current].slice(0, 100));
+    void saveNotification(notification).catch(() => undefined);
+  }, []);
+  const markRead = useCallback(() => {
+    setNotifications(current => current.map(item => ({ ...item, read: true })));
+    void persistNotificationsRead().catch(() => undefined);
+  }, []);
   const refreshPending = useCallback(async () => { const owner = userRef.current?.id; if (!owner) { setPending([]); return; } const list = await pendingList(owner).catch(() => []); if (owner === userRef.current?.id) setPending(list); }, []);
   useEffect(() => { void refreshPending(); }, [user?.id, refreshPending]);
   const sync = useCallback(async () => {
@@ -83,7 +96,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await pendingDelete(entry.id); await refreshPending(); throw error;
     }
   };
-  return <Context.Provider value={{ user, setUser, online, sessionLoading, sessionError, requireUser: () => { if (user) return true; setAuthOpen(true); return false; }, authOpen, setAuthOpen, sectors, catalogs, area, setArea, notify: setToast, pending, syncing, sync, refreshPending, submitRequest }}>
+  const unreadNotifications = notifications.filter(item => !item.read).length;
+  return <Context.Provider value={{ user, setUser, online, sessionLoading, sessionError, requireUser: () => { if (user) return true; setAuthOpen(true); return false; }, authOpen, setAuthOpen, sectors, catalogs, area, setArea, notify, pending, syncing, sync, refreshPending, notifications, unreadNotifications, markNotificationsRead: markRead, submitRequest }}>
     {children}{toast && <div className="toast" role="status">{toast}</div>}
   </Context.Provider>;
 }

@@ -67,6 +67,28 @@ test('API real: cuentas, privacidad, publicaciones, avisos y permisos', { skip: 
       const mine = await owner.get('/api/publicaciones').query({ mios: '1' }).expect(200);
       assert.ok(mine.body.data.some((item: { id: string }) => item.id === publicationId));
     });
+    await t.test('Recorrido completo: pedido, oferta de otro vecino, aceptación y finalización', async () => {
+      const requestBody = {
+        clientRequestId: randomUUID(), categoriaId: catalogs.body.data.ayuda[0].id, sectorId,
+        titulo: `Necesito apoyo ${tag}`, descripcion: 'Pedido de prueba del recorrido comunitario completo.', urgencia: 'normal',
+      };
+      const created = await owner.post('/api/solicitudes').set(headers).send(requestBody).expect(201);
+      const requestId = created.body.data.id;
+      assert.equal(created.body.data.estado, 'abierta');
+      const visible = await other.get('/api/solicitudes').query({ sectorId }).expect(200);
+      assert.ok(visible.body.data.some((item: { id: string }) => item.id === requestId));
+
+      const proposed = await other.post(`/api/solicitudes/${requestId}/ofertas`).set(headers).send({ mensaje: 'Puedo ayudar con este pedido.' }).expect(201);
+      const offerId = proposed.body.data.id;
+      await owner.patch(`/api/ofertas/${offerId}`).set(headers).send({ accion: 'aceptar' }).expect(200);
+      assert.equal((await owner.get(`/api/solicitudes/${requestId}`).expect(200)).body.data.estado, 'en_curso');
+
+      await other.patch(`/api/ofertas/${offerId}`).set(headers).send({ accion: 'entregar' }).expect(200);
+      await owner.patch(`/api/ofertas/${offerId}`).set(headers).send({ accion: 'confirmar' }).expect(200);
+      const completed = await owner.patch(`/api/solicitudes/${requestId}`).set(headers).send({ accion: 'completar' }).expect(200);
+      assert.equal(completed.body.data.estado, 'completada');
+      assert.equal((await other.get(`/api/solicitudes/${requestId}`).expect(200)).body.data.estado, 'completada');
+    });
     await t.test('Avisos reales, permiso por autor y cancelación', async () => {
       const created = await owner.post('/api/avisos').set(headers).send({ categoriaId: catalogs.body.data.avisos[0].id, titulo: `Campaña ${tag}`, contenido: 'Intercambio vecinal de libros.', sectorId }).expect(201);
       noticeId = created.body.data.id;

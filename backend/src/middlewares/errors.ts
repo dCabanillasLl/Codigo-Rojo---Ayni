@@ -17,7 +17,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (["ER_NO_SUCH_TABLE", "ER_BAD_FIELD_ERROR"].includes(code)) {
     res.status(503).json({ error: { code: "DATABASE_SCHEMA_REQUIRED", message: "La base de datos necesita la migración de AYNI." } }); return;
   }
-  if (["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "ER_ACCESS_DENIED_ERROR", "ER_BAD_DB_ERROR", "PROTOCOL_CONNECTION_LOST", "CERT_HAS_EXPIRED", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "SELF_SIGNED_CERT_IN_CHAIN"].includes(code)) {
+  if (["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "ER_ACCESS_DENIED_ERROR", "ER_BAD_DB_ERROR", "PROTOCOL_CONNECTION_LOST", "CERT_HAS_EXPIRED", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "SELF_SIGNED_CERT_IN_CHAIN", "DEPTH_ZERO_SELF_SIGNED_CERT", "ERR_TLS_CERT_ALTNAME_INVALID", "ERR_TLS_CERT_SIGNATURE_ALGORITHM_UNSUPPORTED", "ERR_TLS_CERT_ALTNAME_INVALID"].includes(code)) {
     res.status(503).json({ error: { code: "DATABASE_UNAVAILABLE", message: "No se pudo conectar con la base de datos. Inténtalo más tarde." } }); return;
   }
   // Do not log SQL strings, parameters, passwords, tokens or personal data.

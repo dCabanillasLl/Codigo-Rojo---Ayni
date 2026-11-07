@@ -15,6 +15,7 @@ const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHe
 const dummyHash = bcrypt.hashSync("ayni-only-used-for-login-timing", 12);
 
 export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u.apellidos, u.correo, u.telefono,
+  u.telefono_publico AS telefonoPublico,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre
   FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
   LEFT JOIN sectores_vecinales s ON s.sector_id = l.sector_id`;
@@ -65,6 +66,7 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     nombres: z.string().trim().min(2).max(80).optional(),
     apellidos: z.string().trim().min(2).max(100).optional(),
     telefono: phoneSchema.nullable().optional(),
+    telefonoPublico: z.boolean().optional(),
     sectorId: idSchema.optional(),
     latitud: z.number().finite().min(-90).max(90).optional(),
     longitud: z.number().finite().min(-180).max(180).optional(),
@@ -73,12 +75,21 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     .refine((value) => value.latitud === undefined || Boolean(value.sectorId), "Selecciona el sector para actualizar la ubicación")
     .parse(req.body);
   await transaction(async (connection) => {
-    const [locked] = await connection.execute<RowDataPacket[]>("SELECT usuario_id FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo' FOR UPDATE", [req.userId]);
+    const [locked] = await connection.execute<RowDataPacket[]>("SELECT usuario_id, telefono FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo' FOR UPDATE", [req.userId]);
     if (!locked.length) throw new AppError(401, "UNAUTHENTICATED", "Inicia sesión para continuar.");
+    const resultingPhone = body.telefono !== undefined ? body.telefono : locked[0].telefono;
+    if (body.telefonoPublico === true && !resultingPhone) throw new AppError(400, "PHONE_REQUIRED", "Añade un teléfono antes de mostrarlo como contacto.");
+    if (body.telefonoPublico === true && !/^\+[1-9]\d{7,14}$/.test(String(resultingPhone))) {
+      throw new AppError(400, "PHONE_INTERNATIONAL_FORMAT_REQUIRED", "Para crear el enlace de WhatsApp, guarda el teléfono con prefijo internacional, por ejemplo +51987654321.");
+    }
     const fields: string[] = [];
     const values: unknown[] = [];
     for (const key of ["nombres", "apellidos", "telefono"] as const) {
       if (body[key] !== undefined) { fields.push(`${key} = ?`); values.push(body[key]); }
+    }
+    if (body.telefonoPublico !== undefined || body.telefono === null) {
+      fields.push("telefono_publico = ?");
+      values.push(body.telefono === null ? false : body.telefonoPublico ?? false);
     }
     if (body.sectorId) {
       const [sectors] = await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?", [body.sectorId]);

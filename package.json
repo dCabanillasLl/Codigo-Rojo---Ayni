@@ -12,10 +12,13 @@
     "preview": "vite preview",
     "format": "oxfmt"
   },
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sql.js": "^1.15.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

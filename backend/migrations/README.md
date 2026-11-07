@@ -12,6 +12,9 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
    reseñas verificadas por colaboración y recursos con reservas.
 3. `002_catalogos.sql` añade categorías y cuatro sectores iniciales de Pueblo Libre.
    Es reejecutable. No añade usuarios, solicitudes, ofertas ni reseñas de demostración.
+4. `003_flyers_whatsapp.sql` añade la URL HTTPS del flyer y la preferencia explícita
+   `telefono_publico`, desactivada por defecto. Aplicar también a las bases existentes
+   antes de desplegar la versión que habilita esas funciones.
 
 MySQL hace commit implícito de DDL. Aplicar `001` una sola vez, guardar evidencia de
 éxito y, si falla parcialmente, inspeccionar el esquema antes de reintentarlo.
@@ -31,3 +34,7 @@ confirmaciones NULL; sus reseñas no se convierten en verificadas.
   usar el flujo de colaboración; no se simula gestión de devoluciones de inventario.
 - La creación de solicitudes y reservas usa UUID + usuario + huella del contenido.
   Reintentar devuelve el original; reutilizar el UUID con otro contenido produce 409.
+- El teléfono permanece privado por defecto. Solo se publica en las fichas del vecino
+  después de guardar un número internacional y activar su consentimiento en el perfil.
+- Los flyers de avisos son referencias HTTPS a imágenes alojadas externamente; AYNI no
+  recibe ni procesa archivos de imagen.

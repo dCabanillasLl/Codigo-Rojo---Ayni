@@ -11,7 +11,7 @@ const router = Router();
 const select = `SELECT CAST(a.aviso_id AS CHAR) AS id, CAST(a.autor_id AS CHAR) AS autorId,
   u.nombres AS autor, CAST(a.categoria_aviso_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   a.titulo, a.contenido, a.estado, CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
-  a.fecha_evento AS fechaEvento, a.vence_en AS venceEn, a.creado_en AS creadoEn`;
+  a.imagen_url AS imagenUrl, a.fecha_evento AS fechaEvento, a.vence_en AS venceEn, a.creado_en AS creadoEn`;
 const joins = ` FROM avisos a JOIN usuarios u ON u.usuario_id = a.autor_id
   JOIN ubicaciones l ON l.ubicacion_id = a.ubicacion_id JOIN sectores_vecinales s ON s.sector_id = l.sector_id
   JOIN categorias_avisos c ON c.categoria_aviso_id = a.categoria_aviso_id`;
@@ -20,6 +20,9 @@ const fields = z.object({
   titulo: z.string().trim().min(3).max(180),
   contenido: z.string().trim().min(3).max(8000),
   sectorId: idSchema,
+  imagenUrl: z.string().trim().url().max(2048).refine((value) => {
+    try { return new URL(value).protocol === "https:"; } catch { return false; }
+  }, "La imagen debe usar una URL HTTPS").nullable().optional(),
   fechaEvento: z.string().datetime({ offset: true }).nullable().optional(),
   venceEn: z.string().datetime({ offset: true }).nullable().optional(),
   estado: z.enum(["borrador", "publicado", "cancelado", "vencido"]).optional(),
@@ -53,8 +56,8 @@ router.post("/avisos", requireAuth, asyncHandler(async (req, res) => {
   const id = await transaction(async (connection) => {
     const locationId = await resolveLocation(connection, req.userId, body.sectorId);
     const [result] = await connection.execute<ResultSetHeader>(
-      "INSERT INTO avisos (autor_id, categoria_aviso_id, ubicacion_id, titulo, contenido, estado, fecha_evento, vence_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.userId, body.categoriaId, locationId, body.titulo, body.contenido, body.estado ?? "publicado", body.fechaEvento ? new Date(body.fechaEvento) : null, body.venceEn ? new Date(body.venceEn) : null],
+      "INSERT INTO avisos (autor_id, categoria_aviso_id, ubicacion_id, titulo, contenido, estado, fecha_evento, vence_en, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [req.userId, body.categoriaId, locationId, body.titulo, body.contenido, body.estado ?? "publicado", body.fechaEvento ? new Date(body.fechaEvento) : null, body.venceEn ? new Date(body.venceEn) : null, body.imagenUrl ?? null],
     );
     return String(result.insertId);
   });
@@ -68,7 +71,7 @@ router.patch("/avisos/:id", requireAuth, asyncHandler(async (req, res) => {
     const [rows] = await connection.execute<RowDataPacket[]>("SELECT autor_id FROM avisos WHERE aviso_id = ? FOR UPDATE", [id]);
     if (!rows.length) throw new AppError(404, "NOT_FOUND", "No encontramos este aviso.");
     if (String(rows[0].autor_id) !== req.userId) throw new AppError(403, "FORBIDDEN", "Solo puedes modificar tus avisos.");
-    const map = { categoriaId: "categoria_aviso_id", titulo: "titulo", contenido: "contenido", estado: "estado" } as const;
+    const map = { categoriaId: "categoria_aviso_id", titulo: "titulo", contenido: "contenido", estado: "estado", imagenUrl: "imagen_url" } as const;
     const changes: string[] = [], values: unknown[] = [];
     for (const key of Object.keys(map) as (keyof typeof map)[]) if (body[key] !== undefined) { changes.push(`${map[key]} = ?`); values.push(body[key]); }
     if (body.fechaEvento !== undefined) { changes.push("fecha_evento = ?"); values.push(body.fechaEvento ? new Date(body.fechaEvento) : null); }

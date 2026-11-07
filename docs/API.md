@@ -1,6 +1,6 @@
 # API AYNI
 
-Base `/api`, JSON UTF-8. IDs como cadenas; fechas UTC. Éxito `{ "data": ... }`.
+Todos los paths de esta guía incluyen `/api`. JSON UTF-8. IDs como cadenas; fechas UTC. Éxito `{ "data": ... }`.
 Error `{ "error": { "code": "...", "message": "...", "details": [...] } }`.
 `details` es opcional y contiene campos de validación, nunca contraseñas ni SQL.
 
@@ -21,14 +21,16 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 
 | Método y ruta | Cuerpo / resultado | Éxito |
 |---|---|---|
-| POST `/auth/register` | `{nombres,apellidos,correo,contrasena,sectorId,telefono?,latitud?,longitud?}` → usuario y cookie | 201 |
-| POST `/auth/login` | `{correo,contrasena}` → usuario y cookie | 200 |
-| GET `/auth/me` | Usuario de la sesión | 200 |
-| PATCH `/auth/me` | `{nombres?,apellidos?,telefono?,sectorId?,latitud?,longitud?}` → usuario actualizado | 200 |
-| POST `/auth/logout` | `{}` → `{cerrado:true}`, elimina cookie | 200 |
+| POST `/api/auth/register` | `{nombres,apellidos,correo,contrasena,sectorId,telefono?,latitud?,longitud?}` → `{data: Usuario}` y cookie HttpOnly | 201 |
+| POST `/api/auth/login` | `{correo,contrasena}` → `{data: Usuario}` y cookie HttpOnly | 200 |
+| GET `/api/auth/me` | Sin cuerpo → `{data: Usuario}` de la sesión | 200 |
+| PATCH `/api/auth/me` | `{nombres?,apellidos?,telefono?,telefonoPublico?,sectorId?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
+| POST `/api/auth/logout` | `{}` → `{data:{cerrado:true}}`, elimina cookie | 200 |
 
-Usuario: `{id,nombres,apellidos,correo,telefono,sectorId,sectorNombre}`. Correo y teléfono
-solo se devuelven al propio usuario. El registro valida contraseña y límites de texto;
+Usuario: `{id,nombres,apellidos,correo,telefono,telefonoPublico,sectorId,sectorNombre}`. Correo y teléfono
+solo se devuelven al propio usuario. `telefonoPublico` es consentimiento opcional; para activarlo
+se requiere teléfono E.164 (`+` y prefijo de país). En publicaciones, `telefonoContacto` será
+`null` por defecto; solo devuelve el número con consentimiento. El registro valida contraseña y límites de texto;
 correo/teléfono únicos. Coordenadas opcionales, siempre juntas y con sector; nunca se
 devuelven al público. Errores: `INVALID_CREDENTIALS`, `INVALID_SECTOR`, `DUPLICATE`,
 `AUTH_NOT_CONFIGURED`, `VALIDATION_ERROR`. No hay recuperación de contraseña por correo.
@@ -37,9 +39,9 @@ devuelven al público. Errores: `INVALID_CREDENTIALS`, `INVALID_SECTOR`, `DUPLIC
 
 | Ruta GET | Resultado |
 |---|---|
-| `/health` | Estado de API/base/esquema; 503 si no están listos |
-| `/sectores` | `[{id,nombre,distrito,ciudad}]` |
-| `/catalogos` | `{publicaciones:[{id,nombre}],ayuda:[{id,nombre}],avisos:[{id,nombre}]}` |
+| `/api/health` | `{data:{estado:"ok",baseDeDatos:"conectada"}}`; 503 si no están listos |
+| `/api/sectores` | `{data:[{id,nombre,distrito,ciudad}]}` |
+| `/api/catalogos` | `{data:{publicaciones:[{id,nombre}],ayuda:[{id,nombre}],avisos:[{id,nombre}]}}` |
 
 ## Listados y cercanía
 
@@ -54,15 +56,15 @@ Los filtros de sector y radio se combinan si se proporcionan ambos.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/publicaciones` | Filtros comunes y `tipo=producto|servicio` | 200 |
-| POST `/publicaciones` | `{categoriaId,tipo,titulo,descripcion?,modalidadPrecio,precio?,sectorId,estado?}` | 201 |
-| GET `/publicaciones/:id` | Detalle público publicado o propio | 200 |
-| PATCH `/publicaciones/:id` | Campos editables de creación, al menos uno; solo propietario | 200 |
-| GET `/publicaciones/:id/resenas` | Reseñas de la publicación, `verificada:false` | 200 |
+| GET `/api/publicaciones` | Filtros comunes y `tipo=producto|servicio` → `{data: Publicacion[]}`; incluye `telefonoContacto` solo con consentimiento del vecino | 200 |
+| POST `/api/publicaciones` | `{categoriaId,tipo,titulo,descripcion?,modalidadPrecio,precio?,sectorId,estado?}` → `{data: Publicacion}` | 201 |
+| GET `/api/publicaciones/:id` | Sin cuerpo → `{data: Publicacion}` pública publicada o propia | 200 |
+| PATCH `/api/publicaciones/:id` | Campos editables de creación, al menos uno → `{data: Publicacion}` actualizada; solo propietario | 200 |
+| GET `/api/publicaciones/:id/resenas` | Sin cuerpo → `{data: Resena[]}`; `verificada:false` | 200 |
 
-Publicación: `{id,propietarioId,propietario,categoriaId,categoria,tipo,titulo,descripcion,
+Publicación: `{id,propietarioId,propietario,telefonoContacto,categoriaId,categoria,tipo,titulo,descripcion,
 modalidadPrecio,precio,moneda,estado,sectorId,sectorNombre,distanciaMetros,
-promedioResenas,totalResenas}`. Modalidades `gratis|fijo|desde|cotizar`; fijo/desde
+promedioResenas,totalResenas}`. `telefonoContacto` es null sin consentimiento. Modalidades `gratis|fijo|desde|cotizar`; fijo/desde
 requieren precio no negativo con hasta dos decimales, gratis/cotizar requieren precio
 nulo/omitido. Estados `borrador|publicada|pausada|archivada`. Por defecto se publica.
 Errores específicos: `PRICE_REQUIRED`, `INVALID_PRICE`, `INVALID_SECTOR`.
@@ -71,10 +73,10 @@ Errores específicos: `PRICE_REQUIRED`, `INVALID_PRICE`, `INVALID_SECTOR`.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/solicitudes` | Filtros comunes; `participando=1` para colaboraciones del usuario | 200 |
-| POST `/solicitudes` | `{clientRequestId,categoriaId,sectorId,titulo,descripcion,urgencia}` | 201 o 200 si reintento |
-| GET `/solicitudes/:id` | Detalle | 200 |
-| PATCH `/solicitudes/:id` | `{accion:'completar'}` o `{accion:'cancelar',motivo}`; solo solicitante | 200 |
+| GET `/api/solicitudes` | Filtros comunes; `participando=1` para colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
+| POST `/api/solicitudes` | `{clientRequestId,categoriaId,sectorId,titulo,descripcion,urgencia}` → `{data: Solicitud}` | 201 o 200 si reintento |
+| GET `/api/solicitudes/:id` | Sin cuerpo → `{data: Solicitud}` | 200 |
+| PATCH `/api/solicitudes/:id` | `{accion:'completar'}` o `{accion:'cancelar',motivo}` → `{data: Solicitud}`; solo solicitante | 200 |
 
 Solicitud: `{id,solicitanteId,solicitante,categoriaId,categoria,sectorId,sectorNombre,
 titulo,descripcion,urgencia,estado,creadoEn,distanciaMetros,clientRequestId}`.
@@ -88,11 +90,11 @@ pendientes se rechazan al cerrar. Cancelar requiere motivo.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/solicitudes/:id/ofertas` | Solicitante ve todas; voluntario ve las propias | 200 |
-| POST `/solicitudes/:id/ofertas` | `{mensaje}` describe el aporte; no ofrecerse a uno mismo | 201 |
-| PATCH `/ofertas/:id` | `{accion:'aceptar'|'rechazar'|'retirar'|'entregar'|'confirmar'}` | 200 |
-| PUT `/ofertas/:id/resena` | `{calificacion,comentario?}`; solicitante tras confirmar recepción | 200 |
-| GET `/usuarios/:id/reputacion` | `{colaboracionesConfirmadas,vistosBuenos,promedio,resenas}` | 200 |
+| GET `/api/solicitudes/:id/ofertas` | Sin cuerpo → `{data: Oferta[]}`; solicitante ve todas y voluntario las propias | 200 |
+| POST `/api/solicitudes/:id/ofertas` | `{mensaje}` → `{data: Oferta}`; no ofrecerse a uno mismo | 201 o 200 si ya existe la misma propuesta |
+| PATCH `/api/ofertas/:id` | `{accion:'aceptar'|'rechazar'|'retirar'|'entregar'|'confirmar'}` → `{data: Oferta}` | 200 |
+| PUT `/api/ofertas/:id/resena` | `{calificacion,comentario?}` → `{data: Resena}`; solicitante tras confirmar recepción | 200 |
+| GET `/api/usuarios/:id/reputacion` | Sin cuerpo → `{data:{colaboracionesConfirmadas,vistosBuenos,promedio,resenas}}` | 200 |
 
 Oferta: `{id,solicitudId,voluntarioId,voluntario,mensaje,estado,entregaPendiente,
 confirmadaEn,resena}`. Se conservan ENUM originales:
@@ -114,11 +116,12 @@ Estados incompatibles o cierre con aportes pendientes producen 409; actor incorr
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/recursos` | Listado y filtros comunes | 200 |
-| POST `/recursos` | `{titulo,unidad,cantidadTotal,sectorId}` | 201 |
-| GET `/recursos/:id/reservas` | Dueño ve todas; solicitante ve las propias | 200 |
-| POST `/recursos/:id/reservas` | `{clientRequestId,cantidad,solicitudId?}` | 201 o 200 si reintento |
-| PATCH `/reservas/:id` | `{accion:'confirmar'|'entregar'|'cancelar'}` | 200 |
+| GET `/api/recursos` | Filtros comunes → `{data: Recurso[]}` | 200 |
+| POST `/api/recursos` | `{titulo,unidad,cantidadTotal,sectorId}` → `{data: Recurso}` | 201 |
+| GET `/api/recursos/:id` | Sin cuerpo → `{data: Recurso}` | 200 |
+| GET `/api/recursos/:id/reservas` | Sin cuerpo → `{data: Reserva[]}`; dueño ve todas y solicitante las propias | 200 |
+| POST `/api/recursos/:id/reservas` | `{clientRequestId,cantidad,solicitudId?}` → `{data: Reserva}` | 201 o 200 si reintento |
+| PATCH `/api/reservas/:id` | `{accion:'confirmar'|'entregar'|'cancelar'}` → `{data: Reserva}` | 200 |
 
 Recurso: `{id,propietarioId,propietario,titulo,unidad,cantidadTotal,reservada,entregada,
 disponible,sectorId,sectorNombre,actualizadoEn}`. Cantidades enteras positivas.
@@ -137,13 +140,14 @@ Conflictos de inventario, UUID o estado devuelven 409.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/avisos` | Filtros comunes; público solo vigentes publicados | 200 |
-| POST `/avisos` | `{categoriaId,titulo,contenido,sectorId,fechaEvento?,venceEn?,estado?}` | 201 |
-| GET `/avisos/:id` | Detalle visible | 200 |
-| PATCH `/avisos/:id` | Campos editables; solo autor | 200 |
+| GET `/api/avisos` | Filtros comunes; público solo vigentes publicados → `{data: Aviso[]}` | 200 |
+| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,imagenUrl?,fechaEvento?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
+| GET `/api/avisos/:id` | Sin cuerpo → `{data: Aviso}` visible | 200 |
+| PATCH `/api/avisos/:id` | Campos editables → `{data: Aviso}` actualizado; solo autor | 200 |
 
-Aviso: `{id,autorId,autor,categoriaId,categoria,titulo,contenido,estado,sectorId,
-sectorNombre,fechaEvento,venceEn,creadoEn}`. Fechas ISO UTC o null.
+Aviso: `{id,autorId,autor,categoriaId,categoria,titulo,contenido,imagenUrl,estado,sectorId,
+sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` debe ser una URL HTTPS pública;
+se almacena la referencia, no se carga el archivo. Fechas ISO UTC o null.
 Estados `borrador|publicado|cancelado|vencido`. La interfaz distingue avisos vecinales
 de información oficial. Compartir utiliza enlaces/funciones del dispositivo; la API
 no envía WhatsApp ni mensajes en nombre de usuarios.
