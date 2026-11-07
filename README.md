@@ -63,7 +63,7 @@ npm run dev:api
 npm run dev
 ```
 
-Abrir `http://localhost:8443`. La API escucha en el puerto 3001.
+Abrir `http://localhost:8444`. La API escucha en el puerto 3002.
 `GET /api/health` comprueba disponibilidad de la base y del esquema.
 Sin configuración, se devuelve un error explícito; no se inventan publicaciones ni usuarios.
 
@@ -72,6 +72,68 @@ origen autorizado y un proxy que envíe `/api` al backend. El directorio `dist` 
 contiene solamente el frontend; publicar esa carpeta no despliega la API ni MySQL.
 
 ## Recorrido de demostración
+
+### Fotos opcionales en productos y servicios
+
+En **Ofrecer producto o servicio** hay un campo de foto opcional con vista previa.
+Se admite una foto JPG, PNG o WebP de hasta 5 MB. Al editar, elegir otra foto la
+reemplaza; **Quitar foto** la elimina al guardar; editar solo el texto conserva la
+imagen anterior. Publicar sin foto mantiene el diseño con su icono de producto o servicio.
+La imagen se muestra en la tarjeta y en el detalle de la publicación.
+
+La migración `006_fotos_publicaciones.sql` añade dos columnas opcionales. El servidor
+valida y convierte la foto en JPEG, corrige su orientación, limita sus dimensiones a
+1600 px y elimina los metadatos. Guarda el resultado (hasta 2 MB) en MySQL junto a la
+publicación; no necesita archivos locales persistentes ni un servicio externo de imágenes.
+La publicación y la foto se guardan en la misma transacción. No se modifican fotos de
+otros vecinos y las imágenes de publicaciones no públicas solo son accesibles por su dueño.
+El proxy de producción debe permitir cuerpos JSON de hasta 8 MB en POST/PATCH de
+publicaciones. Las demás rutas conservan el límite de 64 KB.
+
+### Ubicación y mapa comunitario
+
+- En **Tu zona**, elige una comunidad y usa GPS, busca una dirección en Perú o
+  selecciona un punto en el mapa. El GPS requiere permiso y HTTPS o localhost.
+  Con teclado, enfoca el mapa, mueve el centro con las flechas y pulsa Enter.
+- El punto de búsqueda filtra servicios y pedidos dentro de la comunidad y un
+  radio de 1, 1.5 o 2 km. Puedes consultar solo la comunidad, sin radio.
+  Buscar en otro lugar no cambia el perfil; la casilla de guardado lo hace explícito.
+- Al crear un pedido u ofrecer un producto o servicio puedes elegir otro punto
+  propio de esa publicación. Si lo omites, se usa tu ubicación de perfil cuando
+  pertenece a la misma comunidad. Los pedidos offline conservan el punto elegido.
+- **Cerca de mí** conserva el diseño con saludo, ubicación, buscador y filtros.
+  El mapa de productos y servicios aparece dentro de un bloque con bordes redondeados,
+  y debajo se muestran las tarjetas de todos los productos y servicios de la búsqueda.
+  El mapa es un componente de la página, sin ocupar toda la pantalla.
+  Al tocar un marcador se abre su detalle, donde el dueño también puede editarlo.
+  El encuadre incluye automáticamente todos los puntos cargados que coinciden con
+  los filtros. Los pedidos de ayuda se consultan en **Ayuda vecinal**.
+  No hay que seleccionar publicaciones una por una para ubicar sus marcadores.
+- Si varias publicaciones comparten coordenadas aproximadas, sus iconos se separan
+  visualmente y se conectan con su zona de origen mediante líneas. No se alteran las
+  coordenadas guardadas. Al elegir un marcador se abre su detalle sin ocultar
+  ni volver a centrar los demás puntos del mapa.
+- Los iconos se asignan por tipo, categoría y título: alimentos, herramientas,
+  hogar, clases, donaciones, intercambios, urgencias, bicicletas, tecnología y mascotas.
+  Color y distintivo P/S/A diferencian productos, servicios y ayuda. La leyenda explica
+  los símbolos. Cada detalle permite abrir la zona en Google Maps. Las publicaciones
+  sin coordenadas no aparecen como puntos; se indica su cantidad sobre el mapa.
+  Un filtro por distancia requiere coordenadas. Puedes añadirlas al editar un servicio.
+- La API pública entrega `mapaLatitud` y `mapaLongitud` redondeadas a tres decimales
+  (una cuadrícula de aproximadamente 110 m), nunca el punto exacto ni la referencia
+  privada. La distancia se calcula con el punto privado y se redondea a 50 m.
+
+Se utiliza Leaflet con OpenStreetMap; no hace falta una clave de Google Maps.
+Los mapas necesitan internet. La búsqueda se realiza solo al pulsar **Buscar**;
+ese texto se envía al proveedor, mientras que el GPS no hace geocodificación inversa.
+La API limita las consultas al proveedor a una cada 1.1 segundos por proceso y
+mantiene resultados en memoria durante 20 minutos. En producción con varias
+instancias, usar un proveedor con capacidad contratada o un límite global compartido.
+`VITE_MAP_TILE_URL`, `VITE_MAP_ATTRIBUTION` y `GEOCODING_URL` permiten cambiar proveedores.
+Consultar las políticas de [teselas](https://operations.osmfoundation.org/policies/tiles/)
+y [búsqueda](https://operations.osmfoundation.org/policies/nominatim/) antes del despliegue.
+
+### Colaboración entre vecinos
 
 1. Registrar dos vecinos en dos perfiles distintos del navegador (o uno normal y otro
    privado). Elegir sector; compartir ubicación es opcional.

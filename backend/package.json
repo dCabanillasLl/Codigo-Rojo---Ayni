@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx --test tests/auth-security.test.ts tests/community-rules.test.ts",
+    "test": "tsx --test tests/auth-security.test.ts tests/community-rules.test.ts tests/location.test.ts tests/map-layout.test.ts tests/photos.test.ts",
     "test:integration": "tsx --test tests/*.integration.test.ts",
     "db:migrate": "node scripts/migrate.mjs"
   },
@@ -22,6 +22,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.1",
+    "sharp": "^0.35.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {

@@ -21,6 +21,13 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 6. `005_registro_dni_sin_correo.sql` hace opcional el correo y añade la zona general
    `Pueblo Libre` para registrar sin selector de sector. Respeta cuentas con correo
    existentes; aplicar antes de habilitar el nuevo registro.
+7. `006_fotos_publicaciones.sql` añade una foto opcional (`imagen` y `imagen_hash`)
+   a cada producto o servicio. Las filas existentes permanecen sin foto. Se almacena
+   el JPEG normalizado y su huella; las consultas de listados no descargan el BLOB.
+
+El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
+de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum
+sin reescribir el historial; cualquier cambio del contenido SQL sigue bloqueando la ejecución.
 
 MySQL hace commit implícito de DDL. Aplicar `001` una sola vez, guardar evidencia de
 éxito y, si falla parcialmente, inspeccionar el esquema antes de reintentarlo.

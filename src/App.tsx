@@ -75,7 +75,7 @@ export default function App() {
     <main className="app-main mx-auto max-w-[1240px] px-5 pt-7 lg:px-10 lg:pt-10">
       {sessionError && <p className="offline-banner" role="status">{sessionError} · {sessionLoading ? 'Verificando sesión…' : 'Los datos del servidor pueden no estar disponibles.'}</p>}
       {route.page === 'cerca' && <Nearby detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
-      {route.page === 'ayuda' && <Help detailId={route.detailId} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
+      {route.page === 'ayuda' && <Help detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
       {route.page === 'avisos' && <Notices/>}
       {route.page === 'perfil' && <Profile onLocation={() => setLocationOpen(true)} onSignOut={() => void signOut()} signOutBusy={signOutBusy} signOutError={profileError}/>}
     </main>
@@ -85,8 +85,8 @@ export default function App() {
       <button type="button" className="mobile-help-action" onClick={() => { if (requireUser()) setHelpOpen(true); }} aria-label="Pedir ayuda"><span className="mobile-help-icon"><Icon name="mic" size={23}/></span><span>Pedir ayuda</span></button>
       {navItems.slice(2).map(item => <button type="button" key={item.id} onClick={() => navigate(item.id)} className={route.page === item.id ? 'active' : ''} aria-current={route.page === item.id ? 'page' : undefined}><Icon name={item.icon} size={21}/><span>{t(item.id === 'avisos' ? 'notices' : 'profile')}</span></button>)}
     </nav>
-    {helpOpen && <RequestForm onClose={() => setHelpOpen(false)} onLocation={() => setLocationOpen(true)}/>}
-    {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)}/>}
+    {helpOpen && <RequestForm onClose={() => setHelpOpen(false)}/>}
+    {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)} saveToProfile={route.page === 'perfil'}/>}
     {notificationsOpen && <NotificationCenter notifications={notifications} onClose={() => setNotificationsOpen(false)}/>}
     {authOpen && <AuthModal/>}
     <GuideBot onNavigate={navigate} onAsk={() => { if (requireUser()) setHelpOpen(true); }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }} onLocation={() => { if (requireUser()) setLocationOpen(true); }}/>

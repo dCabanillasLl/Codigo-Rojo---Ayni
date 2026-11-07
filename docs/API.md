@@ -58,6 +58,30 @@ Errores adicionales: `DNI_LOOKUP_NOT_CONFIGURED`,
 
 ## Listados y cercanía
 
+Los productos/servicios y pedidos de ayuda incluyen `mapaLatitud` y `mapaLongitud`,
+ambas nulas sin coordenadas. Son coordenadas aproximadas redondeadas a tres decimales;
+no representan una dirección exacta. Los endpoints de creación de publicaciones y
+solicitudes, y la edición de publicaciones, aceptan un campo opcional:
+
+```json
+{"ubicacion":{"latitud":-12.074321,"longitud":-77.063219,"direccion":"Referencia privada opcional"}}
+```
+
+Las dos coordenadas son obligatorias dentro de `ubicacion`, numéricas, finitas y
+dentro de los límites geográficos. El punto crea una ubicación independiente del
+perfil; `direccion` nunca se devuelve en estos endpoints. Si se omite `ubicacion`,
+al crear se usa el punto del perfil solo si coincide la comunidad elegida. Al editar
+en la misma comunidad sin `ubicacion` se conserva el punto anterior.
+La ubicación explícita también forma parte de la huella de idempotencia del pedido.
+
+`GET /api/ubicaciones/buscar?q=...` busca direcciones de Perú al pulsar Buscar.
+`q` tiene entre 3 y 200 caracteres. Devuelve hasta cinco
+`{id,nombre,latitud,longitud}` del proveedor de geocodificación, no de otros usuarios.
+Tiene límite de 15 consultas/minuto por cliente, caché en memoria y un límite de
+una consulta al proveedor cada 1.1 segundos por proceso. Si está ocupado devuelve
+429 `GEOCODING_BUSY`; si falla el proveedor, 503 `GEOCODING_UNAVAILABLE`.
+La selección manual del mapa y el GPS siguen disponibles ante un fallo de búsqueda.
+
 Los listados devuelven arrays, máximo 100 registros. Filtros comunes: `q`, `sectorId`,
 `categoriaId`, `mios=1`, `latitud`, `longitud`, `radio` (1000–2000 metros, por defecto
 1000). Coordenadas siempre juntas; bounding box y distancia geográfica se calculan
@@ -66,6 +90,28 @@ Los filtros de sector y radio se combinan si se proporcionan ambos.
 `mios=1` exige sesión y permite consultar estados no publicados propios.
 
 ## Publicaciones
+
+La creación y edición aceptan `foto` opcional: una data URI
+`data:image/jpeg;base64,...`, `data:image/png;base64,...` o `data:image/webp;base64,...`.
+El archivo original tiene un máximo de 5 MB y 25 millones de píxeles; no se admiten
+SVG ni animaciones. El servidor verifica su contenido, aplica orientación, reduce a
+1600 px como máximo, elimina metadatos y guarda JPEG de hasta 2 MB en MySQL.
+La foto y los datos de la publicación se guardan juntos, sin archivos huérfanos.
+
+- Omitir `foto` al crear permite publicar sin imagen; omitirla al editar conserva la actual.
+- `foto:null` elimina la foto al guardar.
+- Una data URI válida añade o reemplaza la foto; solo puede hacerlo el propietario.
+- Las respuestas incluyen `imagenUrl:string|null`, una ruta de API con versión por hash,
+  y nunca incluyen el BLOB o la data URI. El cliente debe resolverla con su base de API.
+- `GET /api/publicaciones/:id/imagen?v=<hash>` entrega `image/jpeg` o 304 si la versión
+  coincide con `If-None-Match`. Sin foto, con una versión antigua o sin permiso devuelve 404.
+  Una imagen de publicación pausada/borrador/archivada solo se devuelve a su propietario.
+  La caché es privada y requiere revalidación para respetar cambios de visibilidad.
+
+POST/PATCH de publicaciones admiten JSON de hasta 8 MB después de autenticar, manteniendo
+las comprobaciones de origen y cabecera. El resto de rutas admite 64 KB.
+Errores específicos: 400 `INVALID_PHOTO`, `PHOTO_DIMENSIONS_TOO_LARGE`,
+`ANIMATED_PHOTO_NOT_SUPPORTED`; 413 `PHOTO_TOO_LARGE` o `BODY_TOO_LARGE`.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|

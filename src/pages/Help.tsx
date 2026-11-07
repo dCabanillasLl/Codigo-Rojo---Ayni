@@ -6,10 +6,16 @@ import { Empty, ErrorBox, Field, Modal, PageHeading, RemoteState, distance, form
 import Icon from '../components/Icon';
 import type { HelpRequest, Offer } from '../types';
 import Resources from './Resources';
+import { ListingsMap } from '../ServicesMap';
+import CommunityMap from '../components/CommunityMap';
+import { googleMapsUrl, mapPoint } from '../lib/location';
+import { listingSymbol } from '../lib/map-symbols';
 
-export default function Help({ onAsk, detailId }: { onAsk: () => void; detailId?: string }) {
-  const { user, area, requireUser, notify, pending, syncing, sync } = useApp();
+export default function Help({ onAsk, onLocation, detailId }: { onAsk: () => void; onLocation: () => void; detailId?: string }) {
+  const { user, area, setArea, requireUser, notify, pending, syncing, sync } = useApp();
   const [tab, setTab] = useState('todos');
+  const [showMap, setShowMap] = useState(true);
+  const [selected, setSelected] = useState('');
   const params = tab === 'mios' || tab === 'aportes' ? new URLSearchParams() : areaQuery(area);
   if (tab === 'mios') params.set('mios','1');
   if (tab === 'aportes') params.set('participando','1');
@@ -20,7 +26,9 @@ export default function Help({ onAsk, detailId }: { onAsk: () => void; detailId?
     <div className="section-tabs" aria-label="Filtrar ayuda">{[['todos','En mi barrio'],['mios','Mis pedidos'],['aportes','Mis aportes'],['recursos','Recursos compartidos']].map(([value,label]) => <button key={value} aria-pressed={tab === value} className={tab === value ? 'active' : ''} onClick={() => selectTab(value)}>{label}</button>)}</div>
     {pending.length > 0 && <div className="pending-panel"><div className="action-row justify-between"><h2 className="font-bold">Pendientes de envío ({pending.length})</h2><button className="text-action" disabled={syncing} onClick={() => void sync()}>{syncing ? 'Enviando…' : 'Reintentar envío'}</button></div>{pending.map(item => <div key={item.id} className="pending-item"><b>{item.body.titulo}</b><p>Aún no tenemos confirmación del servidor.</p>{item.error && <p className="text-sm">{item.error}</p>}{item.blocked && <p className="text-sm">Este pedido necesita revisión; no se volverá a enviar automáticamente.</p>}</div>)}</div>}
     {tab === 'recursos' ? <Resources/> : <>
+      {tab === 'todos' && <div className="help-map-controls"><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={17}/>{area.coordinates ? 'Cambiar punto de búsqueda' : 'Elegir mi ubicación'}</button><div className="action-row">{[1000,1500,2000].map(radius => <button type="button" className={`radius-btn ${area.radius === radius ? 'active' : ''}`} aria-pressed={area.radius === radius} key={radius} onClick={() => area.coordinates ? setArea({ ...area, radius }) : onLocation()}>{radius / 1000} km</button>)}<button type="button" className="outline-btn" aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>{showMap ? 'Ocultar mapa' : 'Ver mapa'}</button></div></div>}
       <RemoteState {...requests}/>
+      {showMap && <ListingsMap items={requests.data || []} selectedId={selected} onSelect={setSelected} onOpen={id => { window.location.hash = `ayuda/${id}`; }} title="Ayuda cerca de ti" kind="help" filterRadius={tab === 'todos'}/>}
       {!requests.loading && requests.data?.length === 0 && <Empty title={tab === 'mios' ? 'Aquí aparecerán tus pedidos' : tab === 'aportes' ? 'Tu próxima ayuda empieza aquí' : 'Tu barrio empieza contigo'} text={tab === 'aportes' ? 'Cuando te ofrezcas en un pedido, podrás seguirlo desde esta sección.' : 'Publica una necesidad o vuelve a consultar más tarde.'}/>}
       <div className="mt-5 grid gap-4 lg:grid-cols-3">{requests.data?.map(request => <article className="request-card" key={request.id}>
         <div className="flex items-center justify-between gap-2"><span className={`category ${request.urgencia === 'urgente' ? 'urgent' : ''}`}>{request.urgencia === 'urgente' && <Icon name="alert" size={14}/>} {request.categoria}</span><button className="listen-btn" aria-label={`Escuchar pedido de ${request.solicitante}`} onClick={() => { if (!speak(`${request.solicitante} necesita: ${request.descripcion}`)) notify('La lectura en voz alta no está disponible.'); }}><Icon name="headphones" size={16}/>Escuchar</button></div>
@@ -45,6 +53,7 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [cancelling, setCancelling] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const item = request.data;
+  const point = item ? mapPoint(item) : null;
   const owner = item?.solicitanteId === user?.id;
   const ownOffer = offers.data?.find(offer => offer.voluntarioId === user?.id);
   const open = item && ['abierta','en_curso'].includes(item.estado);
@@ -62,6 +71,7 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
     {item && <>
       <div className="action-row justify-between"><span className={`state-badge state-${item.estado}`}>{statusLabel(item.estado)}</span><span className="text-sm text-[#65726b]">{item.sectorNombre}</span></div>
       <p className="detail-description">{item.descripcion}</p><p className="text-sm text-[#65726b]">Publicado por {item.solicitante} · {formatDate(item.creadoEn)}</p>
+      {point && <div className="detail-map"><h3 className="section-subtitle font-display">Zona donde se necesita ayuda</h3><CommunityMap center={point} pins={[{ id, point, title: item.titulo, label: '1', kind: 'help', symbol: listingSymbol(item, 'help'), category: item.categoria }]} selectedId={id} online={online} compact label="Ubicación aproximada del pedido"/><p className="form-hint">El marcador muestra una zona aproximada. Coordina el lugar de entrega con el vecino.</p><a className="text-action" href={googleMapsUrl(point)} target="_blank" rel="noopener noreferrer">Abrir zona en Google Maps</a></div>}
       <div className="action-row mt-4"><button className="outline-btn" onClick={() => { if (!speak(item.descripcion)) notify('La lectura en voz alta no está disponible.'); }}><Icon name="headphones" size={16}/>Escuchar</button><button className="outline-btn" onClick={() => { void shareItem(item.titulo,item.descripcion,`#ayuda/${id}`).then(message => { if (message) notify(message); }).catch(error => { if (error?.name !== 'AbortError') setError(errorMessage(error)); }); }}><Icon name="share" size={16}/>Compartir</button></div>
       <ErrorBox message={error}/>
       {owner && open && <div className="owner-actions"><h3 className="font-bold">Tú decides cuándo está resuelto</h3><p>Confirma cada aporte recibido antes de completar tu pedido.</p><div className="action-row"><button className="offer-button" disabled={busy || !online} onClick={() => void mutate(`/solicitudes/${id}`, { accion: 'completar' }, 'Tu necesidad quedó resuelta. Gracias por confirmarlo.')}><Icon name="check" size={18}/>Mi necesidad está resuelta</button><button className="text-action danger-text" disabled={busy || !online} onClick={() => setCancelling(!cancelling)}>Cancelar pedido</button></div>

@@ -2,10 +2,21 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { AppError } from "./http.js";
 import type { ListFilters } from "./validation.js";
 
+export type LocationInput = { latitud: number; longitud: number; direccion?: string };
+// A fixed grid of about 110 m; never send the private coordinates to public maps.
+export const publicMapColumns = "ROUND(l.latitud, 3) AS mapaLatitud, ROUND(l.longitud, 3) AS mapaLongitud";
+
 /** Reuses the user's own location only if it belongs to the requested sector. */
-export async function resolveLocation(connection: PoolConnection, userId: string, sectorId: string): Promise<string> {
+export async function resolveLocation(connection: PoolConnection, userId: string, sectorId: string, point?: LocationInput): Promise<string> {
   const [sectors] = await connection.execute<RowDataPacket[]>("SELECT sector_id FROM sectores_vecinales WHERE sector_id = ?", [sectorId]);
   if (!sectors.length) throw new AppError(400, "INVALID_SECTOR", "Elige un sector existente.");
+  if (point) {
+    const [inserted] = await connection.execute<ResultSetHeader>(
+      "INSERT INTO ubicaciones (sector_id, etiqueta, direccion, latitud, longitud) VALUES (?, 'Punto elegido para la publicación', ?, ?, ?)",
+      [sectorId, point.direccion || null, point.latitud, point.longitud],
+    );
+    return String(inserted.insertId);
+  }
   const [locations] = await connection.execute<RowDataPacket[]>(
     "SELECT l.ubicacion_id FROM usuarios u JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id WHERE u.usuario_id = ? AND l.sector_id = ?",
     [userId, sectorId],

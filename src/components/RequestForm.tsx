@@ -4,17 +4,21 @@ import { errorMessage } from '../lib/api';
 import { Modal, Field, ErrorBox, RemoteState, speak } from './UI';
 import Icon from './Icon';
 import { useLanguage } from '../lib/language';
-import type { Sector } from '../types';
+import type { LocationDraft } from '../types';
+import LocationPicker from './LocationPicker';
+import { locationInput } from '../lib/location';
 import { blockedRequestReason, requestTitle } from '../lib/request-policy';
 
 type RecognitionResult = { resultIndex: number; results: { length: number; [index: number]: { isFinal: boolean; [index: number]: { transcript: string } } } };
 type Recognition = { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void; abort: () => void };
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 
-export default function RequestForm({ onClose, onLocation }: { onClose: () => void; onLocation: () => void }) {
+export default function RequestForm({ onClose }: { onClose: () => void }) {
   const { catalogs, sectors, area, online, submitRequest, notify } = useApp();
   const { t } = useLanguage();
   const [description, setDescription] = useState('');
+  const [sectorId, setSectorId] = useState(area.sectorId);
+  const [location, setLocation] = useState<LocationDraft>({ coordinates: area.coordinates, address: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -24,7 +28,6 @@ export default function RequestForm({ onClose, onLocation }: { onClose: () => vo
   const voiceSegments = useRef<Map<number, string>>(new Map());
   const voiceBaseDescription = useRef('');
   const Voice = (window as VoiceWindow).SpeechRecognition || (window as VoiceWindow).webkitSpeechRecognition;
-  const configuredSector = sectors.data?.find((sector: Sector) => sector.id === area.sectorId);
   const policyMessage = blockedRequestReason(description);
   useEffect(() => () => { recognition.current?.abort(); }, []);
   function record() {
@@ -73,18 +76,18 @@ export default function RequestForm({ onClose, onLocation }: { onClose: () => vo
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!area.sectorId) { setError('Primero configura tu zona para ubicar el pedido.'); return; }
+    if (!sectorId) { setError('Elige la comunidad de tu pedido.'); return; }
     if (policyMessage) { setError(policyMessage); return; }
     setBusy(true); setError(''); recognition.current?.stop();
     const data = new FormData(event.currentTarget);
     try {
       const selectedCategory = catalogs.data?.ayuda.find(category => category.id === String(data.get('categoriaId')));
-      const result = await submitRequest({ clientRequestId: uuid.current, titulo: requestTitle(description), descripcion: description.trim(), categoriaId: String(data.get('categoriaId')), sectorId: area.sectorId, urgencia: selectedCategory?.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal' });
+      const result = await submitRequest({ clientRequestId: uuid.current, titulo: requestTitle(description), descripcion: description.trim(), categoriaId: String(data.get('categoriaId')), sectorId, ubicacion: locationInput(location), urgencia: selectedCategory?.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal' });
       notify(result === 'published' ? 'Tu pedido está publicado. Ya pueden ofrecerte ayuda.' : 'Pedido guardado en este dispositivo. Todavía no se ha enviado.');
       onClose(); window.location.hash = 'ayuda';
     } catch (error) { setError(errorMessage(error)); } finally { setBusy(false); }
   }
-  return <Modal title={t('ask')} onClose={onClose}>
+  return <Modal title={t('ask')} onClose={onClose} wide>
     <p className="form-intro">{t('describe')}</p>
     <p className="request-policy-note"><Icon name="shield" size={16}/>No se permiten pedidos de drogas, alcohol, dinero ni contenido sexual.</p>
     <form className="form-stack request-form" onSubmit={submit}>
@@ -96,14 +99,15 @@ export default function RequestForm({ onClose, onLocation }: { onClose: () => vo
       {recording && <p role="status" className="recording-message"><span className="recording-dot"/>{t('listening')} Habla con naturalidad; revisa el texto antes de publicarlo.</p>}
       <div className="form-columns">
         <Field label="Tipo de ayuda"><select name="categoriaId" required defaultValue=""><option value="" disabled>Elige una opción</option>{catalogs.data?.ayuda.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>
-        <Field label="Tu zona" hint="El pedido se publicará en la ubicación que configuraste."><div className="request-location-row"><span className={configuredSector ? '' : 'is-unset'}>{area.coordinates ? 'Cerca de tu ubicación' : configuredSector ? `${configuredSector.distrito} · ${configuredSector.nombre}` : 'Aún no configuraste una zona'}</span><button type="button" className="request-location-change" onClick={onLocation}>{configuredSector || area.coordinates ? 'Cambiar' : 'Configurar'}</button></div></Field>
+        <Field label="Comunidad del pedido"><select value={sectorId} onChange={event => setSectorId(event.target.value)} required><option value="" disabled>Elige tu comunidad</option>{sectors.data?.map(sector => <option key={sector.id} value={sector.id}>{sector.distrito} · {sector.nombre}</option>)}</select></Field>
       </div>
+      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige un punto para este pedido. Tu perfil no cambia y otros vecinos ven solo una zona aproximada. Si lo omites, se usará la ubicación de tu perfil en esta comunidad, si existe.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
       <RemoteState {...catalogs}/><RemoteState {...sectors}/>
       {!online && <p className="offline-banner">Se guardará en este dispositivo y se enviará al recuperar conexión con tu sesión activa.</p>}
       {!catalogs.data?.ayuda.length && <ErrorBox message="Necesitamos cargar las categorías al menos una vez con conexión antes de crear pedidos."/>}
       <ErrorBox message={policyMessage}/>
       <ErrorBox message={error}/>
-      <button type="submit" className="record-button justify-center" disabled={busy || recording || Boolean(policyMessage) || !area.sectorId || !catalogs.data?.ayuda.length}>{busy ? 'Guardando…' : online ? t('publish') : t('later')}<Icon name={online ? 'arrow' : 'wifiOff'}/></button>
+      <button type="submit" className="record-button justify-center" disabled={busy || recording || Boolean(policyMessage) || !sectorId || !catalogs.data?.ayuda.length}>{busy ? 'Guardando…' : online ? t('publish') : t('later')}<Icon name={online ? 'arrow' : 'wifiOff'}/></button>
     </form>
   </Modal>;
 }

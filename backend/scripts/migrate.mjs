@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import mysql from 'mysql2/promise';
+import { migrationChecksums } from './migration-checksums.mjs';
 
 const args = new Set(process.argv.slice(2));
 if ([...args].some((arg) => !['--apply', '--baseline'].includes(arg))) {
@@ -15,6 +15,7 @@ const files = [
   '003_flyers_whatsapp.sql',
   '004_dni_hash.sql',
   '005_registro_dni_sin_correo.sql',
+  '006_fotos_publicaciones.sql',
 ];
 const sources = await Promise.all(files.map(async (name) => {
   let sql = await readFile(fileURLToPath(new URL(`../migrations/${name}`, import.meta.url)), 'utf8');
@@ -23,7 +24,8 @@ const sources = await Promise.all(files.map(async (name) => {
     sql = sql.replace(/^CREATE DATABASE IF NOT EXISTS ayni\s+CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\s*USE ayni;\s*/m, '');
   }
   if (/^\s*(CREATE\s+DATABASE|USE\s)/im.test(sql)) throw new Error('La migración no puede cambiar la base de destino.');
-  return { name, sql, hash: createHash('sha256').update(sql).digest('hex') };
+  const canonical = migrationChecksums(sql);
+  return { name, sql: canonical.sql, hash: canonical.checksum, compatibleHashes: canonical.compatible };
 }));
 if (!args.has('--apply')) {
   console.log('Plan de migración (no se ejecutó SQL):');
@@ -61,7 +63,7 @@ try {
     const [existing] = await connection.execute('SELECT checksum, estado FROM ayni_schema_migrations WHERE version = ?', [source.name]);
     if (existing.length) {
       if (existing[0].estado !== 'completada') throw new Error(`${source.name}: ejecución parcial anterior. Revisar el esquema antes de continuar.`);
-      if (existing[0].checksum !== source.hash) throw new Error(`${source.name}: el archivo cambió después de aplicarse.`);
+      if (!source.compatibleHashes.has(existing[0].checksum)) throw new Error(`${source.name}: el archivo cambió después de aplicarse.`);
       console.log(`Ya aplicada: ${source.name}`);
       continue;
     }

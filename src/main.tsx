@@ -4,6 +4,8 @@ import App from "./App";
 import { AppProvider } from "./AppContext";
 import { LanguageProvider } from "./lib/language";
 import "./index.css";
+import "./maps.css";
+import "./photos.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
