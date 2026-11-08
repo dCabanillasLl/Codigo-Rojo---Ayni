@@ -73,6 +73,7 @@ export default function App() {
     </header>
 
     <main className="app-main mx-auto max-w-[1240px] px-5 pt-7 lg:px-10 lg:pt-10">
+      {!online && <p className="offline-banner" role="status"><Icon name="wifiOff" size={18}/>Estás sin conexión. Puedes consultar información guardada y guardar pedidos para enviarlos cuando vuelvas a conectarte.</p>}
       {sessionError && <p className="offline-banner" role="status">{sessionError} · {sessionLoading ? 'Verificando sesión…' : 'Los datos del servidor pueden no estar disponibles.'}</p>}
       {route.page === 'cerca' && <Nearby detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
       {route.page === 'ayuda' && <Help detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}

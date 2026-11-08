@@ -45,6 +45,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     let active = true;
+    if (!online) { setSessionLoading(false); setSessionError(''); return; }
     setSessionLoading(true);
     api<User>('/auth/me').then(value => { if (active) setUser(value); }).catch(error => {
       if (!active) return;
@@ -69,6 +70,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let active = true, fetching = false;
     const controller = new AbortController();
     const key = `${ownerId}:/notificaciones`;
+    if (!online) {
+      void cacheRead<AppNotification[]>(key).then(cached => { if (active && cached) setServerNotifications({ ownerId, items: cached.data }); }).catch(() => undefined);
+      setNotificationsError('');
+      return () => { active = false; };
+    }
     const receive = async () => {
       if (fetching || !active) return;
       fetching = true;

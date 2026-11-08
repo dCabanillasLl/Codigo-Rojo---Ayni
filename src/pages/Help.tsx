@@ -12,7 +12,7 @@ import { googleMapsUrl, mapPoint } from '../lib/location';
 import { listingSymbol, mapSymbols } from '../lib/map-symbols';
 
 export default function Help({ onAsk, onLocation, detailId }: { onAsk: () => void; onLocation: () => void; detailId?: string }) {
-  const { user, area, setArea, catalogs, requireUser, notify, pending, syncing, sync } = useApp();
+  const { user, area, setArea, catalogs, requireUser, notify, pending, syncing, sync, online } = useApp();
   const [tab, setTab] = useState('todos');
   const [showMap, setShowMap] = useState(true);
   const [selected, setSelected] = useState('');
@@ -32,7 +32,7 @@ export default function Help({ onAsk, onLocation, detailId }: { onAsk: () => voi
   return <section>
     <PageHeading eyebrow="NOS APOYAMOS" title="Ayuda vecinal" text="Pequeñas acciones que hacen un barrio más fuerte."><button className="record-button" onClick={onAsk}><Icon name="plus"/>Pedir ayuda</button></PageHeading>
     <div className="section-tabs" aria-label="Filtrar ayuda">{[['todos','En mi barrio'],['mios','Mis pedidos'],['aportes','Mis aportes'],['recursos','Recursos compartidos']].map(([value,label]) => <button data-tour={value === 'todos' ? 'tour-help' : undefined} key={value} aria-pressed={tab === value} className={tab === value ? 'active' : ''} onClick={() => selectTab(value)}>{label}</button>)}</div>
-    {pending.length > 0 && <div className="pending-panel"><div className="action-row justify-between"><h2 className="font-bold">Pendientes de envío ({pending.length})</h2><button className="text-action" disabled={syncing} onClick={() => void sync()}>{syncing ? 'Enviando…' : 'Reintentar envío'}</button></div>{pending.map(item => <div key={item.id} className="pending-item"><b>{item.body.titulo}</b><p>Aún no tenemos confirmación del servidor.</p>{item.error && <p className="text-sm">{item.error}</p>}{item.blocked && <p className="text-sm">Este pedido necesita revisión; no se volverá a enviar automáticamente.</p>}</div>)}</div>}
+    {pending.length > 0 && <div className="pending-panel"><div className="action-row justify-between"><h2 className="font-bold">Pendientes de envío ({pending.length})</h2><button className="text-action" disabled={syncing || !online} onClick={() => void sync()}>{syncing ? 'Enviando…' : 'Reintentar envío'}</button></div>{pending.map(item => <div key={item.id} className="pending-item"><b>{item.body.titulo}</b><p>Aún no tenemos confirmación del servidor.</p>{item.error && <p className="text-sm">{item.error}</p>}{item.blocked && <p className="text-sm">Este pedido necesita revisión; no se volverá a enviar automáticamente.</p>}</div>)}</div>}
     {tab === 'recursos' ? <Resources/> : <>
       {tab === 'todos' && <div className="help-map-controls"><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={17}/>{area.coordinates ? 'Cambiar punto de búsqueda' : 'Elegir mi ubicación'}</button><div className="action-row">{[1000,1500,2000].map(radius => <button type="button" className={`radius-btn ${area.radius === radius ? 'active' : ''}`} aria-pressed={area.radius === radius} key={radius} onClick={() => area.coordinates ? setArea({ ...area, radius }) : onLocation()}>{radius / 1000} km</button>)}<button type="button" className="outline-btn" aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>{showMap ? 'Ocultar mapa' : 'Ver mapa'}</button></div></div>}
       <div className="help-filters" aria-label="Filtrar pedidos de ayuda">

@@ -7,7 +7,7 @@ import { config } from "./config.js";
 import { query } from "./db/index.js";
 import { AppError, asyncHandler } from "./lib/http.js";
 import { optionalAuth } from "./middlewares/auth.js";
-import { protectMutations } from "./middlewares/security.js";
+import { protectMutations, verifyExpectedUser } from "./middlewares/security.js";
 import { errorHandler } from "./middlewares/errors.js";
 import { defaultJson } from "./middlewares/json.js";
 import auth from "./routes/auth.js";
@@ -55,6 +55,7 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
   res.json({ data: { estado: "ok", baseDeDatos: "conectada" } });
 }));
 app.use("/api", (req, res, next) => req.path === "/auth/logout" ? next() : optionalAuth(req, res, next));
+app.use('/api', verifyExpectedUser);
 app.use("/api", identity, auth, catalog, publications, notices, community, locations, notifications, assistant);
 app.use((_req, _res, next) => next(new AppError(404, "NOT_FOUND", "La ruta solicitada no existe.")));
 app.use(errorHandler);

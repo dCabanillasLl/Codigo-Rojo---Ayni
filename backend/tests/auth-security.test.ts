@@ -4,10 +4,21 @@ import express from "express";
 import request from "supertest";
 import { registerSchema, listSchema } from "../src/lib/validation.js";
 import { geoFilter } from "../src/lib/location.js";
-import { protectMutations } from "../src/middlewares/security.js";
+import { protectMutations, verifyExpectedUser } from "../src/middlewares/security.js";
 import { errorHandler } from "../src/middlewares/errors.js";
 
 const origin = "http://localhost:8443";
+test('las lecturas de caché privada verifican la cuenta activa antes de devolver datos', async () => {
+  const app = express();
+  app.use((req, _res, next) => { req.userId = req.get('X-Test-User') || ''; next(); });
+  app.use(verifyExpectedUser);
+  app.get('/private', (_req, res) => res.json({ data: 'dato de prueba' }));
+  app.use(errorHandler);
+  await request(app).get('/private').set({ 'X-Test-User': '1', 'X-AYNI-User': '1' }).expect(200);
+  const mismatch = await request(app).get('/private').set({ 'X-Test-User': '2', 'X-AYNI-User': '1' }).expect(409);
+  assert.equal(mismatch.body.error.code, 'SESSION_CHANGED');
+  await request(app).get('/private').set('X-AYNI-User', '1').expect(409);
+});
 const app = express();
 app.use(protectMutations([origin]));
 app.use(express.json());
