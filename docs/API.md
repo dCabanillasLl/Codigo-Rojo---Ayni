@@ -36,7 +36,11 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 
 Usuario: `{id,nombres,apellidos,correo|null,telefono,telefonoPublico,sectorId,sectorNombre,direccion,latitud,longitud}`. Dirección y coordenadas solo se devuelven en las respuestas autenticadas de la propia cuenta; nunca se incluyen en listados o fichas vecinales. Correo y teléfono
 solo se devuelven al propio usuario. `telefonoPublico` es consentimiento opcional; para activarlo
-se requiere teléfono E.164 (`+` y prefijo de país). En publicaciones, `telefonoContacto` será
+se requiere teléfono E.164 (`+` y prefijo de país). En registro y edición de perfil,
+`telefono` es opcional y debe ser un celular peruano de nueve dígitos que empiece con 9.
+La API acepta `987654321`, `51987654321` o `+51987654321` y lo guarda como `+51987654321`.
+En perfil, `null` permite quitarlo. El formulario muestra +51 fijo y pide solo los nueve dígitos.
+En publicaciones, `telefonoContacto` será
 `null` por defecto; solo devuelve el número con consentimiento. El registro se hace con DNI validado;
 el correo es opcional y el acceso se realiza con DNI. Se asigna internamente la zona general Pueblo Libre.
 El registro valida contraseña y límites de texto; teléfonos únicos. Dirección requerida y guardada en la

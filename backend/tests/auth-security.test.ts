@@ -2,12 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
 import request from "supertest";
-import { registerSchema, listSchema } from "../src/lib/validation.js";
+import { registerSchema, listSchema, phoneSchema } from "../src/lib/validation.js";
 import { geoFilter } from "../src/lib/location.js";
 import { protectMutations, verifyExpectedUser } from "../src/middlewares/security.js";
 import { errorHandler } from "../src/middlewares/errors.js";
 
 const origin = "http://localhost:8443";
+test('el celular peruano se normaliza con +51 y exige nueve dígitos empezando con 9', () => {
+  for (const value of ['987654321', '+51987654321', '51987654321', ' 987654321 ']) {
+    assert.equal(phoneSchema.parse(value), '+51987654321');
+  }
+  for (const value of ['', '+51', '98765432', '9876543210', '887654321', '+54987654321', '+5151987654321', '987abc321']) {
+    assert.equal(phoneSchema.safeParse(value).success, false, value);
+  }
+  assert.equal(phoneSchema.nullable().optional().parse(null), null);
+  assert.equal(phoneSchema.nullable().optional().parse(undefined), undefined);
+});
 test('las lecturas de caché privada verifican la cuenta activa antes de devolver datos', async () => {
   const app = express();
   app.use((req, _res, next) => { req.userId = req.get('X-Test-User') || ''; next(); });

@@ -10,6 +10,7 @@
     "dev:api": "npm --prefix backend run dev",
     "test:api": "npm --prefix backend test",
     "test:offline": "npm run build && playwright test -c playwright.offline.config.ts",
+    "test:account": "npm run build && playwright test -c playwright.account.config.ts",
     "preview": "vite preview",
     "format": "oxfmt"
   },

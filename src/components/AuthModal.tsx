@@ -6,11 +6,15 @@ import type { LocationDraft, User } from '../types';
 import RegistrationLocationDialog from './RegistrationLocationDialog';
 import Icon from './Icon';
 import AddressAutocomplete from './AddressAutocomplete';
+import PasswordField from './PasswordField';
+import PhoneField from './PhoneField';
 
 export default function AuthModal() {
   const { setAuthOpen, setUser, online, notify } = useApp();
   const [register, setRegister] = useState(false);
   const [legacyLogin, setLegacyLogin] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [dni, setDni] = useState('');
@@ -51,6 +55,7 @@ export default function AuthModal() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || dniBusy || locationOpen) return;
+    if (register && password !== passwordConfirmation) { setError('Las contraseñas no coinciden. Revisa la confirmación.'); return; }
     if (register && location.address.trim().length < 3) { setError('Escribe una dirección o referencia de al menos 3 caracteres.'); return; }
     const data = new FormData(event.currentTarget); setBusy(true); setError('');
     try {
@@ -71,7 +76,8 @@ export default function AuthModal() {
         <p className="dni-fields-note">Los nombres y apellidos vienen de la consulta del DNI y no se pueden editar.</p>
       </>}
       {!register && <Field label={legacyLogin ? 'Correo de tu cuenta anterior' : 'DNI'}><input name={legacyLogin ? 'correo' : 'identificador'} type={legacyLogin ? 'email' : 'text'} inputMode={legacyLogin ? 'email' : 'numeric'} autoComplete="username" required minLength={legacyLogin ? undefined : 8} maxLength={legacyLogin ? 254 : 8} pattern={legacyLogin ? undefined : '[0-9]{8}'} placeholder={legacyLogin ? 'tu@correo.com' : 'Escribe los 8 dígitos'}/></Field>}
-      <Field label="Contraseña" hint={register ? 'Usa al menos 10 caracteres.' : undefined}><input name="contrasena" type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={register ? 10 : 1} maxLength={72}/></Field>
+      <PasswordField key={register ? 'register-password' : 'login-password'} label="Contraseña" name="contrasena" value={password} onChange={setPassword} autoComplete={register ? 'new-password' : 'current-password'} minLength={register ? 10 : 1} hint={register ? 'Usa al menos 10 caracteres.' : undefined}/>
+      {register && <PasswordField label="Confirmar contraseña" name="confirmarContrasena" value={passwordConfirmation} onChange={setPasswordConfirmation} autoComplete="new-password" minLength={10} confirmAgainst={password} hint="Vuelve a escribir tu contraseña."/>}
       {register && <>
         <div className="registration-location">
           <div className="registration-location-heading"><span className="registration-location-icon"><Icon name="pin" size={19}/></span><div><b>¿Dónde vives?</b><small>Para mostrarte apoyo y servicios cercanos</small></div></div>
@@ -79,13 +85,13 @@ export default function AuthModal() {
           <div className="registration-location-actions"><button type="button" className="outline-btn" disabled={busy || dniBusy || !online} onClick={() => setLocationOpen(true)}><Icon name="pin" size={17}/>{location.coordinates ? 'Ajustar punto en el mapa' : 'Usar GPS o elegir en el mapa'}</button>{location.coordinates && <><span className="registration-location-selected" role="status"><Icon name="check" size={15}/>Ubicación precisa guardada</span><button type="button" className="text-action" disabled={busy} onClick={() => setLocation(current => ({ ...current, coordinates: null }))}>Quitar punto</button></>}</div>
           <p className="registration-location-privacy">Tu dirección y punto exacto son privados. Puedes corregirlos antes de crear tu cuenta.</p>
         </div>
-        <Field label="Teléfono (opcional)" hint="No se muestra públicamente en los listados."><input name="telefono" type="tel" autoComplete="tel" maxLength={25}/></Field>
+        <PhoneField hint="No se muestra públicamente en los listados."/>
       </>}
       {!online && <ErrorBox message="Necesitas conexión para iniciar sesión o crear una cuenta."/>}
       <ErrorBox message={error}/>
       <div className="auth-actions"><button type="submit" className="record-button justify-center" disabled={busy || dniBusy || locationOpen || !online || (register && (!dniProof || !dniConsent))}>{busy ? 'Un momento…' : register ? 'Crear mi cuenta' : 'Entrar'}</button>
       {!register && <button type="button" className="text-action" onClick={() => { setLegacyLogin(!legacyLogin); setError(''); }}>{legacyLogin ? 'Entrar con DNI' : '¿Cuenta anterior? Entrar con correo'}</button>}
-      <button type="button" className="text-action" onClick={() => { setRegister(!register); setLegacyLogin(false); setError(''); }}>{register ? 'Ya tengo una cuenta · Iniciar sesión' : '¿Aún no tienes cuenta? Regístrate'}</button></div>
+      <button type="button" className="text-action" onClick={() => { setRegister(!register); setLegacyLogin(false); setPassword(''); setPasswordConfirmation(''); setError(''); }}>{register ? 'Ya tengo una cuenta · Iniciar sesión' : '¿Aún no tienes cuenta? Regístrate'}</button></div>
     </form>
   </Modal>{locationOpen && <RegistrationLocationDialog value={location} online={online} onClose={() => setLocationOpen(false)} onConfirm={value => { setLocation(value); setLocationOpen(false); setError(''); }}/>}</>;
 }
