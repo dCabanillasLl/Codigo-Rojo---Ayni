@@ -73,8 +73,8 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
       const height = Math.min(window.innerHeight - top - 4, rect.height + pad * 2);
       const right = left + width;
       const bottom = top + height;
-      const tooltipWidth = Math.min(352, window.innerWidth - 24);
-      const tooltipHeight = 230;
+      const tooltipWidth = Math.min(400, window.innerWidth - 24);
+      const tooltipHeight = 260;
       const placement = window.innerHeight - bottom >= tooltipHeight + 28 ? 'below' : 'above';
       const tooltipTop = placement === 'below'
         ? Math.min(window.innerHeight - tooltipHeight - 12, bottom + 18)
@@ -174,7 +174,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
 
   return <>
     {open && <section className="guide-panel" aria-label="Guía sencilla de AYNI">
-      <header className="guide-header"><span className="guide-avatar"><Icon name="hands" size={20}/></span><div><b>Guía AYNI</b><small>Aprende haciendo · paso a paso</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => setOpen(false)}><Icon name="close" size={18}/></button></header>
+      <header className="guide-header"><span className="guide-avatar"><img src="/ayni-logo.png" alt=""/></span><div><b>Tu guía vecinal</b><small>Estoy aquí para ayudarte</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => setOpen(false)}><Icon name="close" size={18}/></button></header>
       <div className="guide-messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
         {messages.map(message => <div key={message.id} className={`guide-message ${message.from}`}>
           <span className="sr-only">{message.from === 'bot' ? 'Guía AYNI: ' : 'Tú: '}</span>
@@ -195,10 +195,10 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
       {open ? <Icon name="close" size={23}/> : <><Icon name="hands" size={22}/><span>¿Te ayudo?</span></>}
     </button>
     {tourIndex !== null && spotlight && <>
-      <div className="guide-tour-shade" style={{ top: 0, left: 0, width: '100vw', height: spotlight.top }}/>
-      <div className="guide-tour-shade" style={{ top: spotlight.top, left: 0, width: spotlight.left, height: spotlight.height }}/>
-      <div className="guide-tour-shade" style={{ top: spotlight.top, left: spotlight.right, width: Math.max(0, window.innerWidth - spotlight.right), height: spotlight.height }}/>
-      <div className="guide-tour-shade" style={{ top: spotlight.bottom, left: 0, width: '100vw', height: Math.max(0, window.innerHeight - spotlight.bottom) }}/>
+      <div className="guide-tour-shade" style={{ top: 0, left: 0, width: '100vw', height: spotlight.top + 1 }}/>
+      <div className="guide-tour-shade" style={{ top: spotlight.top - 1, left: 0, width: spotlight.left + 1, height: spotlight.height + 2 }}/>
+      <div className="guide-tour-shade" style={{ top: spotlight.top - 1, left: spotlight.right - 1, width: Math.max(0, window.innerWidth - spotlight.right + 1), height: spotlight.height + 2 }}/>
+      <div className="guide-tour-shade" style={{ top: spotlight.bottom - 1, left: 0, width: '100vw', height: Math.max(0, window.innerHeight - spotlight.bottom + 1) }}/>
       <div className="guide-spotlight" aria-hidden="true" style={{ top: spotlight.top, left: spotlight.left, width: spotlight.width, height: spotlight.height }}/>
       <section className="guide-tour-card" role="dialog" aria-live="polite" aria-label={`Guía AYNI, paso ${tourIndex + 1} de ${tutorial.length}`} data-placement={spotlight.placement} style={{ top: spotlight.tooltipTop, left: spotlight.tooltipLeft, width: spotlight.tooltipWidth }}>
         <div className="guide-tour-topline"><span>RECORRIDO AYNI</span><button type="button" onClick={() => endVisualTour(true)} aria-label="Salir del recorrido"><Icon name="close" size={17}/></button></div>

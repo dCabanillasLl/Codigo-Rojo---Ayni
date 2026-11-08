@@ -4,6 +4,7 @@ import { one, query, transaction } from '../db/index.js';
 import { AppError } from '../lib/http.js';
 import { locationSchema } from '../lib/validation.js';
 import { publicMapColumns } from '../lib/location.js';
+import { sendCommunityEmail } from './email.js';
 import { assertAllowedRequestText, generateRequestTitle } from '../lib/request-policy.js';
 import { approximateDistance, createLocation, geoClause, idSchema, insert, publicName, row, rows, uuidSchema, type ListOptions } from './community-data.js';
 import { assertCanCloseRequest, assertRequestActive, contentHash, requireSameContent, transitionOffer, type OfferState, type RequestState } from './community-rules.js';
@@ -50,7 +51,7 @@ interface OfferLock {
 interface PublicRequest {
   id: string; solicitanteId: string; solicitante: string; categoriaId: string;
   categoria: string; sectorId: string; sectorNombre: string; titulo: string;
-  descripcion: string; urgencia: string; estado: RequestState; creadoEn: Date;
+  descripcion: string; urgencia: string; estado: RequestState; creadoEn: Date; venceEn: Date | null;
   distanciaMetros: number | string | null; clientRequestId: string | null;
   motivoCancelacion: string | null;
 }
@@ -58,7 +59,7 @@ const requestColumns = `CAST(s.solicitud_id AS CHAR) AS id,
   CAST(s.solicitante_id AS CHAR) AS solicitanteId, ${publicName('u')} AS solicitante,
   CAST(s.categoria_ayuda_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   CAST(l.sector_id AS CHAR) AS sectorId, v.nombre AS sectorNombre,
-  s.titulo, s.descripcion, s.urgencia, s.estado, s.creado_en AS creadoEn,
+  s.titulo, s.descripcion, s.urgencia, s.estado, s.creado_en AS creadoEn, s.vence_en AS venceEn,
   s.client_request_id AS clientRequestId, s.motivo_cancelacion AS motivoCancelacion,
   ${publicMapColumns}`;
 const requestFrom = `FROM solicitudes_ayuda s
@@ -72,6 +73,7 @@ function privateRequestFields(request: PublicRequest, userId?: string): PublicRe
 }
 export async function listRequests(options: ListOptions, userId?: string): Promise<PublicRequest[]> {
   if ((options.mios === '1' || options.participando === '1') && !userId) throw new AppError(401, 'AUTH_REQUIRED', 'Inicia sesión para ver tus pedidos y aportes.');
+  await expireOpenRequests();
   const geo = geoClause(options);
   const conditions = ["u.estado_cuenta = 'activo'", ...geo.where];
   const params = [...geo.whereParams];
@@ -81,6 +83,7 @@ export async function listRequests(options: ListOptions, userId?: string): Promi
     conditions.push('EXISTS (SELECT 1 FROM ofertas_ayuda propias WHERE propias.solicitud_id = s.solicitud_id AND propias.voluntario_id = ?)'); params.push(userId);
   } else {
     conditions.push("s.estado IN ('abierta','en_curso')", '(s.vence_en IS NULL OR s.vence_en > UTC_TIMESTAMP())');
+    if (userId) { conditions.push('s.solicitante_id <> ?'); params.push(userId); }
   }
   if (options.q) { conditions.push('(s.titulo LIKE ? OR s.descripcion LIKE ?)'); params.push(`%${options.q}%`, `%${options.q}%`); }
   if (options.sectorId) { conditions.push('l.sector_id = ?'); params.push(options.sectorId); }
@@ -93,10 +96,21 @@ export async function listRequests(options: ListOptions, userId?: string): Promi
   return result.map((request) => privateRequestFields(request, userId));
 }
 export async function getRequest(id: string, userId?: string): Promise<PublicRequest> {
+  await expireOpenRequests();
   const request = await one<PublicRequest>(`SELECT ${requestColumns}, NULL AS distanciaMetros ${requestFrom}
     WHERE s.solicitud_id = ? AND u.estado_cuenta = 'activo'`, [id]);
   if (!request) throw new AppError(404, 'REQUEST_NOT_FOUND', 'No se encontró el pedido.');
   return privateRequestFields(request, userId);
+}
+async function expireOpenRequests(): Promise<void> {
+  await transaction(async (connection) => {
+    await connection.execute(`UPDATE solicitudes_ayuda SET estado = 'vencida'
+      WHERE estado = 'abierta' AND vence_en IS NOT NULL AND vence_en <= UTC_TIMESTAMP()`);
+    await connection.execute(`UPDATE ofertas_ayuda o
+      JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id
+      SET o.estado = 'rechazada', o.motivo_cancelacion = 'El pedido venció antes de aceptar la propuesta.'
+      WHERE s.estado = 'vencida' AND o.estado = 'pendiente'`);
+  });
 }
 async function lockRequest(connection: PoolConnection, id: string): Promise<RequestLock> {
   const request = await row<RequestLock>(connection, `SELECT CAST(solicitud_id AS CHAR) AS solicitud_id,
@@ -123,12 +137,15 @@ export async function createRequest(userId: string, data: z.infer<typeof createR
     if (previous) { requireSameContent(previous.request_hash, fingerprint); return { id: previous.id, replayed: true }; }
     const category = await row<{ categoria_ayuda_id: string; nombre: string }>(connection, 'SELECT categoria_ayuda_id, nombre FROM categorias_ayuda WHERE categoria_ayuda_id = ?', [data.categoriaId]);
     if (!category) throw new AppError(400, 'UNKNOWN_CATEGORY', 'Selecciona una categoría de ayuda disponible.');
-    const urgency = category.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal';
+    const categoryName = category.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    const urgent = categoryName.includes('urgent');
+    const urgency = urgent ? 'urgente' : 'normal';
+    const expiryHours = urgent ? 24 : categoryName.includes('favor') ? 72 : 168;
     const locationId = await createLocation(connection, userId, data.sectorId, data.ubicacion);
     const id = await insert(connection, `INSERT INTO solicitudes_ayuda
-      (solicitante_id, categoria_ayuda_id, ubicacion_id, titulo, descripcion, urgencia, client_request_id, request_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, data.categoriaId, locationId, title, data.descripcion, urgency, data.clientRequestId, fingerprint]);
+      (solicitante_id, categoria_ayuda_id, ubicacion_id, titulo, descripcion, urgencia, client_request_id, request_hash, vence_en)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? HOUR))`,
+    [userId, data.categoriaId, locationId, title, data.descripcion, urgency, data.clientRequestId, fingerprint, expiryHours]);
     return { id, replayed: false };
   });
   return { request: await getRequest(result.id, userId), replayed: result.replayed };
@@ -139,7 +156,7 @@ export async function closeRequest(userId: string, id: string, data: z.infer<typ
     if (request.solicitante_id !== userId) throw new AppError(403, 'FORBIDDEN', 'Solo quien publicó el pedido puede cerrarlo.');
     const target = data.accion === 'completar' ? 'completada' : 'cancelada';
     if (request.estado === target) return;
-    assertRequestActive(request.estado);
+    if (request.estado !== 'vencida') assertRequestActive(request.estado);
     const contributions = await row<{ total: number }>(connection,
       "SELECT COUNT(*) AS total FROM ofertas_ayuda WHERE solicitud_id = ? AND estado = 'aceptada'", [id]);
     assertCanCloseRequest(Number(contributions?.total ?? 0));
@@ -199,13 +216,22 @@ export async function createOffer(userId: string, requestId: string, data: z.inf
       'INSERT INTO ofertas_ayuda (solicitud_id, voluntario_id, mensaje) VALUES (?, ?, ?)', [requestId, userId, data.mensaje]);
     return { id, replayed: false };
   });
-  return { offer: await getOffer(result.id), replayed: result.replayed };
+  const offer = await getOffer(result.id);
+  if (!result.replayed) {
+    const recipient = await one<{ correo: string | null; enabled: number; titulo: string; voluntario: string }>(
+      `SELECT owner.correo, owner.notificaciones_correo AS enabled, s.titulo, ${publicName('voluntario')} AS voluntario
+       FROM solicitudes_ayuda s JOIN usuarios owner ON owner.usuario_id = s.solicitante_id
+       JOIN usuarios voluntario ON voluntario.usuario_id = ? WHERE s.solicitud_id = ?`, [userId, requestId]);
+    if (recipient?.enabled) await sendCommunityEmail(recipient.correo, 'Alguien ofreció ayudarte en AYNI',
+      `Hola, ${offer.voluntario} ofreció ayuda en tu pedido “${recipient.titulo}”.\n\nEntra a AYNI para revisar la propuesta y decidir si la aceptas.`);
+  }
+  return { offer, replayed: result.replayed };
 }
 export async function updateOffer(userId: string, id: string, data: z.infer<typeof offerActionSchema>) {
   const lookup = await one<{ solicitudId: string }>(
     'SELECT CAST(solicitud_id AS CHAR) AS solicitudId FROM ofertas_ayuda WHERE oferta_id = ?', [id]);
   if (!lookup) throw new AppError(404, 'OFFER_NOT_FOUND', 'No se encontró la colaboración.');
-  await transaction(async (connection) => {
+  const changed = await transaction(async (connection) => {
     // All offer mutations lock the request before the offer, including completion/reviews.
     const request = await lockRequest(connection, lookup.solicitudId);
     const offer = await row<OfferLock>(connection, `SELECT CAST(oferta_id AS CHAR) AS oferta_id,
@@ -216,7 +242,7 @@ export async function updateOffer(userId: string, id: string, data: z.infer<type
     const next = transitionOffer({ action: data.accion, state: offer.estado,
       requester: userId === request.solicitante_id, volunteer: userId === offer.voluntario_id,
       requestState: request.estado, delivered: offer.entregada_en !== null });
-    if (next.state === offer.estado && !next.markConfirmed && !next.markDelivered) return;
+    if (next.state === offer.estado && !next.markConfirmed && !next.markDelivered) return false;
     await connection.execute(`UPDATE ofertas_ayuda SET estado = ?,
       entregada_en = CASE WHEN ? THEN COALESCE(entregada_en, UTC_TIMESTAMP()) ELSE entregada_en END,
       confirmada_en = CASE WHEN ? THEN COALESCE(confirmada_en, UTC_TIMESTAMP()) ELSE confirmada_en END,
@@ -232,8 +258,34 @@ export async function updateOffer(userId: string, id: string, data: z.infer<type
         await connection.execute("UPDATE solicitudes_ayuda SET estado = 'abierta' WHERE solicitud_id = ?", [lookup.solicitudId]);
       }
     }
+    return true;
   });
-  return getOffer(id);
+  const updated = await getOffer(id);
+  if (changed) {
+    const details = await one<{ ownerEmail: string | null; ownerNotifications: number; ownerName: string; volunteerEmail: string | null; volunteerNotifications: number; titulo: string }>(
+      `SELECT owner.correo AS ownerEmail, owner.notificaciones_correo AS ownerNotifications,
+        ${publicName('owner')} AS ownerName, volunteer.correo AS volunteerEmail,
+        volunteer.notificaciones_correo AS volunteerNotifications, s.titulo
+       FROM ofertas_ayuda o JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id
+       JOIN usuarios owner ON owner.usuario_id = s.solicitante_id
+       JOIN usuarios volunteer ON volunteer.usuario_id = o.voluntario_id WHERE o.oferta_id = ?`, [id]);
+    if (details) {
+      const subject = data.accion === 'aceptar' ? 'Aceptaron tu ayuda en AYNI'
+        : data.accion === 'rechazar' ? 'Respondieron a tu propuesta en AYNI'
+          : data.accion === 'retirar' ? 'Se retiró una propuesta en AYNI'
+            : data.accion === 'entregar' ? 'Un vecino indicó que entregó su aporte'
+              : 'Un vecino confirmó que recibió tu ayuda';
+      const body = data.accion === 'aceptar' ? `Tu propuesta para “${details.titulo}” fue aceptada. Entra a AYNI para coordinar con tu vecino.`
+        : data.accion === 'rechazar' ? `Tu propuesta para “${details.titulo}” no fue aceptada. Gracias por ofrecer tu ayuda en AYNI.`
+          : data.accion === 'retirar' ? `Una propuesta para “${details.titulo}” fue retirada. Entra a AYNI para revisar el estado del pedido.`
+            : data.accion === 'entregar' ? `El colaborador indicó que ya entregó su aporte para “${details.titulo}”. Entra a AYNI para confirmar si lo recibiste.`
+              : `El vecino confirmó que recibió tu ayuda para “${details.titulo}”. ¡Gracias por colaborar en AYNI!`;
+      const toOwner = data.accion === 'retirar' || data.accion === 'entregar';
+      if (toOwner && details.ownerNotifications) await sendCommunityEmail(details.ownerEmail, subject, `Hola, ${details.ownerName}.\n\n${body}`);
+      if (!toOwner && details.volunteerNotifications) await sendCommunityEmail(details.volunteerEmail, subject, `Hola.\n\n${body}`);
+    }
+  }
+  return updated;
 }
 export async function saveReview(userId: string, offerId: string, data: z.infer<typeof reviewSchema>) {
   const lookup = await one<{ solicitudId: string }>(

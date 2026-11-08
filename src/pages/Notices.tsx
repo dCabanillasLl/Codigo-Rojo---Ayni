@@ -40,7 +40,7 @@ export default function Notices({ view }: { view?: string }) {
   const visible = notices.data?.filter(item => !deletedIds.has(item.id) && (tab !== 'cerca' || noticeVisible(item, Math.max(now, Date.now()))));
   return <section data-tour="tour-notices">
     <PageHeading eyebrow="LO QUE PASA CERCA" title="Avisos del barrio" text="Actividades, campañas y avisos compartidos por vecinos.">
-      <button className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>Crear aviso</button>
+      <button data-tour="tour-notices" className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>Crear aviso</button>
     </PageHeading>
     <p className="form-hint mt-3">Los avisos son información compartida por vecinos; no representan comunicados oficiales.</p>
     <div className="notice-view-switch" role="group" aria-label="Ver avisos"><button type="button" className="notice-view-button notice-view-nearby" aria-pressed={tab === 'cerca'} onClick={() => { window.location.hash = 'avisos'; }}><Icon name="pin" size={18}/><span>Actividades cercanas</span></button><button type="button" className="notice-view-button notice-view-attending" aria-pressed={tab === 'asistencias'} onClick={() => { if (requireUser()) window.location.hash = 'avisos/asistencias'; }}><Icon name="check" size={18}/><span>Mis asistencias</span></button><button type="button" className="notice-view-button notice-view-owned" aria-pressed={tab === 'mios'} onClick={() => { if (requireUser()) window.location.hash = 'avisos/mios'; }}><Icon name="calendar" size={18}/><span>Mis actividades</span></button></div>

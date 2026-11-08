@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useApp } from '../AppContext';
 import { api, errorMessage, refreshData } from '../lib/api';
-import { areaQuery, useRemote } from '../lib/hooks';
+import { areaQuery, useDebounced, useRemote } from '../lib/hooks';
 import { Empty, ErrorBox, Field, Modal, PageHeading, RemoteState, distance, formatDate, initials, shareItem, speak, statusLabel } from '../components/UI';
 import Icon from '../components/Icon';
 import type { HelpRequest, Offer } from '../types';
@@ -9,33 +9,48 @@ import Resources from './Resources';
 import { ListingsMap } from '../ServicesMap';
 import CommunityMap from '../components/CommunityMap';
 import { googleMapsUrl, mapPoint } from '../lib/location';
-import { listingSymbol } from '../lib/map-symbols';
+import { listingSymbol, mapSymbols } from '../lib/map-symbols';
 
 export default function Help({ onAsk, onLocation, detailId }: { onAsk: () => void; onLocation: () => void; detailId?: string }) {
-  const { user, area, setArea, requireUser, notify, pending, syncing, sync } = useApp();
+  const { user, area, setArea, catalogs, requireUser, notify, pending, syncing, sync } = useApp();
   const [tab, setTab] = useState('todos');
   const [showMap, setShowMap] = useState(true);
   const [selected, setSelected] = useState('');
+  const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const debouncedSearch = useDebounced(search.trim(), 300);
   const params = tab === 'mios' || tab === 'aportes' ? new URLSearchParams() : areaQuery(area);
   if (tab === 'mios') params.set('mios','1');
   if (tab === 'aportes') params.set('participando','1');
+  if (debouncedSearch) params.set('q', debouncedSearch);
+  if (categoryId) params.set('categoriaId', categoryId);
   const requests = useRemote<HelpRequest[]>(tab === 'recursos' ? null : `/solicitudes?${params}`, user?.id || 'public');
+  const visibleRequests = requests.data?.filter(request => tab !== 'todos' || request.solicitanteId !== user?.id);
+  const hasFilters = Boolean(search || categoryId);
+  function clearFilters() { setSearch(''); setCategoryId(''); }
   function selectTab(value: string) { if ((value === 'mios' || value === 'aportes') && !requireUser()) return; setTab(value); }
-  return <section data-tour="tour-help">
+  return <section>
     <PageHeading eyebrow="NOS APOYAMOS" title="Ayuda vecinal" text="Pequeñas acciones que hacen un barrio más fuerte."><button className="record-button" onClick={onAsk}><Icon name="plus"/>Pedir ayuda</button></PageHeading>
-    <div className="section-tabs" aria-label="Filtrar ayuda">{[['todos','En mi barrio'],['mios','Mis pedidos'],['aportes','Mis aportes'],['recursos','Recursos compartidos']].map(([value,label]) => <button key={value} aria-pressed={tab === value} className={tab === value ? 'active' : ''} onClick={() => selectTab(value)}>{label}</button>)}</div>
+    <div className="section-tabs" aria-label="Filtrar ayuda">{[['todos','En mi barrio'],['mios','Mis pedidos'],['aportes','Mis aportes'],['recursos','Recursos compartidos']].map(([value,label]) => <button data-tour={value === 'todos' ? 'tour-help' : undefined} key={value} aria-pressed={tab === value} className={tab === value ? 'active' : ''} onClick={() => selectTab(value)}>{label}</button>)}</div>
     {pending.length > 0 && <div className="pending-panel"><div className="action-row justify-between"><h2 className="font-bold">Pendientes de envío ({pending.length})</h2><button className="text-action" disabled={syncing} onClick={() => void sync()}>{syncing ? 'Enviando…' : 'Reintentar envío'}</button></div>{pending.map(item => <div key={item.id} className="pending-item"><b>{item.body.titulo}</b><p>Aún no tenemos confirmación del servidor.</p>{item.error && <p className="text-sm">{item.error}</p>}{item.blocked && <p className="text-sm">Este pedido necesita revisión; no se volverá a enviar automáticamente.</p>}</div>)}</div>}
     {tab === 'recursos' ? <Resources/> : <>
       {tab === 'todos' && <div className="help-map-controls"><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={17}/>{area.coordinates ? 'Cambiar punto de búsqueda' : 'Elegir mi ubicación'}</button><div className="action-row">{[1000,1500,2000].map(radius => <button type="button" className={`radius-btn ${area.radius === radius ? 'active' : ''}`} aria-pressed={area.radius === radius} key={radius} onClick={() => area.coordinates ? setArea({ ...area, radius }) : onLocation()}>{radius / 1000} km</button>)}<button type="button" className="outline-btn" aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>{showMap ? 'Ocultar mapa' : 'Ver mapa'}</button></div></div>}
+      <div className="help-filters" aria-label="Filtrar pedidos de ayuda">
+        <label className="help-filter-search"><span>Buscar</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Ej. necesito una escalera" aria-label="Buscar por palabra"/></label>
+        <label><span>Categoría</span><select value={categoryId} onChange={event => setCategoryId(event.target.value)}><option value="">Todas las categorías</option>{catalogs.data?.ayuda.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
+        {hasFilters && <button type="button" className="help-filter-clear" onClick={clearFilters}>Limpiar filtros</button>}
+      </div>
       <RemoteState {...requests}/>
-      {showMap && <ListingsMap items={requests.data || []} selectedId={selected} onSelect={setSelected} onOpen={id => { window.location.hash = `ayuda/${id}`; }} title="Ayuda cerca de ti" kind="help" filterRadius={tab === 'todos'}/>}
-      {!requests.loading && requests.data?.length === 0 && <Empty title={tab === 'mios' ? 'Aquí aparecerán tus pedidos' : tab === 'aportes' ? 'Tu próxima ayuda empieza aquí' : 'Tu barrio empieza contigo'} text={tab === 'aportes' ? 'Cuando te ofrezcas en un pedido, podrás seguirlo desde esta sección.' : 'Publica una necesidad o vuelve a consultar más tarde.'}/>}
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">{requests.data?.map(request => <article className="request-card" key={request.id}>
-        <div className="flex items-center justify-between gap-2"><span className={`category ${request.urgencia === 'urgente' ? 'urgent' : ''}`}>{request.urgencia === 'urgente' && <Icon name="alert" size={14}/>} {request.categoria}</span><button className="listen-btn" aria-label={`Escuchar pedido de ${request.solicitante}`} onClick={() => { if (!speak(`${request.solicitante} necesita: ${request.descripcion}`)) notify('La lectura en voz alta no está disponible.'); }}><Icon name="headphones" size={16}/>Escuchar</button></div>
+      {showMap && <ListingsMap items={visibleRequests || []} selectedId={selected} onSelect={setSelected} onOpen={id => { window.location.hash = `ayuda/${id}`; }} title="Ayuda cerca de ti" kind="help" filterRadius={tab === 'todos'}/>}
+      {!requests.loading && visibleRequests?.length === 0 && <Empty title={hasFilters ? 'No encontramos pedidos con esos filtros' : tab === 'mios' ? 'Aquí aparecerán tus pedidos' : tab === 'aportes' ? 'Tu próxima ayuda empieza aquí' : 'Tu barrio empieza contigo'} text={hasFilters ? 'Prueba otra palabra o categoría. También puedes limpiar los filtros.' : tab === 'todos' ? 'Aquí verás pedidos de otros vecinos. Tus publicaciones están en Mis pedidos.' : tab === 'aportes' ? 'Cuando te ofrezcas en un pedido, podrás seguirlo desde esta sección.' : 'Publica una necesidad o vuelve a consultar más tarde.'}/>}
+      {!requests.loading && visibleRequests && visibleRequests.length > 0 && hasFilters && <p className="help-filter-count">{visibleRequests.length} {visibleRequests.length === 1 ? 'pedido coincide' : 'pedidos coinciden'} con tus filtros</p>}
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">{visibleRequests?.map(request => <article className="request-card" key={request.id}>
+        <div className="flex items-center justify-between gap-2"><div className="request-card-tags"><span className={`request-category-badge symbol-${listingSymbol({ categoria: request.categoria, titulo: request.titulo, urgencia: 'normal' }, 'help')}`}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: mapSymbols[listingSymbol({ categoria: request.categoria, titulo: request.titulo, urgencia: 'normal' }, 'help')].paths }}/>{request.categoria}</span>{request.urgencia === 'urgente' && <span className="request-urgent-badge"><Icon name="alert" size={13}/>Urgente</span>}</div><button className="listen-btn" aria-label={`Escuchar pedido de ${request.solicitante}`} onClick={() => { if (!speak(`${request.solicitante} necesita: ${request.descripcion}`)) notify('La lectura en voz alta no está disponible.'); }}><Icon name="headphones" size={16}/>Escuchar</button></div>
         <div className="mt-5 flex items-center gap-3"><div className="small-avatar">{initials(request.solicitante)}</div><div><p className="font-bold">{request.solicitante}</p></div></div>
         <h2 className="mt-5 text-lg font-bold leading-snug">{request.titulo}</h2><p className="card-description">{request.descripcion}</p>
         <p className="mt-3 flex items-center gap-2 text-sm text-[#748078]"><Icon name="pin" size={16}/>{distance(request.distanciaMetros, 'Distancia no disponible')}</p>
         <p className="mt-2 flex items-center gap-2 text-xs text-[#748078]"><Icon name="clock" size={14}/>{formatDate(request.creadoEn)}</p>
+        {request.venceEn && <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-[#9b5b39]"><Icon name="clock" size={14}/>{request.estado === 'vencida' ? 'Venció' : 'Recibimos propuestas hasta'} {formatDate(request.venceEn)}</p>}
         <span className={`state-badge mt-3 state-${request.estado}`}>{statusLabel(request.estado)}</span>
         <button className="offer-button" onClick={() => { window.location.hash = `ayuda/${request.id}`; }}>{request.solicitanteId === user?.id ? 'Ver mi pedido' : 'Ver pedido y colaborar'}<Icon name="arrow" size={17}/></button>
       </article>)}</div>
@@ -68,18 +83,21 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
   async function cancel(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); if (await mutate(`/solicitudes/${id}`, { accion: 'cancelar', motivo: data.get('motivo') }, 'Pedido cancelado')) setCancelling(false); }
   return <Modal title={item?.titulo || 'Pedido de ayuda'} onClose={onClose} wide>
     <RemoteState {...request}/>
-    {item && <>
-      <div className="action-row justify-between"><span className={`state-badge state-${item.estado}`}>{statusLabel(item.estado)}</span></div>
-      <p className="detail-description">{item.descripcion}</p><p className="text-sm text-[#65726b]">Publicado por {item.solicitante} · {formatDate(item.creadoEn)}</p>
-      {point && <div className="detail-map"><h3 className="section-subtitle font-display">Zona donde se necesita ayuda</h3><CommunityMap center={point} pins={[{ id, point, title: item.titulo, label: '1', kind: 'help', symbol: listingSymbol(item, 'help'), category: item.categoria }]} selectedId={id} online={online} compact label="Ubicación aproximada del pedido"/><p className="form-hint">El marcador muestra una zona aproximada. Coordina el lugar de entrega con el vecino.</p><a className="text-action" href={googleMapsUrl(point)} target="_blank" rel="noopener noreferrer">Abrir zona en Google Maps</a></div>}
-      <div className="action-row mt-4"><button className="outline-btn" onClick={() => { if (!speak(item.descripcion)) notify('La lectura en voz alta no está disponible.'); }}><Icon name="headphones" size={16}/>Escuchar</button><button className="outline-btn" onClick={() => { void shareItem(item.titulo,item.descripcion,`#ayuda/${id}`).then(message => { if (message) notify(message); }).catch(error => { if (error?.name !== 'AbortError') setError(errorMessage(error)); }); }}><Icon name="share" size={16}/>Compartir</button></div>
+    {item && <div className="request-detail">
+      <div className="request-summary-card">
+        <div className="request-summary-tags"><span className={`state-badge state-${item.estado}`}>{statusLabel(item.estado)}</span><span className="category">{item.categoria}</span>{item.urgencia === 'urgente' && <span className="category urgent"><Icon name="alert" size={14}/>Apoyo urgente</span>}</div>
+        <p className="request-summary-description">{item.descripcion}</p>
+        <div className="request-summary-meta"><span className="small-avatar">{initials(item.solicitante)}</span><span><b>{item.solicitante}</b><small>Publicado el {formatDate(item.creadoEn)}</small></span>{item.venceEn && <span className="request-expiry"><Icon name="clock" size={15}/>{item.estado === 'vencida' ? 'Venció' : 'Recibe propuestas hasta'} {formatDate(item.venceEn)}</span>}</div>
+      </div>
+      {point && <div className="detail-map request-detail-map"><div><p className="eyebrow">PUNTO DE ENCUENTRO</p><h3 className="font-display">Zona aproximada</h3></div><CommunityMap center={point} pins={[{ id, point, title: item.titulo, label: '1', kind: 'help', symbol: listingSymbol(item, 'help'), category: item.categoria }]} selectedId={id} online={online} compact label="Ubicación aproximada del pedido"/><p className="request-map-caption">El marcador señala una zona aproximada. Acuerden un lugar de encuentro seguro por el chat o en persona.</p><a className="request-map-link" href={googleMapsUrl(point)} target="_blank" rel="noopener noreferrer"><Icon name="pin" size={16}/>Abrir zona en Google Maps</a></div>}
+      <div className="request-detail-actions"><button className="outline-btn" onClick={() => { if (!speak(item.descripcion)) notify('La lectura en voz alta no está disponible.'); }}><Icon name="headphones" size={17}/>Escuchar pedido</button><button className="outline-btn" onClick={() => { void shareItem(item.titulo,item.descripcion,`#ayuda/${id}`).then(message => { if (message) notify(message); }).catch(error => { if (error?.name !== 'AbortError') setError(errorMessage(error)); }); }}><Icon name="share" size={17}/>Compartir</button></div>
       <ErrorBox message={error}/>
-      {owner && open && <div className="owner-actions"><h3 className="font-bold">Tú decides cuándo está resuelto</h3><p>Confirma cada aporte recibido antes de completar tu pedido.</p><div className="action-row"><button className="offer-button" disabled={busy || !online} onClick={() => void mutate(`/solicitudes/${id}`, { accion: 'completar' }, 'Tu necesidad quedó resuelta. Gracias por confirmarlo.')}><Icon name="check" size={18}/>Mi necesidad está resuelta</button><button className="text-action danger-text" disabled={busy || !online} onClick={() => setCancelling(!cancelling)}>Cancelar pedido</button></div>
+      {owner && open && <div className="owner-actions request-owner-actions"><div className="request-owner-copy"><span><Icon name="check" size={18}/></span><div><h3>Tú decides cuándo está resuelto</h3><p>Confirma los aportes recibidos antes de completar el pedido.</p></div></div><div className="request-owner-buttons"><button className="offer-button" disabled={busy || !online} onClick={() => void mutate(`/solicitudes/${id}`, { accion: 'completar' }, 'Tu necesidad quedó resuelta. Gracias por confirmarlo.')}><Icon name="check" size={18}/>Mi necesidad está resuelta</button><button className="text-action danger-text" disabled={busy || !online} onClick={() => setCancelling(!cancelling)}>Cancelar pedido</button></div>
         {cancelling && <form className="form-stack mt-4" onSubmit={cancel}><Field label="¿Por qué cancelas el pedido?"><textarea name="motivo" required minLength={3} maxLength={500} rows={2}/></Field><button className="outline-btn danger-text" disabled={busy}>Confirmar cancelación</button></form>}
       </div>}
-      <h3 className="font-display section-subtitle">{owner ? 'Aportes de tus vecinos' : 'Tu colaboración'}</h3>
+      <div className="request-offers-heading"><div><p className="eyebrow">AYUDA VECINAL</p><h3 className="font-display">{owner ? 'Aportes de tus vecinos' : 'Tu colaboración'}</h3></div>{owner && offers.data && <span>{offers.data.length} {offers.data.length === 1 ? 'propuesta' : 'propuestas'}</span>}</div>
       {user ? <RemoteState {...offers}/> : <button className="offer-button" onClick={requireUser}>Inicia sesión para ofrecer ayuda</button>}
-      {offers.data?.map(contribution => <article className="contribution-card" key={contribution.id}>
+      {offers.data?.map(contribution => <article className="contribution-card request-offer-card" key={contribution.id}>
         <div className="action-row justify-between"><b>{contribution.voluntario}</b><span className="state-badge">{contribution.estado === 'completada' ? 'Aporte confirmado' : contribution.entregaPendiente ? 'Recepción pendiente' : statusLabel(contribution.estado)}</span></div>
         <p className="mt-3 whitespace-pre-wrap">{contribution.mensaje}</p>
         <div className="action-row mt-3">
@@ -95,9 +113,9 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Field label="¿Cómo fue la ayuda?"><select name="calificacion" defaultValue={contribution.resena?.calificacion || 5}>{[5,4,3,2,1].map(rating => <option key={rating} value={rating}>{rating} de 5{rating >= 4 ? ' · Visto Bueno Vecinal' : ''}</option>)}</select></Field><Field label="Cuéntale a tu barrio (opcional)"><textarea name="comentario" maxLength={1200} rows={3} defaultValue={contribution.resena?.comentario || ''}/></Field><button className="small-primary" disabled={busy || !online}>Guardar valoración</button>
         </form>}
       </article>)}
-      {user && !owner && open && !offers.loading && !offers.error && !ownOffer && <form className="form-stack mt-4" onSubmit={offer}><Field label="¿Qué puedes aportar?" hint="Describe qué ofreces y cuándo estarás disponible. Evita publicar tu dirección exacta."><textarea name="mensaje" required minLength={3} maxLength={1200} placeholder="Puedo prestarte una escalera mañana por la tarde." rows={3}/></Field><button className="record-button justify-center" disabled={busy || !online}>Ofrecer mi ayuda<Icon name="hands"/></button></form>}
+      {user && !owner && open && !offers.loading && !offers.error && !ownOffer && <form className="form-stack request-offer-form" onSubmit={offer}><Field label="¿Qué puedes aportar?" hint="Cuéntale al vecino cómo puedes ayudar y cuándo. No compartas tu dirección exacta."><textarea name="mensaje" required minLength={3} maxLength={1200} placeholder="Puedo prestarte una escalera mañana por la tarde." rows={3}/></Field><button className="record-button justify-center" disabled={busy || !online}>Ofrecer mi ayuda<Icon name="hands"/></button></form>}
       {owner && offers.data?.length === 0 && <p className="form-intro">Todavía no hay propuestas. Puedes compartir tu pedido con el barrio.</p>}
       {!online && <p className="offline-banner">Puedes consultar lo guardado. Para aceptar o confirmar aportes, recupera la conexión.</p>}
-    </>}
+    </div>}
   </Modal>;
 }

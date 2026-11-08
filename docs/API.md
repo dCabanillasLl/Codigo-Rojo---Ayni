@@ -25,7 +25,7 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 | POST `/api/auth/login` | `{identificador: DNI,contrasena}` (la API mantiene compatibilidad con correo para clientes antiguos) → `{data: Usuario}` y cookie HttpOnly | 200 |
 | POST `/api/identity/dni/lookup` | `{dni,consentimiento:true}` → `{data:{nombres,apellidos,proof,venceEnSegundos}}`; devuelve solo nombres y apellidos, no dirección ni ubigeos. Máximo 8 consultas/15 min/IP. | 200 |
 | GET `/api/auth/me` | Sin cuerpo → `{data: Usuario}` de la sesión | 200 |
-| PATCH `/api/auth/me` | `{nombres?,apellidos?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
+| PATCH `/api/auth/me` | `{correo?,notificacionesCorreo?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
 | POST `/api/auth/logout` | `{}` → `{data:{cerrado:true}}`, elimina cookie | 200 |
 
 Usuario: `{id,nombres,apellidos,correo|null,telefono,telefonoPublico,sectorId,sectorNombre,direccion,latitud,longitud}`. Dirección y coordenadas solo se devuelven en las respuestas autenticadas de la propia cuenta; nunca se incluyen en listados o fichas vecinales. Correo y teléfono
@@ -47,6 +47,14 @@ dirección desde GPS usa BigDataCloud client-side; devuelve localidad aproximada
 Errores adicionales: `DNI_LOOKUP_NOT_CONFIGURED`,
 `DNI_PROVIDER_UNAVAILABLE`, `DNI_PROVIDER_AUTH_FAILED`, `DNI_NOT_FOUND`,
 `DNI_PROOF_INVALID`, `INVALID_DNI`.
+
+Nombres y apellidos se fijan con la consulta verificada del DNI y no se pueden modificar
+desde el perfil ni desde PATCH `/auth/me`. El correo es opcional y único. La preferencia
+`notificacionesCorreo` se activa explícitamente y requiere un correo válido. AYNI envía
+avisos cuando alguien ofrece ayuda, una propuesta cambia de estado, se marca una entrega
+o se confirma su recepción. Se necesita `RESEND_API_KEY`, un remitente verificado en
+Resend (`EMAIL_FROM`) y aplicar `008_notificaciones_correo.sql`; sin configuración del
+proveedor se guarda el perfil, pero no se entrega correo.
 
 ## Catálogos
 
@@ -154,18 +162,25 @@ Errores específicos: `PRICE_REQUIRED`, `INVALID_PRICE`, `INVALID_SECTOR`.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/api/solicitudes` | Filtros comunes; `participando=1` para colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
+| GET `/api/solicitudes` | Filtros comunes; excluye los pedidos propios del listado vecinal. `mios=1` consulta pedidos propios; `participando=1`, colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
 | POST `/api/solicitudes` | `{clientRequestId,categoriaId,sectorId,descripcion,titulo?,urgencia?}` → `{data: Solicitud}` | 201 o 200 si reintento |
 | GET `/api/solicitudes/:id` | Sin cuerpo → `{data: Solicitud}` | 200 |
 | PATCH `/api/solicitudes/:id` | `{accion:'completar'}` o `{accion:'cancelar',motivo}` → `{data: Solicitud}`; solo solicitante | 200 |
 
 Solicitud: `{id,solicitanteId,solicitante,categoriaId,categoria,sectorId,sectorNombre,
-titulo,descripcion,urgencia,estado,creadoEn,distanciaMetros,clientRequestId}`.
+titulo,descripcion,urgencia,estado,creadoEn,venceEn,distanciaMetros,clientRequestId}`.
 Urgencia `normal|urgente`; estados `abierta|en_curso|completada|cancelada|vencida`.
 La creación guarda UUID + huella del contenido: mismo usuario/UUID/contenido devuelve
 el original; distinto contenido produce 409. No se debe generar otro UUID al reintentar.
 Completar requiere resolver aportes aceptados pendientes de recepción; las propuestas
 pendientes se rechazan al cerrar. Cancelar requiere motivo.
+
+La vigencia se asigna automáticamente por categoría: apoyo urgente 24 horas, un favor
+3 días, y préstamos, donaciones e intercambios 7 días. Al vencer, un pedido abierto pasa
+a `vencida`, deja de aparecer en el mapa vecinal y sus propuestas pendientes se rechazan;
+el dueño puede consultar y cerrar su pedido desde `mios=1`. Si ya estaba `en_curso`, deja
+de aceptar nuevas ofertas y sale del listado público al vencer, pero las personas que ya
+acordaron la ayuda pueden terminarla y el dueño puede confirmar el resultado.
 
 El servidor genera el título a partir de la descripción. La categoría “Apoyo urgente” asigna
 la urgencia automáticamente. Se rechazan solicitudes que mencionen drogas, alcohol, dinero

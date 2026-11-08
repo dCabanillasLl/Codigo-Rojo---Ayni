@@ -20,7 +20,9 @@ const files = [
   '008_asistencia_avisos_notificaciones.sql',
   '009_estado_cambio_actividad.sql',
   '010_ubicacion_publica_actividades.sql',
+  '010_vencimiento_solicitudes.sql',
   '011_notificaciones_actividades_eliminadas.sql',
+  '011_notificaciones_correo.sql',
 ];
 const sources = await Promise.all(files.map(async (name) => {
   let sql = await readFile(fileURLToPath(new URL(`../migrations/${name}`, import.meta.url)), 'utf8');

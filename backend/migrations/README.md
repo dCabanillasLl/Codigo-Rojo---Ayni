@@ -41,6 +41,15 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 12. `011_notificaciones_actividades_eliminadas.sql` permite borrar una actividad
     cancelada sin perder las notificaciones pendientes: su referencia al aviso pasa
     a NULL. La asistencia se elimina por cascada. Esta migración no elimina actividades.
+13. `010_vencimiento_solicitudes.sql` asigna fecha límite a solicitudes antiguas sin
+    vencimiento y marca como vencidas las que ya superaron el plazo. Aplicar para que
+    los pedidos existentes tampoco permanezcan publicados indefinidamente.
+14. `011_notificaciones_correo.sql` añade la preferencia privada de avisos por correo,
+    desactivada para todas las cuentas existentes hasta que cada persona la active.
+
+Las migraciones con el mismo prefijo numérico surgieron en ramas paralelas. El runner
+las identifica por el nombre completo: conservar los nombres y los archivos ya
+aplicados, sin renumerarlos, permite integrar ambas bases sin repetir SQL.
 
 El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
 de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum
