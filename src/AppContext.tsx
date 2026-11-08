@@ -54,7 +54,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [online, setUser]);
   useEffect(() => { if (!toast) return; const timeout = window.setTimeout(() => setToast(''), 5000); return () => window.clearTimeout(timeout); }, [toast]);
-  useEffect(() => { let active = true; void notificationList().then(value => { if (active) setNotifications(value); }).catch(() => undefined); return () => { active = false; }; }, []);
+  useEffect(() => {
+    let active = true;
+    const ownerId = user?.id;
+    setNotifications([]);
+    if (ownerId) void notificationList(ownerId).then(value => {
+      if (active && userRef.current?.id === ownerId) setNotifications(value);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [user?.id]);
   useEffect(() => {
     const ownerId = user?.id;
     if (!ownerId || sessionLoading) return;
@@ -86,14 +94,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.id, online, sessionLoading]);
   const notify = useCallback((text: string) => {
     setToast(text);
-    const notification: AppNotification = { id: crypto.randomUUID(), text, createdAt: new Date().toISOString(), read: false };
-    setNotifications(current => [notification, ...current].slice(0, 100));
-    void saveNotification(notification).catch(() => undefined);
+    const ownerId = userRef.current?.id;
+    if (!ownerId) return;
+    const notification: AppNotification = { id: crypto.randomUUID(), ownerId, text, createdAt: new Date().toISOString(), read: false };
+    setNotifications(current => userRef.current?.id === ownerId ? [notification, ...current].slice(0, 100) : current);
+    void saveNotification(notification).then(() => notificationList(ownerId)).then(value => {
+      if (userRef.current?.id === ownerId) setNotifications(value);
+    }).catch(() => undefined);
   }, []);
   const markRead = useCallback(() => {
-    setNotifications(current => current.map(item => ({ ...item, read: true })));
-    void persistNotificationsRead().catch(() => undefined);
     const ownerId = userRef.current?.id;
+    if (!ownerId) return;
+    setNotifications(current => current.map(item => item.ownerId === ownerId ? { ...item, read: true } : item));
+    void persistNotificationsRead(ownerId).catch(() => undefined);
     const items = serverNotifications && serverNotifications.ownerId === ownerId ? serverNotifications.items : [];
     const ids = items.filter(item => !item.read).map(item => item.id);
     if (ownerId && ids.length) void api('/notificaciones/leidas', { method: 'POST', body: { ids }, expectedUserId: ownerId }).then(() => {
