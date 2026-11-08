@@ -1,4 +1,24 @@
-import type { Notice } from '../types';
+import type { LocationDraft, Notice } from '../types';
+import { locationInput, mapPoint } from './location';
+
+export function noticeVenueChanged(initial: Notice, location: LocationDraft): boolean {
+  const previous = mapPoint({ mapaLatitud: initial.latitudActividad, mapaLongitud: initial.longitudActividad });
+  return (previous?.latitude ?? null) !== (location.coordinates?.latitude ?? null)
+    || (previous?.longitude ?? null) !== (location.coordinates?.longitude ?? null)
+    || (initial.direccionActividad || '').trim() !== location.address.trim();
+}
+
+export function noticeEditPayload(initial: Notice, draft: { titulo: string; contenido: string; categoriaId: string; fechaEvento: string; location: LocationDraft; foto?: string | null }) {
+  const previousDate = initial.fechaEvento ? localDateTimeInput(new Date(initial.fechaEvento)) : '';
+  return {
+    ...(draft.titulo.trim() !== initial.titulo ? { titulo: draft.titulo.trim() } : {}),
+    ...(draft.contenido.trim() !== initial.contenido ? { contenido: draft.contenido.trim() } : {}),
+    ...(draft.categoriaId !== initial.categoriaId ? { categoriaId: draft.categoriaId } : {}),
+    ...(draft.fechaEvento !== previousDate ? { fechaEvento: draft.fechaEvento ? new Date(draft.fechaEvento).toISOString() : null, venceEn: null } : {}),
+    ...(noticeVenueChanged(initial, draft.location) ? { ubicacion: locationInput(draft.location) } : {}),
+    ...(draft.foto !== undefined ? { foto: draft.foto } : {}),
+  };
+}
 
 export function noticeCategory(name: string): { key: string; icon: 'calendar' | 'hands' | 'megaphone' } {
   const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es');

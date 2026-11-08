@@ -68,6 +68,7 @@ test('subir, reemplazar y quitar un flyer respeta permisos, fechas y acceso tras
     execute: async (sql: string, values: unknown[]) => {
       if (sql.startsWith('SELECT sector_id')) return [[{ sector_id: '1' }]];
       if (sql.startsWith('SELECT l.ubicacion_id')) return [[{ ubicacion_id: '2' }]];
+      if (sql.startsWith('INSERT INTO ubicaciones')) return [{ insertId: 10 }];
       if (sql.startsWith('INSERT INTO avisos')) {
         state.estado = String(values[5]); state.fechaEvento = values[6] as Date;
         state.venceEn = values[7] as Date | null; state.imagenUrl = values[8] as string | null;
@@ -101,12 +102,13 @@ test('subir, reemplazar y quitar un flyer respeta permisos, fechas y acceso tras
   app.use(protectMutations([origin])); app.use(defaultJson);
   app.use((req, _res, next) => { req.userId = req.get('X-Test-User'); next(); });
   app.use('/api', notices); app.use(errorHandler);
-  const body = { titulo: 'Actividad de prueba', contenido: 'Flyer de prueba', categoriaId: '1', sectorId: '1', fechaEvento: state.fechaEvento.toISOString() };
+  const body = { titulo: 'Actividad de prueba', contenido: 'Flyer de prueba', categoriaId: '1', sectorId: '1', fechaEvento: state.fechaEvento.toISOString(), ubicacion: { latitud: -12.074, longitud: -77.063, direccion: 'Lugar de la actividad' } };
   const input = await sharp(randomBytes(240 * 240 * 3), { raw: { width: 240, height: 240, channels: 3 } }).png().toBuffer();
   const foto = `data:image/png;base64,${input.toString('base64')}`;
   assert.ok(foto.length > 64 * 1024);
   await request(app).post('/api/avisos').set({ Origin: origin, 'X-AYNI-Client': 'web' }).send({ ...body, foto }).expect(401);
   await request(app).post('/api/avisos').set(headers).send({ ...body, fechaEvento: undefined }).expect(400);
+  await request(app).post('/api/avisos').set(headers).send({ ...body, ubicacion: undefined }).expect(400);
   await request(app).post('/api/avisos').set(headers).send({ ...body, fechaEvento: '2000-01-01T00:00:00Z' }).expect(400);
   await request(app).post('/api/avisos').set(headers).send({ ...body, foto: 'data:image/png;base64,AAAA' }).expect(400);
   const created = await request(app).post('/api/avisos').set(headers).send({ ...body, foto }).expect(201);

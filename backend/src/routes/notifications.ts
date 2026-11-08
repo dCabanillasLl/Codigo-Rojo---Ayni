@@ -7,7 +7,7 @@ import { requireAuth } from '../middlewares/auth.js';
 const router = Router();
 router.get('/notificaciones', requireAuth, asyncHandler(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const items = await query<{ id: string; text: string; createdAt: Date; read: number; avisoId: string }>(`SELECT notificacion_id AS id, texto AS text, creado_en AS createdAt,
+  const items = await query<{ id: string; text: string; createdAt: Date; read: number; avisoId: string | null }>(`SELECT notificacion_id AS id, texto AS text, creado_en AS createdAt,
     (leida_en IS NOT NULL) AS \`read\`, CAST(aviso_id AS CHAR) AS avisoId
     FROM notificaciones_avisos WHERE usuario_id = ? ORDER BY creado_en DESC, notificacion_id DESC LIMIT 100`, [req.userId]);
   res.json({ data: items.map(item => ({ ...item, read: Boolean(item.read) })) });

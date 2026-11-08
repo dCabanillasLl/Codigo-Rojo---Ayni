@@ -110,6 +110,37 @@ configure una fecha o los cancele; no se les asigna una fecha inventada.
 
 ### Confirmación de asistencia y cambios de actividad
 
+Al crear un aviso, **Lugar de la actividad** permite elegir una sugerencia de dirección
+o abrir un mapa en una ventana con GPS, pin arrastrable y zoom táctil. El mapa no
+ocupa espacio permanente en el formulario. Confirmar copia la selección; volver
+conserva el lugar anterior y los demás campos. El punto es obligatorio para publicar
+un aviso nuevo y se guarda como una ubicación independiente del perfil.
+
+El lugar y la referencia seleccionados serán públicos; el formulario lo indica antes
+de publicar. La tarjeta muestra la dirección y **Ver ubicación**, con acceso a Google
+Maps. La migración `010_ubicacion_publica_actividades.sql` diferencia ese lugar de las
+ubicaciones privadas: las referencias heredadas por avisos antiguos no se publican
+automáticamente. Cambiar después el punto por API notifica a los asistentes confirmados.
+
+El organizador dispone de **Editar actividad o ubicación** en sus tarjetas. El
+formulario carga título, descripción, categoría, flyer, fecha y lugar actuales. Puede
+reemplazar o quitar el flyer y cambiar el lugar con el mismo selector de mapa.
+Guardar envía únicamente los campos modificados: editar texto no borra la foto,
+el lugar ni cambia una fecha pasada; volver o cerrar descarta los cambios pendientes.
+Los cambios de fecha o ubicación notifican a los asistentes confirmados. Cambiar la
+fecha exige una fecha futura y elimina el vencimiento anterior. Una actividad cancelada
+no permite edición: el organizador puede eliminarla permanentemente. Un control de revisión evita sobrescribir otra edición:
+si la actividad cambió, cerrar y abrir de nuevo el formulario carga la versión actual.
+
+Los avisos cancelados no muestran **Compartir por WhatsApp**. Solo su organizador
+ve **Eliminar permanentemente**, que requiere confirmar que la acción no se puede
+deshacer. Se elimina el registro, su flyer y la asistencia; también el lugar público
+si ya no lo utiliza ningún otro registro. Nunca se borra una ubicación privada del
+perfil. La migración `011_notificaciones_actividades_eliminadas.sql` conserva las
+notificaciones pendientes con referencia nula, para que la cancelación llegue a los
+asistentes al reconectarse. No se borran actividades reales al aplicar la migración.
+El cliente actualiza su lista y su caché local al eliminar.
+
 Los vecinos con sesión pueden marcar **Asistiré** o retirar su confirmación. Las
 tarjetas muestran el total de confirmaciones, sin publicar nombres de los asistentes.
 **Mis asistencias** permite seguir las actividades confirmadas, incluidas las que
@@ -173,7 +204,7 @@ para conservar una notificación pendiente, pero sí abrirla con conexión para 
   los símbolos. Cada detalle permite abrir la zona en Google Maps. Las publicaciones
   sin coordenadas no aparecen como puntos; se indica su cantidad sobre el mapa.
   Un filtro por distancia requiere coordenadas. Puedes añadirlas al editar un servicio.
-- La API pública entrega `mapaLatitud` y `mapaLongitud` redondeadas a tres decimales
+- Para productos, servicios y pedidos, la API pública entrega `mapaLatitud` y `mapaLongitud` redondeadas a tres decimales
   (una cuadrícula de aproximadamente 110 m), nunca el punto exacto ni la referencia
   privada. La distancia se calcula con el punto privado y se redondea a 50 m.
 
@@ -230,7 +261,9 @@ limpieza destructiva automática.
 - JWT de duración limitada en cookie HttpOnly; no se guardan tokens en localStorage.
   Las mutaciones validan origen y cabecera propia. La cola también comprueba el usuario
   esperado para impedir publicar borradores de otra cuenta.
-- Las ubicaciones exactas son privadas. La API devuelve sector y distancia redondeada;
+- Las ubicaciones exactas del perfil y de productos, servicios y pedidos son privadas.
+  El lugar que el organizador elige explícitamente para una actividad sí es público.
+  Para las ubicaciones privadas, la API devuelve sector y distancia redondeada;
   el mapa muestra una zona aproximada, no el domicilio de un vecino.
 - La cola y caché usan IndexedDB porque este proyecto es web. No se migró a React Native
   ni se añadió SQLite. Publicado significa persistido y confirmado por el servidor.

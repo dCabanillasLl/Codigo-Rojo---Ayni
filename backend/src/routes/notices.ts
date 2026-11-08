@@ -4,7 +4,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { one, query, transaction } from "../db/index.js";
 import { AppError, asyncHandler } from "../lib/http.js";
 import { geoFilter, resolveLocation } from "../lib/location.js";
-import { idSchema, listSchema } from "../lib/validation.js";
+import { idSchema, listSchema, locationSchema } from "../lib/validation.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { publicationJson } from '../middlewares/json.js';
 import { photoSchema, preparePhoto } from '../lib/photos.js';
@@ -16,6 +16,9 @@ const select = `SELECT CAST(a.aviso_id AS CHAR) AS id, CAST(a.autor_id AS CHAR) 
   u.nombres AS autor, CAST(a.categoria_aviso_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   a.titulo, a.contenido, CASE WHEN a.estado = 'publicado' AND NOT (${noticeDateSql}) THEN 'vencido' ELSE a.estado END AS estado,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
+  CASE WHEN a.ubicacion_publica = 1 THEN l.direccion ELSE NULL END AS direccionActividad,
+  CASE WHEN a.ubicacion_publica = 1 THEN l.latitud ELSE NULL END AS latitudActividad,
+  CASE WHEN a.ubicacion_publica = 1 THEN l.longitud ELSE NULL END AS longitudActividad,
   CASE WHEN a.imagen_hash IS NULL THEN a.imagen_url ELSE CONCAT('/api/avisos/', CAST(a.aviso_id AS CHAR), '/imagen?v=', a.imagen_hash) END AS imagenUrl,
   a.fecha_evento AS fechaEvento, a.vence_en AS venceEn, a.creado_en AS creadoEn,
   a.revision_evento AS revisionEvento, a.motivo_cambio AS motivoCambio, a.ultimo_cambio_evento AS ultimoCambioEvento,
@@ -29,6 +32,7 @@ const fields = z.object({
   titulo: z.string().trim().min(3).max(180),
   contenido: z.string().trim().min(3).max(8000),
   sectorId: idSchema,
+  ubicacion: locationSchema.optional(),
   foto: photoSchema,
   imagenUrl: z.string().trim().url().max(2048).refine((value) => {
     try { return new URL(value).protocol === "https:"; } catch { return false; }
@@ -81,12 +85,13 @@ router.get('/avisos/:id/imagen', asyncHandler(async (req, res) => {
 router.post("/avisos", requireAuth, publicationJson, asyncHandler(async (req, res) => {
   const body = fields.parse(req.body);
   validateNoticeDates(body, true);
+  if (!body.ubicacion) throw new AppError(400, 'EVENT_LOCATION_REQUIRED', 'Elige la ubicación de la actividad en el mapa o selecciona una dirección sugerida.');
   if (body.foto && body.imagenUrl) throw new AppError(400, 'AMBIGUOUS_PHOTO', 'Elige un archivo o un enlace de flyer, solo uno.');
   const photo = await preparePhoto(body.foto);
   const id = await transaction(async (connection) => {
-    const locationId = await resolveLocation(connection, req.userId, body.sectorId);
+    const locationId = await resolveLocation(connection, req.userId, body.sectorId, body.ubicacion);
     const [result] = await connection.execute<ResultSetHeader>(
-      "INSERT INTO avisos (autor_id, categoria_aviso_id, ubicacion_id, titulo, contenido, estado, fecha_evento, vence_en, imagen_url, imagen, imagen_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO avisos (autor_id, categoria_aviso_id, ubicacion_id, titulo, contenido, estado, fecha_evento, vence_en, imagen_url, imagen, imagen_hash, ubicacion_publica) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
       [req.userId, body.categoriaId, locationId, body.titulo, body.contenido, body.estado ?? "publicado", new Date(body.fechaEvento!), body.venceEn ? new Date(body.venceEn) : null, body.imagenUrl ?? null, photo?.buffer ?? null, photo?.hash ?? null],
     );
     return String(result.insertId);
@@ -96,13 +101,15 @@ router.post("/avisos", requireAuth, publicationJson, asyncHandler(async (req, re
 
 router.patch("/avisos/:id", requireAuth, publicationJson, asyncHandler(async (req, res) => {
   const id = idSchema.parse(req.params.id);
-  const body = fields.partial().refine((value) => Object.keys(value).length > 0, "Indica qué deseas modificar").parse(req.body);
+  const body = fields.partial().extend({ revisionEvento: z.number().int().min(0).optional() }).refine((value) => Object.keys(value).some(key => key !== 'revisionEvento'), "Indica qué deseas modificar").parse(req.body);
   validateNoticeDates(body);
   if (body.foto !== undefined && body.imagenUrl !== undefined) throw new AppError(400, 'AMBIGUOUS_PHOTO', 'Modifica el archivo o el enlace de flyer, solo uno.');
   await transaction(async (connection) => {
-    const [rows] = await connection.execute<RowDataPacket[]>("SELECT autor_id, titulo, estado, fecha_evento, vence_en, revision_evento FROM avisos WHERE aviso_id = ? FOR UPDATE", [id]);
+    const [rows] = await connection.execute<RowDataPacket[]>("SELECT autor_id, titulo, estado, fecha_evento, vence_en, revision_evento, (SELECT sector_id FROM ubicaciones WHERE ubicacion_id = avisos.ubicacion_id) AS sector_id FROM avisos WHERE aviso_id = ? FOR UPDATE", [id]);
     if (!rows.length) throw new AppError(404, "NOT_FOUND", "No encontramos este aviso.");
     if (String(rows[0].autor_id) !== req.userId) throw new AppError(403, "FORBIDDEN", "Solo puedes modificar tus avisos.");
+    if (rows[0].estado === 'cancelado') throw new AppError(409, 'EVENT_CANCELLED', 'Una actividad cancelada no se puede editar. Puedes eliminarla permanentemente.');
+    if (body.revisionEvento !== undefined && body.revisionEvento !== Number(rows[0].revision_evento || 0)) throw new AppError(409, 'EVENT_CHANGED', 'La actividad cambió mientras la editabas. Cierra el formulario y vuelve a abrirlo para cargar los datos actuales.');
     if ((body.fechaEvento !== undefined || body.venceEn !== undefined) && !(body.fechaEvento === undefined ? rows[0].fecha_evento : body.fechaEvento) && !(body.venceEn === undefined ? rows[0].vence_en : body.venceEn)) throw new AppError(400, 'EVENT_DATE_REQUIRED', 'El aviso debe conservar una fecha de actividad o vencimiento.');
     const map = { categoriaId: "categoria_aviso_id", titulo: "titulo", contenido: "contenido", estado: "estado", imagenUrl: "imagen_url" } as const;
     const changes: string[] = [], values: unknown[] = [];
@@ -114,8 +121,14 @@ router.patch("/avisos/:id", requireAuth, publicationJson, asyncHandler(async (re
     } else if (body.imagenUrl !== undefined) { changes.push('imagen = ?', 'imagen_hash = ?'); values.push(null, null); }
     if (body.fechaEvento !== undefined) { changes.push("fecha_evento = ?"); values.push(body.fechaEvento ? new Date(body.fechaEvento) : null); }
     if (body.venceEn !== undefined) { changes.push("vence_en = ?"); values.push(body.venceEn ? new Date(body.venceEn) : null); }
-    if (body.sectorId) { changes.push("ubicacion_id = ?"); values.push(await resolveLocation(connection, req.userId, body.sectorId)); }
-    await notifyEventChange(connection, id, rows[0] as EventSnapshot, body);
+    if (body.sectorId && body.sectorId !== String(rows[0].sector_id) && !body.ubicacion) throw new AppError(400, 'EVENT_LOCATION_REQUIRED', 'Para cambiar el lugar de la actividad elige un punto explícito.');
+    if (body.ubicacion) {
+      changes.push('ubicacion_id = ?', 'ubicacion_publica = ?');
+      values.push(await resolveLocation(connection, req.userId, body.sectorId ?? String(rows[0].sector_id), body.ubicacion), 1);
+    }
+    const notified = await notifyEventChange(connection, id, rows[0] as EventSnapshot, body);
+    if (!changes.length) return;
+    if (!notified) { changes.push('revision_evento = ?'); values.push(Number(rows[0].revision_evento || 0) + 1); }
     await connection.execute(`UPDATE avisos SET ${changes.join(", ")} WHERE aviso_id = ?`, [...values, id] as never[]);
   });
   res.json({ data: await one(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]) });
@@ -164,6 +177,30 @@ router.post('/avisos/:id/cambios', requireAuth, asyncHandler(async (req, res) =>
     }
   });
   res.json({ data: await one(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]) });
+}));
+
+router.delete('/avisos/:id', requireAuth, asyncHandler(async (req, res) => {
+  const id = idSchema.parse(req.params.id);
+  const body = z.object({ confirmar: z.literal(true), revisionEvento: z.number().int().min(0) }).strict().parse(req.body);
+  await transaction(async connection => {
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT autor_id, estado, revision_evento, ubicacion_id, ubicacion_publica FROM avisos WHERE aviso_id = ? FOR UPDATE', [id]);
+    const item = rows[0];
+    if (!item) return; // A retry after a successful deletion is harmless.
+    if (String(item.autor_id) !== req.userId) throw new AppError(403, 'FORBIDDEN', 'Solo el organizador puede eliminar esta actividad.');
+    if (item.estado !== 'cancelado') throw new AppError(409, 'EVENT_NOT_CANCELLED', 'Cancela la actividad antes de eliminarla permanentemente.');
+    if (Number(item.revision_evento) !== body.revisionEvento) throw new AppError(409, 'EVENT_CHANGED', 'La actividad cambió. Actualiza la lista antes de eliminarla.');
+    // Attendance and the flyer are deleted; notification text survives via SET NULL.
+    await connection.execute('DELETE FROM avisos WHERE aviso_id = ?', [id]);
+    if (Number(item.ubicacion_publica) === 1) {
+      await connection.execute(`DELETE l FROM ubicaciones l WHERE l.ubicacion_id = ?
+        AND NOT EXISTS (SELECT 1 FROM usuarios u WHERE u.ubicacion_id = l.ubicacion_id)
+        AND NOT EXISTS (SELECT 1 FROM publicaciones p WHERE p.ubicacion_id = l.ubicacion_id)
+        AND NOT EXISTS (SELECT 1 FROM solicitudes_ayuda s WHERE s.ubicacion_id = l.ubicacion_id)
+        AND NOT EXISTS (SELECT 1 FROM avisos a WHERE a.ubicacion_id = l.ubicacion_id)
+        AND NOT EXISTS (SELECT 1 FROM recursos_comunitarios r WHERE r.ubicacion_id = l.ubicacion_id)`, [item.ubicacion_id]);
+    }
+  });
+  res.json({ data: { eliminado: true } });
 }));
 
 export default router;

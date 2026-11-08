@@ -4,7 +4,7 @@ import sqliteWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 
 type CacheRecord<T> = { key: string; data: T; savedAt: string };
 export type PendingRequest = { id: string; ownerId: string; body: RequestInput; createdAt: string; error?: string; blocked?: boolean };
-export type AppNotification = { id: string; ownerId: string; text: string; createdAt: string; read: boolean; avisoId?: string };
+export type AppNotification = { id: string; ownerId: string; text: string; createdAt: string; read: boolean; avisoId?: string | null };
 let database: Promise<IDBDatabase> | undefined;
 function openDatabase() {
   if (!database) database = new Promise<IDBDatabase>((resolve, reject) => {
@@ -33,6 +33,25 @@ async function operation<T>(store: 'cache' | 'pending', mode: IDBTransactionMode
 }
 export async function cacheRead<T>(key: string) { return operation<CacheRecord<T> | undefined>('cache', 'readonly', store => store.get(key)); }
 export async function cacheWrite<T>(key: string, data: T) { await operation('cache', 'readwrite', store => store.put({ key, data, savedAt: new Date().toISOString() })); }
+export async function forgetNoticeCache(ownerId: string, noticeId: string) {
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction('cache', 'readwrite');
+    const cursor = transaction.objectStore('cache').openCursor();
+    cursor.onsuccess = () => {
+      const entry = cursor.result; if (!entry) return;
+      const record = entry.value as CacheRecord<unknown>;
+      const prefixes = [`${ownerId}:/avisos`, 'public:/avisos'];
+      const prefix = prefixes.find(value => record.key === value || record.key.startsWith(`${value}?`) || record.key.startsWith(`${value}/`));
+      if (prefix && Array.isArray(record.data)) entry.update({ ...record, data: record.data.filter(item => item?.id !== noticeId) });
+      else if (prefix && record.key.split('?')[0] === `${prefix}/${noticeId}`) entry.delete();
+      entry.continue();
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(new Error('No se pudo actualizar la caché local.'));
+    transaction.onabort = transaction.onerror;
+  });
+}
 
 let sqliteFileDatabase: Promise<IDBDatabase> | undefined;
 let sqlite: Promise<Database> | undefined;

@@ -241,7 +241,7 @@ Conflictos de inventario, UUID o estado devuelven 409.
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
 | GET `/api/avisos` | Filtros comunes; público solo vigentes publicados → `{data: Aviso[]}` | 200 |
-| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,fechaEvento,foto?,imagenUrl?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
+| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,fechaEvento,ubicacion,foto?,imagenUrl?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
 | GET `/api/avisos/:id` | Sin cuerpo → `{data: Aviso}` visible | 200 |
 | PATCH `/api/avisos/:id` | Campos editables → `{data: Aviso}` actualizado; solo autor | 200 |
 | GET `/api/avisos/:id/imagen?v=hash` | JPEG del flyer cargado, sujeto a visibilidad y vigencia | 200 |
@@ -263,6 +263,51 @@ no-store`. El autor puede consultar el registro vencido y su imagen; los demás 
 404. El estado efectivo devuelto es `vencido`, sin borrar el registro ni requerir cron.
 Editar no permite quitar todas las fechas. Los avisos antiguos sin fechas se conservan.
 La interfaz filtra además avisos vencidos en su caché y al permanecer abierta.
+
+`ubicacion:{latitud,longitud,direccion?}` es obligatoria para crear un aviso nuevo.
+Ambas coordenadas deben ser numéricas, finitas y estar dentro de los límites
+geográficos; `direccion` admite hasta 255 caracteres. El servidor crea un lugar
+independiente y lo marca como público con la migración 010. No hereda ni modifica la
+dirección del perfil. Si falta el punto devuelve 400 `EVENT_LOCATION_REQUIRED`.
+
+Los avisos devuelven `direccionActividad`, `latitudActividad` y `longitudActividad`:
+son el lugar exacto elegido explícitamente para la actividad, visible en su tarjeta,
+mapa y enlace a Google Maps. Los tres son null en avisos anteriores cuya ubicación
+podría proceder del perfil privado. Se mantienen las restricciones de visibilidad
+del aviso: la ubicación no hace públicos los avisos cancelados o vencidos.
+
+PATCH admite `ubicacion` para cambiar el punto solo por el autor; cada cambio crea
+una ubicación nueva y notifica a los asistentes confirmados. Omitirla conserva el
+lugar anterior, incluso si se reenvía el mismo `sectorId`. Cambiar el sector interno
+exige un punto explícito para evitar heredar por error una ubicación de perfil.
+`ultimoCambioEvento:"ubicacion"` representa este cambio y se presenta como ACTUALIZADO.
+
+La interfaz de edición está disponible solo para el autor y envía únicamente los campos
+modificados. PATCH admite además `revisionEvento?:number` para comprobar la revisión
+que el usuario abrió: si no coincide, devuelve 409 `EVENT_CHANGED` sin guardar. Todas
+las ediciones incrementan la revisión, incluso texto o flyer; solo cambios de fecha,
+estado o ubicación generan notificaciones. Reenviar únicamente la revisión no es una
+edición válida. Omitir fecha, foto o ubicación los conserva sin modificar. Esto permite
+corregir el texto de actividades vencidas sin reactivarlas ni exigir una fecha nueva.
+Las actividades canceladas no admiten PATCH, ni siquiera del autor: devuelve 409
+`EVENT_CANCELLED`. No se permite modificar su lugar, texto, flyer o reactivarlas por
+edición. La interfaz oculta el acceso al editor y mantiene la eliminación permanente.
+
+`DELETE /api/avisos/:id` requiere sesión del autor y JSON
+`{confirmar:true,revisionEvento:number}`. Solo permite borrar registros en estado
+`cancelado`; en otro estado devuelve 409 `EVENT_NOT_CANCELLED`. Una revisión antigua
+devuelve 409 `EVENT_CHANGED`; otro usuario recibe 403. Devuelve
+`{data:{eliminado:true}}` y admite reintentos si el registro ya no existe.
+La protección de origen, cabecera propia y comprobación de `X-AYNI-User` también
+se aplican a DELETE; CORS incluye ese método.
+
+La eliminación es transaccional: borra la fila del aviso, el flyer y sus asistencias
+por cascada. Borra el lugar público solo si ningún perfil, producto, servicio, pedido,
+aviso o recurso lo referencia. No elimina ubicaciones privadas heredadas. La migración
+011 cambia la referencia de notificaciones a `ON DELETE SET NULL`: se conserva su
+texto y lectura pendiente, con `avisoId:null`, sin enlace a una actividad inexistente.
+La interfaz oculta compartir por WhatsApp para cancelados y solo ofrece la eliminación
+al organizador, con confirmación explícita previa.
 Estados `borrador|publicado|cancelado|vencido`. La interfaz distingue avisos vecinales
 de información oficial. Compartir utiliza enlaces/funciones del dispositivo; la API
 no envía WhatsApp ni mensajes en nombre de usuarios.
