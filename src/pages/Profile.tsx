@@ -94,7 +94,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         <ErrorBox message={error}/>{success && <p className="success-message" role="status">{success}</p>}
         <button type="submit" className="record-button justify-center" disabled={busy || !online}>{busy ? 'Guardando…' : 'Guardar perfil'}</button>
       </form>
-      <ErrorBox message={signOutError}/><button type="button" className="outline-btn mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
+      <ErrorBox message={signOutError}/><button type="button" className="outline-btn profile-signout-button mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </article>
 
     <article className="profile-card">
