@@ -141,7 +141,8 @@ notificaciones pendientes con referencia nula, para que la cancelación llegue a
 asistentes al reconectarse. No se borran actividades reales al aplicar la migración.
 El cliente actualiza su lista y su caché local al eliminar.
 
-Los vecinos con sesión pueden marcar **Asistiré** o retirar su confirmación. Las
+Los vecinos con sesión pueden pulsar **Confirmar asistencia**; después el botón cambia
+a **Quitar confirmación** para permitir retirar la asistencia. Las
 tarjetas muestran el total de confirmaciones, sin publicar nombres de los asistentes.
 **Mis asistencias** permite seguir las actividades confirmadas, incluidas las que
 posteriormente se cancelaron o vencieron. **Mis actividades** muestra al organizador

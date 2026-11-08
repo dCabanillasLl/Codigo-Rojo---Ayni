@@ -1,6 +1,11 @@
 import type { LocationDraft, Notice } from '../types';
 import { locationInput, mapPoint } from './location';
 
+export function noticeAttendanceConfirmed(value: unknown): boolean {
+  // Old API responses and cached notices may contain MySQL's string "0"/"1".
+  return value === true || value === 1 || value === '1';
+}
+
 export function noticeVenueChanged(initial: Notice, location: LocationDraft): boolean {
   const previous = mapPoint({ mapaLatitud: initial.latitudActividad, mapaLongitud: initial.longitudActividad });
   return (previous?.latitude ?? null) !== (location.coordinates?.latitude ?? null)

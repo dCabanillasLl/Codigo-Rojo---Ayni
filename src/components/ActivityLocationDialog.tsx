@@ -16,7 +16,7 @@ export default function ActivityLocationDialog({ value, initialCenter, online, o
   return <Modal title="Ubicación de la actividad" onClose={onClose} wide>
     <form className="form-stack" onSubmit={confirm}>
       <p className="form-intro">Elige el lugar de encuentro. Puedes buscar una dirección, usar GPS o arrastrar el pin. El punto y la referencia de esta actividad se mostrarán a los vecinos.</p>
-      <LocationPicker value={draft} onChange={setDraft} initialCenter={initialCenter} online={online} onBusyChange={setBusy} publicVenue/>
+      <LocationPicker value={draft} onChange={setDraft} initialCenter={initialCenter} online={online} onBusyChange={setBusy} publicVenue addressField={{ label: 'Buscar dirección o calle', name: 'direccion-actividad-selector' }}/>
       <p className="form-hint">Revisa el lugar antes de confirmar. Tu dirección privada de perfil no se modifica. Cancelar conserva la selección anterior.</p>
       <div className="event-change-actions"><button type="button" className="outline-btn" onClick={onClose}>Volver</button><button type="submit" className="record-button event-change-submit" disabled={busy || !draft.coordinates || !online}>{busy ? 'Buscando dirección…' : 'Usar este lugar'}</button></div>
     </form>

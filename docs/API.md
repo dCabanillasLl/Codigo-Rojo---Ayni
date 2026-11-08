@@ -343,6 +343,8 @@ no envía WhatsApp ni mensajes en nombre de usuarios.
 ### Asistencia y cambios de actividades
 
 Los avisos incluyen `totalAsistentes`, `miAsistencia`, `revisionEvento` y `motivoCambio`.
+`miAsistencia` siempre se devuelve como booleano (`true` o `false`), aunque MySQL
+devuelva el resultado de `EXISTS` como texto `"0"` o `"1"`.
 `ultimoCambioEvento` distingue `postergado`, `reprogramado`, `cancelado` y `retirado`
 (nullable para registros anteriores; migración 009). Permite mostrar etiquetas de
 estado sin confundir una actualización de vencimiento con una postergación. El estado
