@@ -48,7 +48,13 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
 
 En **Cerca de ti**, el diseño conserva el saludo, la zona, el buscador y los filtros.
 Los productos y servicios con ubicación aparecen al mismo tiempo en un mapa dentro
-de su propio bloque. Debajo están sus tarjetas, con descripción, precio y opciones
+de la pantalla **Cerca de mí**, junto con un filtro visual: puedes elegir **Todo**,
+**Productos** o **Servicios** y abrir **Filtros** para seleccionar categoría, distancia
+o tus propias publicaciones. Las opciones seleccionadas se resaltan con color y se
+muestran como etiquetas que puedes quitar; **Limpiar todo** restablece la búsqueda.
+El mapa y las tarjetas muestran los mismos resultados.
+
+El mapa se mantiene en su propio bloque. Debajo están sus tarjetas, con descripción, precio y opciones
 de contacto. El mapa ajusta la vista para incluir los puntos de los resultados cargados;
 no necesitas ir cambiando de publicación.
 Tocar un icono abre su información. Los pedidos tienen su propio mapa en **Ayuda vecinal**.
