@@ -75,8 +75,11 @@ test('MySQL real: colaboraciones, reputación, idempotencia y reservas concurren
       assert.deepEqual(repeated.confirmadaEn, confirmed.confirmadaEn);
       assert.equal((await community.getRequest(requestId)).estado, 'en_curso');
     });
-    await t.test('una reseña verificable por colaboración, editable y sin autorreseña', async () => {
-      await assert.rejects(() => community.saveReview(first, firstOfferId, { calificacion: 5 }), { code: 'FORBIDDEN' });
+    await t.test('cada participante valora al otro tras confirmar; las reseñas son editables y rechazan terceros', async () => {
+      await assert.rejects(() => community.saveReview(resourceOwner, firstOfferId, { calificacion: 5 }), { code: 'FORBIDDEN' });
+      await community.saveReview(first, firstOfferId, { calificacion: 5, comentario: 'Buena coordinación del solicitante' });
+      const requesterReputation = await community.getReputation(owner);
+      assert.equal(requesterReputation.resenas.length, 1);
       const initial = await community.saveReview(owner, firstOfferId, { calificacion: 5, comentario: 'Ayuda recibida y confirmada' });
       const edited = await community.saveReview(owner, firstOfferId, { calificacion: 3, comentario: 'Reseña editada' });
       assert.equal(edited?.id, initial?.id);
