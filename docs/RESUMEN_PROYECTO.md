@@ -35,6 +35,19 @@ Esta separación es visual: no cambia la ubicación guardada.
 
 Puedes indicar una ubicación usando GPS, buscando una dirección o eligiendo un punto
 en el mapa. Los demás vecinos ven una zona aproximada; tu dirección exacta es privada.
+También puedes configurarla al crear tu cuenta, en **Dirección o referencia**.
+El botón opcional **Elegir ubicación** abre una ventana con el mapa, sin agrandar
+el formulario. Al escribir una calle aparecen sugerencias; al elegir una se completa
+el campo y se selecciona su punto. Al pulsar un punto del mapa o usar GPS también se
+completa su dirección aproximada, que puedes corregir. También puedes arrastrar el
+pin para ajustar el punto: al soltarlo se actualiza la dirección. En el celular,
+separa dos dedos para acercar el mapa y júntalos para alejarlo. El pin inicial es
+una guía; debes moverlo, elegir un punto, una sugerencia o usar GPS para seleccionarlo.
+Si no se encuentra una calle,
+puedes escribir una referencia. Confirmar aplica la selección; cancelar conserva lo
+que tenías antes de abrir la ventana.
+Se guarda en tu perfil para buscar cerca de ti desde el inicio; seleccionar el punto
+es opcional si prefieres registrarte únicamente con una referencia escrita.
 Las publicaciones sin coordenadas no pueden mostrarse como puntos ni calcular su
 cercanía, pero siguen apareciendo en las tarjetas cuando se consulta por comunidad.
 

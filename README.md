@@ -92,6 +92,16 @@ publicaciones. Las demás rutas conservan el límite de 64 KB.
 
 ### Ubicación y mapa comunitario
 
+- Al crear una cuenta, **Dirección o referencia** es un campo compacto con un botón
+  opcional **Elegir ubicación**. Este abre una ventana superpuesta para buscar una
+  dirección, usar GPS o elegir un punto. Al seleccionar un resultado y confirmar,
+  se autocompleta el campo y se guarda el punto elegido en el formulario. Cancelar
+  conserva la dirección anterior y los demás datos del registro.
+  El punto se guarda en el perfil al crear la cuenta y se usa al entrar
+  para buscar cerca de ti; la dirección y las coordenadas exactas son privadas.
+  También puedes registrarte solo con una referencia escrita. Al escribir una calle
+  aparecen sugerencias; al elegir un punto o usar GPS se completa una dirección
+  aproximada que puedes revisar y corregir antes de crear la cuenta.
 - En **Tu zona**, elige una comunidad y usa GPS, busca una dirección en Perú o
   selecciona un punto en el mapa. El GPS requiere permiso y HTTPS o localhost.
   Con teclado, enfoca el mapa, mueve el centro con las flechas y pulsa Enter.
@@ -124,12 +134,18 @@ publicaciones. Las demás rutas conservan el límite de 64 KB.
   privada. La distancia se calcula con el punto privado y se redondea a 50 m.
 
 Se utiliza Leaflet con OpenStreetMap; no hace falta una clave de Google Maps.
-Los mapas necesitan internet. La búsqueda se realiza solo al pulsar **Buscar**;
-ese texto se envía al proveedor, mientras que el GPS no hace geocodificación inversa.
-La API limita las consultas al proveedor a una cada 1.1 segundos por proceso y
-mantiene resultados en memoria durante 20 minutos. En producción con varias
-instancias, usar un proveedor con capacidad contratada o un límite global compartido.
-`VITE_MAP_TILE_URL`, `VITE_MAP_ATTRIBUTION` y `GEOCODING_URL` permiten cambiar proveedores.
+Los mapas necesitan internet. Después de escribir al menos tres caracteres y hacer
+una pausa de 650 ms, Photon ofrece sugerencias de calles en Perú. Elegir un punto
+o usar GPS consulta su dirección aproximada y completa el campo, sin mover el punto
+elegido. El texto y las coordenadas consultadas se envían a Photon; si no hay una
+dirección disponible, puedes escribir una referencia manualmente.
+La API comparte consultas simultáneas iguales, limita las llamadas a una por segundo
+por proceso y guarda resultados durante diez minutos. `PLACES_API_URL` permite usar
+una instancia Photon propia; la instancia pública de demostración admite uso moderado
+y no garantiza disponibilidad. En producción, dimensionar el proveedor y compartir
+los límites entre instancias. `VITE_MAP_TILE_URL` y `VITE_MAP_ATTRIBUTION` configuran
+el mapa. La ruta anterior `/ubicaciones/buscar` conserva su proveedor `GEOCODING_URL`
+para búsquedas explícitas; no se utiliza para autocompletado.
 Consultar las políticas de [teselas](https://operations.osmfoundation.org/policies/tiles/)
 y [búsqueda](https://operations.osmfoundation.org/policies/nominatim/) antes del despliegue.
 

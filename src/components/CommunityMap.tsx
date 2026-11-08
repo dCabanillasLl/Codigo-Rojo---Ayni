@@ -9,17 +9,17 @@ import { kindLabels, markerHtml, mapSymbols, type MapKind, type MapSymbol } from
 export type MapPin = { id: string; point: Coordinates; title: string; label: string; kind?: MapKind; symbol?: MapSymbol; category?: string };
 type Props = {
   center?: Coordinates | null; reference?: Coordinates | null; pins?: MapPin[]; selectedId?: string;
-  onSelect?: (id: string) => void; onPick?: (point: Coordinates) => void;
+  onSelect?: (id: string) => void; onPick?: (point: Coordinates) => void; onPickStart?: () => void;
   picked?: Coordinates | null; radius?: number; accuracy?: number | null;
   online: boolean; label: string; compact?: boolean; fitAll?: boolean; zoomPosition?: L.ControlPosition;
 };
 
-export default function CommunityMap({ center, reference, pins = [], selectedId, onSelect, onPick, picked, radius, accuracy, online, label, compact, fitAll = true, zoomPosition = 'topleft' }: Props) {
+export default function CommunityMap({ center, reference, pins = [], selectedId, onSelect, onPick, onPickStart, picked, radius, accuracy, online, label, compact, fitAll = true, zoomPosition = 'topleft' }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const tiles = useRef<L.TileLayer | null>(null);
   const layers = useRef<L.LayerGroup | null>(null);
-  const callbacks = useRef({ onPick, onSelect }); callbacks.current = { onPick, onSelect };
+  const callbacks = useRef({ onPick, onSelect, onPickStart }); callbacks.current = { onPick, onSelect, onPickStart };
   const initialCenter = useRef(center || picked || COMMUNITY_CENTER);
   const fitView = useRef<() => void>(() => undefined);
   const geometryKey = pins.map(pin => `${pin.id}:${pin.point.latitude},${pin.point.longitude}`).sort().join('|');
@@ -27,6 +27,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
   pins.forEach(pin => { const key = `${pin.point.latitude},${pin.point.longitude}`; sharedPoints.set(key, (sharedPoints.get(key) || 0) + 1); });
   const sharedCount = Math.max(0, ...sharedPoints.values());
   const [tileError, setTileError] = useState(false);
+  const editable = Boolean(onPick);
 
   fitView.current = () => {
     const instance = map.current; if (!instance) return;
@@ -52,7 +53,10 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
   useEffect(() => {
     if (!host.current || !online) return;
     const start = initialCenter.current;
-    const instance = L.map(host.current, { scrollWheelZoom: false, keyboard: true, zoomControl: true })
+    const instance = L.map(host.current, {
+      scrollWheelZoom: false, keyboard: true, zoomControl: true,
+      touchZoom: true, dragging: true, bounceAtZoomLimits: false,
+    })
       .setView([start.latitude, start.longitude], compact ? 15 : 14);
     map.current = instance;
     instance.zoomControl.setPosition(zoomPosition);
@@ -76,6 +80,30 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     return () => { observer.disconnect(); container.removeEventListener('keydown', keydown); instance.remove(); map.current = null; layers.current = null; tiles.current = null; };
   }, [online, compact, zoomPosition]);
 
+  // Keep the editable marker outside the layers redrawn when the map pans.
+  // Leaflet can then auto-pan during a drag without replacing the active pin.
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !editable) return;
+    const point = picked || center || COMMUNITY_CENTER;
+    const icon = L.divIcon({
+      className: 'location-drag-pin',
+      html: '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M20 50C17 45 2 30 2 20a18 18 0 1 1 36 0c0 10-15 25-18 30Z" fill="currentColor" stroke="#fffef9" stroke-width="3"/><circle cx="20" cy="20" r="6" fill="#fffef9"/></svg>',
+      iconSize: [40, 52], iconAnchor: [20, 50], tooltipAnchor: [0, -44],
+    });
+    const marker = L.marker([point.latitude, point.longitude], {
+      icon, draggable: true, autoPan: true, keyboard: true, bubblingMouseEvents: false,
+      title: 'Arrastra el pin para elegir tu ubicación', alt: 'Ubicación ajustable: arrastra el pin o elige un punto con el teclado', zIndexOffset: 1000,
+    }).bindTooltip(picked ? 'Arrastra para ajustar la ubicación' : 'Arrastra para elegir la ubicación').addTo(instance);
+    marker.on('dragstart', () => { callbacks.current.onPickStart?.(); marker.closeTooltip(); marker.getElement()?.classList.add('is-dragging'); });
+    marker.on('dragend', () => {
+      marker.getElement()?.classList.remove('is-dragging');
+      const position = marker.getLatLng();
+      callbacks.current.onPick?.({ latitude: position.lat, longitude: position.lng });
+    });
+    return () => { marker.remove(); };
+  }, [online, compact, zoomPosition, editable, picked?.latitude, picked?.longitude, center?.latitude, center?.longitude]);
+
   useEffect(() => {
     if (!map.current || !layers.current) return;
     const instance = map.current, group = layers.current;
@@ -86,7 +114,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
       const latlng: L.LatLngExpression = [origin.latitude, origin.longitude];
       if (radius) L.circle(latlng, { radius, color: '#39765d', fillOpacity: 0.06, weight: 1.5, dashArray: '6 7', interactive: false }).addTo(group);
       if (picked && accuracy) L.circle(latlng, { radius: accuracy, color: '#367fc0', fillOpacity: 0.08, weight: 1, interactive: false }).addTo(group);
-      L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#2879c7', fillOpacity: 1 })
+      if (!editable) L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#2879c7', fillOpacity: 1 })
         .bindTooltip(picked ? 'Punto elegido' : 'Tu punto de búsqueda').addTo(group);
     }
     const layout = spreadMapPoints(pins.map(pin => ({ id: pin.id, ...instance.latLngToContainerPoint([pin.point.latitude, pin.point.longitude]) })));
@@ -111,7 +139,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     draw();
     instance.on('zoomend moveend', draw);
     return () => { instance.off('zoomend moveend', draw); };
-  }, [online, reference, picked, pins, selectedId, radius, accuracy]);
+  }, [online, reference, picked, pins, selectedId, radius, accuracy, editable]);
 
   useEffect(() => {
     fitView.current();

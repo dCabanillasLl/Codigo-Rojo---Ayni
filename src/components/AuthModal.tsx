@@ -2,7 +2,10 @@ import { useRef, useState, type FormEvent } from 'react';
 import { useApp } from '../AppContext';
 import { ApiError, api, errorMessage, refreshData } from '../lib/api';
 import { Modal, Field, ErrorBox } from './UI';
-import type { User } from '../types';
+import type { LocationDraft, User } from '../types';
+import RegistrationLocationDialog from './RegistrationLocationDialog';
+import Icon from './Icon';
+import AddressAutocomplete from './AddressAutocomplete';
 
 export default function AuthModal() {
   const { setAuthOpen, setUser, online, notify } = useApp();
@@ -15,10 +18,8 @@ export default function AuthModal() {
   const [dniBusy, setDniBusy] = useState(false);
   const [dniProof, setDniProof] = useState('');
   const [dniMessage, setDniMessage] = useState('');
-  const [coordinates, setCoordinates] = useState<{ latitud: number; longitud: number } | null>(null);
-  const [locationBusy, setLocationBusy] = useState(false);
-  const [locationMessage, setLocationMessage] = useState('');
-  const [locationError, setLocationError] = useState('');
+  const [location, setLocation] = useState<LocationDraft>({ coordinates: null, address: '' });
+  const [locationOpen, setLocationOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   function explainError(value: unknown) {
     if (value instanceof ApiError && ['INVALID_ORIGIN', 'CORS_ORIGIN_REJECTED'].includes(value.code)) {
@@ -44,44 +45,18 @@ export default function AuthModal() {
     } catch (lookupError) { setError(errorMessage(lookupError)); }
     finally { setDniBusy(false); }
   }
-  function useCurrentLocation() {
-    setLocationMessage(''); setLocationError('');
-    if (!navigator.geolocation) { setLocationError('Este dispositivo no permite detectar la ubicación. Puedes escribir tu dirección.'); return; }
-    setLocationBusy(true);
-    navigator.geolocation.getCurrentPosition(async position => {
-      const location = { latitud: position.coords.latitude, longitud: position.coords.longitude };
-      setCoordinates(location);
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 8000);
-      try {
-        const params = new URLSearchParams({ latitude: String(location.latitud), longitude: String(location.longitud), localityLanguage: 'es' });
-        const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${params}`, { headers: { Accept: 'application/json' }, cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error('GEOCODING_FAILED');
-        const place = await response.json() as { locality?: string; city?: string; principalSubdivision?: string; countryName?: string; plusCode?: string };
-        const suggestedAddress = [...new Set([place.locality, place.city, place.principalSubdivision, place.countryName].map(value => value?.trim()).filter((value): value is string => Boolean(value)))].join(', ') || place.plusCode || '';
-        const addressInput = formRef.current?.elements.namedItem('direccion') as HTMLInputElement | null;
-        if (!suggestedAddress || !addressInput) throw new Error('ADDRESS_NOT_FOUND');
-        addressInput.value = suggestedAddress;
-        setLocationMessage('Dirección aproximada detectada. Revísala y corrígela si hace falta.');
-      } catch {
-        setLocationError('Guardamos tu ubicación GPS, pero no pudimos sugerir una dirección. Escríbela manualmente.');
-      } finally {
-        window.clearTimeout(timeout);
-        setLocationBusy(false);
-      } },
-      () => { setLocationError('No pudimos detectar la ubicación. Revisa el permiso del navegador o escribe tu dirección.'); setLocationBusy(false); },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
-    );
-  }
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const data = new FormData(event.currentTarget); setBusy(true); setError('');
+    event.preventDefault();
+    if (busy || dniBusy || locationOpen) return;
+    if (register && location.address.trim().length < 3) { setError('Escribe una dirección o referencia de al menos 3 caracteres.'); return; }
+    const data = new FormData(event.currentTarget); setBusy(true); setError('');
     try {
-      const body = register ? { nombres: data.get('nombres'), apellidos: data.get('apellidos'), contrasena: data.get('contrasena'), dni, consentimientoDni: true, dniProof, direccion: data.get('direccion'), ...(coordinates ?? {}), ...(data.get('telefono') ? { telefono: data.get('telefono') } : {}) } : legacyLogin ? { correo: data.get('correo'), contrasena: data.get('contrasena') } : { identificador: data.get('identificador'), contrasena: data.get('contrasena') };
+      const body = register ? { nombres: data.get('nombres'), apellidos: data.get('apellidos'), contrasena: data.get('contrasena'), dni, consentimientoDni: true, dniProof, direccion: location.address.trim(), ...(location.coordinates ? { latitud: location.coordinates.latitude, longitud: location.coordinates.longitude } : {}), ...(data.get('telefono') ? { telefono: data.get('telefono') } : {}) } : legacyLogin ? { correo: data.get('correo'), contrasena: data.get('contrasena') } : { identificador: data.get('identificador'), contrasena: data.get('contrasena') };
       const user = await api<User>(`/auth/${register ? 'register' : 'login'}`, { method: 'POST', body });
       setUser(user); refreshData(); setAuthOpen(false); notify(`Bienvenido${register ? ' a AYNI' : ' de vuelta'}, ${user.nombres}`);
     } catch (error) { setError(explainError(error)); } finally { setBusy(false); }
   }
-  return <Modal title={register ? 'Únete a tu barrio' : 'Qué bueno verte'} onClose={() => setAuthOpen(false)}>
+  return <><Modal title={register ? 'Únete a tu barrio' : 'Qué bueno verte'} onClose={() => setAuthOpen(false)}>
     <p className="form-intro">{register ? 'Crea tu cuenta para pedir ayuda y colaborar con tus vecinos.' : 'Entra para encontrar ayuda y conectar con tus vecinos.'}</p>
     <form ref={formRef} onSubmit={submit} className="form-stack auth-form">
       {register && <>
@@ -93,16 +68,17 @@ export default function AuthModal() {
       {!register && <Field label={legacyLogin ? 'Correo de tu cuenta anterior' : 'DNI'}><input name={legacyLogin ? 'correo' : 'identificador'} type={legacyLogin ? 'email' : 'text'} inputMode={legacyLogin ? 'email' : 'numeric'} autoComplete="username" required minLength={legacyLogin ? undefined : 8} maxLength={legacyLogin ? 254 : 8} pattern={legacyLogin ? undefined : '[0-9]{8}'} placeholder={legacyLogin ? 'tu@correo.com' : 'Escribe los 8 dígitos'}/></Field>}
       <Field label="Contraseña" hint={register ? 'Usa al menos 10 caracteres.' : undefined}><input name="contrasena" type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={register ? 10 : 1} maxLength={72}/></Field>
       {register && <>
-        <Field label="Dirección o referencia" hint="Escríbela o usa el GPS para sugerir una localidad. BigDataCloud recibe tus coordenadas e IP para esa consulta; puedes corregir la sugerencia antes de guardar."><div className="input-with-action"><input name="direccion" autoComplete="street-address" maxLength={255} placeholder="Calle, distrito o referencia" required/><button type="button" className="secondary-button location-button" onClick={useCurrentLocation} disabled={locationBusy || !online}>{locationBusy ? 'Buscando…' : 'Usar mi ubicación'}</button></div></Field>
-        {locationMessage && <p className="success-text" role="status">{locationMessage}</p>}
-        {locationError && <ErrorBox message={locationError}/>}
+        <div className="registration-location">
+          <AddressAutocomplete label="Dirección o referencia" name="direccion" value={location.address} onChange={address => setLocation({ address, coordinates: null })} onSelect={place => setLocation({ address: place.nombre, coordinates: { latitude: place.latitud, longitude: place.longitud } })} bias={location.coordinates} online={online} disabled={busy} required showSearchButton={false}/>
+          <div className="registration-location-actions"><button type="button" className="outline-btn" disabled={busy || dniBusy || !online} onClick={() => setLocationOpen(true)}><Icon name="pin" size={17}/>{location.coordinates ? 'Cambiar ubicación' : 'Elegir ubicación'}</button>{location.coordinates && <><span className="registration-location-selected" role="status"><Icon name="check" size={15}/>Punto seleccionado</span><button type="button" className="text-action" disabled={busy} onClick={() => setLocation(current => ({ ...current, coordinates: null }))}>Quitar punto</button></>}</div>
+        </div>
         <Field label="Teléfono (opcional)" hint="No se muestra públicamente en los listados."><input name="telefono" type="tel" autoComplete="tel" maxLength={25}/></Field>
       </>}
       {!online && <ErrorBox message="Necesitas conexión para iniciar sesión o crear una cuenta."/>}
       <ErrorBox message={error}/>
-      <div className="auth-actions"><button type="submit" className="record-button justify-center" disabled={busy || !online || (register && (!dniProof || !dniConsent))}>{busy ? 'Un momento…' : register ? 'Crear mi cuenta' : 'Entrar'}</button>
+      <div className="auth-actions"><button type="submit" className="record-button justify-center" disabled={busy || dniBusy || locationOpen || !online || (register && (!dniProof || !dniConsent))}>{busy ? 'Un momento…' : register ? 'Crear mi cuenta' : 'Entrar'}</button>
       {!register && <button type="button" className="text-action" onClick={() => { setLegacyLogin(!legacyLogin); setError(''); }}>{legacyLogin ? 'Entrar con DNI' : '¿Cuenta anterior? Entrar con correo'}</button>}
       <button type="button" className="text-action" onClick={() => { setRegister(!register); setLegacyLogin(false); setError(''); }}>{register ? 'Ya tengo una cuenta · Iniciar sesión' : '¿Aún no tienes cuenta? Regístrate'}</button></div>
     </form>
-  </Modal>;
+  </Modal>{locationOpen && <RegistrationLocationDialog value={location} online={online} onClose={() => setLocationOpen(false)} onConfirm={value => { setLocation(value); setLocationOpen(false); setError(''); }}/>}</>;
 }

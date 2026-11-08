@@ -74,7 +74,24 @@ al crear se usa el punto del perfil solo si coincide la comunidad elegida. Al ed
 en la misma comunidad sin `ubicacion` se conserva el punto anterior.
 La ubicación explícita también forma parte de la huella de idempotencia del pedido.
 
-`GET /api/ubicaciones/buscar?q=...` busca direcciones de Perú al pulsar Buscar.
+`GET /api/ubicaciones/sugerencias?q=...&latitud=...&longitud=...` ofrece hasta cinco
+direcciones de Perú mediante Photon como `{id,nombre,latitud,longitud}`. `q` tiene
+entre 3 y 200 caracteres; las coordenadas de preferencia son opcionales y deben
+enviarse juntas. El cliente espera 650 ms después de escribir y cancela solicitudes
+anteriores para evitar respuestas desactualizadas.
+
+`GET /api/ubicaciones/reversa?latitud=...&longitud=...` consulta una dirección cercana
+al punto y devuelve `{data:{direccion:string|null}}`. Las coordenadas son obligatorias,
+numéricas, finitas y dentro de sus límites geográficos. No reemplaza el punto elegido;
+la dirección es aproximada y editable. `null` permite escribir una referencia manual.
+
+Ambas rutas envían `Cache-Control: no-store` y comparten un límite de 60 consultas/minuto
+por cliente. El servidor usa caché interna de diez minutos, agrupa solicitudes iguales
+y consulta como máximo una vez por segundo por proceso. Devuelven 429
+`PLACE_LOOKUP_BUSY` si la cola está ocupada y 503 `PLACE_LOOKUP_UNAVAILABLE` si falla
+el proveedor. `PLACES_API_URL` configura la instancia Photon. No consultan datos de vecinos.
+
+`GET /api/ubicaciones/buscar?q=...` conserva la búsqueda explícita anterior de Perú.
 `q` tiene entre 3 y 200 caracteres. Devuelve hasta cinco
 `{id,nombre,latitud,longitud}` del proveedor de geocodificación, no de otros usuarios.
 Tiene límite de 15 consultas/minuto por cliente, caché en memoria y un límite de
