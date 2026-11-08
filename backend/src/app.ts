@@ -29,7 +29,7 @@ app.use(cors({
     callback(new AppError(403, "CORS_ORIGIN_REJECTED", "El navegador llegó con un origen distinto al configurado en el backend."));
   },
   credentials: true,
-  methods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "X-AYNI-Client", "X-AYNI-User"],
 }));
 app.get("/api/version", (_req, res) => res.json({ data: { api: "ayni-api", build: "dni-apiperu-v1" } }));
@@ -43,7 +43,7 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
   await query("SELECT client_request_id FROM solicitudes_ayuda LIMIT 0");
   await query("SELECT entregada_en, confirmada_en FROM ofertas_ayuda LIMIT 0");
   await query("SELECT imagen_url, imagen, imagen_hash FROM avisos LIMIT 0");
-  await query('SELECT revision_evento, motivo_cambio, ultimo_cambio_evento FROM avisos LIMIT 0');
+  await query('SELECT revision_evento, motivo_cambio, ultimo_cambio_evento, ubicacion_publica FROM avisos LIMIT 0');
   await query('SELECT confirmada FROM asistencias_avisos LIMIT 0');
   await query('SELECT leida_en FROM notificaciones_avisos LIMIT 0');
   await query("SELECT telefono_publico FROM usuarios LIMIT 0");

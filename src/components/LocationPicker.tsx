@@ -6,9 +6,9 @@ import AddressAutocomplete, { type AddressSuggestion } from './AddressAutocomple
 import Icon from './Icon';
 import { ErrorBox, Field } from './UI';
 
-export default function LocationPicker({ value, onChange, online, disabled = false, initialCenter, addressField, onBusyChange }: {
+export default function LocationPicker({ value, onChange, online, disabled = false, initialCenter, addressField, onBusyChange, publicVenue = false }: {
   value: LocationDraft; onChange: (value: LocationDraft) => void; online: boolean; disabled?: boolean; initialCenter?: Coordinates | null;
-  addressField?: { label: string; name: string; required?: boolean }; onBusyChange?: (busy: boolean) => void;
+  addressField?: { label: string; name: string; required?: boolean }; onBusyChange?: (busy: boolean) => void; publicVenue?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [suggesting, setSuggesting] = useState(false);
@@ -82,7 +82,7 @@ export default function LocationPicker({ value, onChange, online, disabled = fal
     {resolving && <p className="success-text" role="status">Completando la dirección del punto seleccionado…</p>}
     <p className="form-hint">{value.coordinates ? `Punto seleccionado: ${value.coordinates.latitude.toFixed(5)}, ${value.coordinates.longitude.toFixed(5)}.` : 'Aún no hay un punto elegido.'} Con teclado: enfoca el mapa, muévelo con las flechas y pulsa Enter.</p>
     {accuracy != null && value.coordinates && <p className="location-accuracy" role="status">Precisión del GPS: aproximadamente ±{Math.max(1, Math.round(accuracy))} m.</p>}
-    {!addressField && <Field label="Dirección o referencia privada" hint="Se completa al elegir un punto. Puedes corregirla antes de guardar."><input value={value.address} onChange={event => updateAddress(event.target.value)} maxLength={255} placeholder="Calle, número o referencia" disabled={disabled}/></Field>}
+    {!addressField && <Field label={publicVenue ? 'Dirección o referencia de la actividad' : 'Dirección o referencia privada'} hint="Se completa al elegir un punto. Puedes corregirla antes de guardar."><input value={value.address} onChange={event => updateAddress(event.target.value)} maxLength={255} placeholder="Calle, número o referencia" disabled={disabled}/></Field>}
     {message && <p className="success-text" role="status">{message}</p>}
     <ErrorBox message={error}/>
   </div>;

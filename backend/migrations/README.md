@@ -34,6 +34,13 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 10. `009_estado_cambio_actividad.sql` conserva el tipo del último cambio de actividad
     para distinguir la etiqueta de postergación de otras actualizaciones. No modifica
     las fechas, estados ni publicaciones existentes.
+11. `010_ubicacion_publica_actividades.sql` marca si el lugar de un aviso se eligió
+    explícitamente para ser público. Los avisos anteriores quedan en `0`: no expone
+    direcciones ni coordenadas privadas heredadas del perfil. La ubicación se guarda
+    en una fila propia y no modifica el domicilio del organizador.
+12. `011_notificaciones_actividades_eliminadas.sql` permite borrar una actividad
+    cancelada sin perder las notificaciones pendientes: su referencia al aviso pasa
+    a NULL. La asistencia se elimina por cascada. Esta migración no elimina actividades.
 
 El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
 de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum

@@ -16,6 +16,19 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
 - **Publicar avisos:** compartir actividades e información vecinal, con un flyer
   opcional que puedes subir desde tu celular. Los avisos nuevos requieren fecha y
   hora de la actividad y dejan de mostrarse automáticamente al llegar ese momento.
+  También eliges el lugar: busca una dirección, usa GPS o arrastra el pin en una
+  ventana de mapa. La tarjeta muestra la dirección de la actividad y permite abrir
+  el mapa o Google Maps. Este lugar será público; tu ubicación privada de perfil
+  permanece sin cambios.
+  Si ocurre un inconveniente, el organizador puede usar **Editar actividad o ubicación**
+  para corregir el texto, la categoría o el flyer, cambiar la fecha o seleccionar otro
+  lugar. Los cambios de fecha o lugar avisan a los asistentes confirmados; editar solo
+  el texto conserva el flyer y la ubicación. Volver cierra sin guardar los cambios.
+  Al cancelar se oculta **Compartir por WhatsApp**. El organizador puede usar
+  **Eliminar permanentemente**, pero ya no puede editar los datos ni la ubicación.
+  Esta opción pide confirmación antes de borrar. Al confirmar se eliminan la actividad,
+  su flyer y las confirmaciones. Las notificaciones de cancelación pendientes se
+  conservan para quienes todavía no se hayan conectado.
 - **Confirmar asistencia:** marcar **Asistiré** y consultar las actividades en
   **Mis asistencias**. Cada anuncio muestra cuántos vecinos confirmaron.
 - **Gestionar actividades:** desde **Mis actividades**, el creador puede postergar
