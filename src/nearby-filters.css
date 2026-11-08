@@ -35,6 +35,12 @@
 .nearby-filter-active > button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; max-width: 100%; padding: 8px 10px; border: 1px solid #ccd9c6; border-radius: 10px; background: #e7eee1; color: #38583e; font-size: 11px; font-weight: 600; }
 .nearby-filter-active > button > span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nearby-filter-active > button > svg { flex-shrink: 0; }
+.nearby-radius-options { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 7px; color: #65806c; }
+.nearby-radius-options > svg { flex: 0 0 auto; margin-inline: 3px; }
+.nearby-radius-options > button { display: inline-flex; align-items: center; justify-content: center; min-width: 62px; min-height: 40px; padding: 7px 12px; border: 1px solid #cbd9cc; border-radius: 11px; background: #fffefa; color: #45644f; font-size: 12px; font-weight: 750; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.nearby-radius-options > button:hover { border-color: #6c987a; background: #f1f6ef; transform: translateY(-1px); }
+.nearby-radius-options > button[aria-pressed="true"] { border-color: #285d46; background: #285d46; color: #fff; box-shadow: 0 3px 8px #285d4630; }
+.nearby-radius-options > button:focus-visible { outline: 3px solid #e3654380; outline-offset: 2px; }
 .nearby-filter-active > .nearby-filter-reset { border-color: transparent; color: #9a492f; background: transparent; text-decoration: underline; text-underline-offset: 3px; }
 .nearby-filter-results { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 5px 12px; margin-top: 14px; padding: 0 2px; color: #556d59; font-size: 12px; }
 .nearby-filter-results > small { color: #82907f; font-size: 11px; }

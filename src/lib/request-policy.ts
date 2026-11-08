@@ -5,6 +5,7 @@ const rules: Rule[] = [
   { label: 'alcohol', terms: ['alcohol', 'cerveza', 'licor', 'vino', 'whisky', 'whiskey', 'ron', 'vodka', 'pisco', 'aguardiente', 'trago'], phrases: ['bebida alcoholica', 'bebidas alcoholicas'], typoTolerant: ['alcohol', 'cerveza', 'aguardiente'] },
   { label: 'dinero', terms: ['dinero', 'efectivo', 'cash', 'plata', 'billete', 'billetes', 'yape', 'plin', 'transferencia', 'transferencias', 'deposito', 'depositos', 'soles', 'dolares'], phrases: ['prestamo de dinero', 'prestamo de plata', 'prestamo economico', 'prestamo financiero', 'prestame dinero', 'prestame plata', 'apoyo economico', 'aporte economico', 'ayuda economica', 'ayuda financiera', 'pago en efectivo'] },
   { label: 'contenido sexual', terms: ['sexo', 'sexual', 'sexuales', 'prostitucion', 'prostituta', 'prostitutas', 'prostituto', 'prostitutos', 'escort', 'porno', 'pornografia', 'pornografico', 'nude', 'nudes', 'desnudo', 'desnudos', 'desnuda', 'desnudas', 'onlyfans'], phrases: ['relaciones sexuales', 'servicios sexuales', 'servicio intimo', 'encuentro intimo', 'contenido erotico', 'contenido explicito', 'trabajo sexual', 'trabajadora sexual', 'trabajador sexual', 'masaje erotico', 'masaje sensual', 'only fans'], typoTolerant: ['sexual', 'sexuales', 'prostitucion', 'prostituta', 'prostituto', 'pornografia', 'pornografico', 'desnudos', 'desnudas'] },
+  { label: 'insultos, malas palabras o lenguaje discriminatorio', terms: ['mierda', 'mierdas', 'puta', 'puto', 'putas', 'putos', 'pendejo', 'pendeja', 'pendejos', 'pendejas', 'huevon', 'huevona', 'huevones', 'cojudo', 'cojuda', 'cojudos', 'cojudas', 'idiota', 'idiotas', 'imbecil', 'imbeciles', 'estupido', 'estupida', 'estupidos', 'estupidas', 'maldito', 'maldita', 'malditos', 'malditas', 'joder', 'jodete', 'carajo', 'csm', 'ptm', 'ctm', 'conchatumare', 'conchatumadre', 'conchesumare', 'conchesumadre', 'webon', 'weon', 'weona', 'hijueputa', 'hdp', 'cabron', 'cabrona', 'maricon', 'marica'], phrases: ['hijo de puta', 'hija de puta', 'hijo de perra', 'concha de tu madre', 'vete a la mierda', 'chupa tu madre', 'chupala idiota'] },
 ];
 
 function normalize(text: string) {
@@ -39,7 +40,7 @@ export function blockedRequestReason(text: string): string | undefined {
   const words = normalized.split(/\s+/).filter(Boolean);
   for (const rule of rules) {
     if (rule.phrases?.some(phrase => (` ${normalized} `).includes(` ${phrase} `))) {
-      return `AYNI no permite solicitudes relacionadas con ${rule.label}. Edita el pedido para continuar.`;
+      return `AYNI no permite publicar contenido relacionado con ${rule.label}. Edita el texto para continuar.`;
     }
     const candidates = words.flatMap(word => [word, word.replace(/(.)\1+/g, '$1')]);
     // Catch intentionally spaced spellings such as "s e x o" without fuzzy matching whole sentences.
@@ -51,9 +52,9 @@ export function blockedRequestReason(text: string): string | undefined {
       }
     }
     for (const candidate of candidates) {
-      if (rule.terms.includes(candidate)) return `AYNI no permite solicitudes relacionadas con ${rule.label}. Edita el pedido para continuar.`;
+      if (rule.terms.includes(candidate)) return `AYNI no permite publicar contenido relacionado con ${rule.label}. Edita el texto para continuar.`;
       if (candidate.length >= 6 && rule.typoTolerant?.some(term => distanceAtMostOne(candidate, term))) {
-        return `AYNI no permite solicitudes relacionadas con ${rule.label}. Revisa la palabra “${candidate}”.`;
+        return `AYNI no permite publicar contenido relacionado con ${rule.label}. Revisa la palabra “${candidate}”.`;
       }
     }
   }

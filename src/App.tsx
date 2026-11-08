@@ -21,10 +21,11 @@ const navItems: { id: Destination; label: string; icon: 'home' | 'hands' | 'mega
   { id: 'perfil', label: 'Mi perfil', icon: 'user' },
 ];
 
-function readRoute(): { page: Destination; detailId?: string } {
+function readRoute(): { page: Destination; detailId?: string; helpTab?: 'mios' } {
   const [route, id] = window.location.hash.replace(/^#\/?/, '').split('/');
   const page = (['cerca', 'ayuda', 'avisos', 'perfil'].includes(route) ? route : 'cerca') as Destination;
-  return { page, detailId: id || undefined };
+  const reviewsShortcut = page === 'ayuda' && id === 'mis-pedidos';
+  return { page, detailId: reviewsShortcut ? undefined : id || undefined, helpTab: reviewsShortcut ? 'mios' : undefined };
 }
 function navigate(page: Destination, id?: string) {
   const hash = `#${page}${id ? `/${encodeURIComponent(id)}` : ''}`;
@@ -76,9 +77,9 @@ export default function App() {
       {!online && <p className="offline-banner" role="status"><Icon name="wifiOff" size={18}/>Estás sin conexión. Puedes consultar información guardada y guardar pedidos para enviarlos cuando vuelvas a conectarte.</p>}
       {sessionError && <p className="offline-banner" role="status">{sessionError} · {sessionLoading ? 'Verificando sesión…' : 'Los datos del servidor pueden no estar disponibles.'}</p>}
       {route.page === 'cerca' && <Nearby detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
-      {route.page === 'ayuda' && <Help detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
+      {route.page === 'ayuda' && <Help detailId={route.detailId} initialTab={route.helpTab} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
       {route.page === 'avisos' && <Notices view={route.detailId}/>}
-      {route.page === 'perfil' && <Profile onLocation={() => setLocationOpen(true)} onSignOut={() => void signOut()} signOutBusy={signOutBusy} signOutError={profileError}/>}
+      {route.page === 'perfil' && <Profile onLocation={() => setLocationOpen(true)} onReviewHelp={() => navigate('ayuda', 'mis-pedidos')} onSignOut={() => void signOut()} signOutBusy={signOutBusy} signOutError={profileError}/>}
     </main>
 
     <nav className="mobile-nav md:hidden" aria-label="Navegación principal">

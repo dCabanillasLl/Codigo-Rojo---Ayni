@@ -97,12 +97,14 @@ router.post("/auth/email/verification", requireAuth, emailLimiter, asyncHandler(
   await query("UPDATE usuarios SET correo_codigo_hash = ?, correo_codigo_vence = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE) WHERE usuario_id = ?", [codeHash, req.userId]);
   const sent = await sendCommunityEmail(account.correo, "Confirma tu correo de AYNI", `Tu código de confirmación es: ${code}\n\nVence en 10 minutos. Si no solicitaste este código, ignora este mensaje.`);
   if (!sent.sent) {
-    const message = sent.providerCode === 'EAUTH' && config.emailProvider === 'gmail' ? "Google rechazó el acceso SMTP. Revisa GMAIL_USER y la contraseña de aplicación en backend/.env."
+    const message = config.emailProvider === 'gmail' && sent.providerCode === 'EAUTH' ? "Google rechazó el acceso SMTP. Revisa GMAIL_USER y la contraseña de aplicación en backend/.env."
+      : config.emailProvider === 'gmail' && sent.providerCode === 'EDNS' ? "El backend no pudo encontrar smtp.gmail.com. Revisa la conexión DNS del equipo donde ejecutas AYNI y vuelve a intentar."
+      : config.emailProvider === 'gmail' ? "No se pudo conectar con Gmail SMTP. Revisa la conexión de red y que el equipo permita conexiones seguras al puerto 465."
       : sent.status === 401 ? "Resend rechazó la clave API. Revisa RESEND_API_KEY en backend/.env y reinicia el backend."
       : sent.status === 403 ? "Resend rechazó el remitente. Verifica en Resend que el dominio de EMAIL_FROM esté aprobado para enviar."
       : sent.status === 422 ? "Resend rechazó la dirección remitente o destinataria. Revisa el remitente y el dominio configurado."
       : sent.status === 429 ? "Resend limitó temporalmente los envíos. Espera unos minutos antes de volver a intentar."
-      : "No se pudo enviar el correo. Revisa Logs en Resend y la conexión del backend.";
+      : "No se pudo enviar el correo. Revisa la configuración del proveedor y la conexión del backend.";
     throw new AppError(503, "EMAIL_DELIVERY_FAILED", message);
   }
   res.json({ data: { enviado: true } });

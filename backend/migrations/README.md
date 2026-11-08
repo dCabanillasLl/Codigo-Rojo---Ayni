@@ -51,6 +51,8 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
     empiezan sin verificar.
 16. `013_notificaciones_interacciones.sql` crea notificaciones privadas persistentes
     para propuestas y cambios de estado de colaboraciones vecinales.
+17. `014_resenas_reciprocas.sql` conserva las reseñas existentes y permite una reseña
+    independiente por cada participante de una colaboración confirmada.
 
 Las migraciones con el mismo prefijo numérico surgieron en ramas paralelas. El runner
 las identifica por el nombre completo: conservar los nombres y los archivos ya
@@ -74,8 +76,9 @@ confirmaciones NULL; sus reseñas no se convierten en verificadas.
 - `pendiente` es propuesta; `aceptada` con `entregada_en` es entrega por confirmar;
   `completada` con `confirmada_en` es colaboración confirmada. Se preservan `rechazada`
   y `retirada` para distinguir quién canceló. El solicitante cierra el pedido aparte.
-- Una reseña de colaboración referencia una oferta única. Autor y destinatario se
-  derivan del solicitante y voluntario, conservando la relación sin duplicar identidades.
+- Cada participante puede dejar una reseña por colaboración confirmada. La migración
+  conserva las reseñas actuales como valoraciones del solicitante al colaborador;
+  autor y evaluado se guardan explícitamente para calcular reputación en ambas direcciones.
 - Disponibilidad = total − reservas aceptadas − entregas. No se almacena un contador
   duplicado. La API bloquea la fila del recurso durante cada cambio de reserva.
 - Los recursos de inventario son donaciones/consumibles. Para herramientas prestadas,

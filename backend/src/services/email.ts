@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import nodemailer, { type Transporter } from 'nodemailer';
+import { setServers } from 'node:dns';
 
 export type EmailSendResult = { sent: true } | { sent: false; status: number | null; providerCode: string };
 
@@ -24,6 +25,7 @@ export async function sendCommunityEmail(to: string | null, subject: string, tex
   if (!to || !config.emailConfigured) return { sent: false, status: null, providerCode: 'missing_configuration' };
   if (config.emailProvider === 'gmail') {
     try {
+      if (config.gmailDnsServers.length) setServers(config.gmailDnsServers);
       await getGmailTransporter().sendMail({ from: config.emailFrom, to, subject, text });
       return { sent: true };
     } catch (error) {
