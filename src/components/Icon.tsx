@@ -28,7 +28,9 @@ export type IconName =
   | "eye"
   | "eyeOff"
   | "hand"
-  | "thumbsUp";
+  | "thumbsUp"
+  | "info"
+  | "send";
 
 const paths: Record<IconName, React.ReactNode> = {
   hand: <><path d="M8 13V5a1.5 1.5 0 0 1 3 0v7M11 11V3.5a1.5 1.5 0 0 1 3 0V12M14 11V5a1.5 1.5 0 0 1 3 0v8M17 11V8a1.5 1.5 0 0 1 3 0v7a7 7 0 0 1-14 1l-3-4a1.5 1.5 0 0 1 2.3-1.9L8 13Z"/></>,
@@ -174,6 +176,18 @@ const paths: Record<IconName, React.ReactNode> = {
   plus: (
     <>
       <path d="M12 5v14M5 12h14" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
     </>
   ),
 };

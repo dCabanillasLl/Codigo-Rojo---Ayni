@@ -27,6 +27,9 @@ test('el registro conserva la referencia y el punto elegido, acepta referencia s
         return [{ insertId: 10 }];
       }
       if (sql.startsWith('INSERT INTO usuarios')) return [{ insertId: 42 }];
+      if (sql.startsWith('INSERT INTO verificaciones_identidad')) return [{ affectedRows: 1 }];
+      if (sql.startsWith('INSERT INTO pertenencias_zona')) return [{ affectedRows: 1 }];
+      if (sql.startsWith('INSERT INTO auditoria_verificaciones')) return [{ affectedRows: 2 }];
       throw new Error('Consulta inesperada en la prueba de registro');
     },
   };
