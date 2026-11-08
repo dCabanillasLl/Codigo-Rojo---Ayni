@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AYNI</string>
+    <string name="title_activity_main">AYNI</string>
+    <string name="package_name">pe.ayni.app</string>
+    <string name="custom_url_scheme">pe.ayni.app</string>
+</resources>
