@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap");
+﻿@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap");
 @import "tailwindcss";
 
 .notice-view-switch {
@@ -2727,7 +2727,20 @@ textarea:disabled {
 }
 @media (max-width: 767.98px) {
   .mobile-nav { display: grid; }
-  .guide-launcher { bottom: calc(5.75rem + env(safe-area-inset-bottom)); }
+  .guide-launcher {
+    bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    min-width: 2.85rem;
+    min-height: 2.85rem;
+    gap: 0.35rem;
+    padding: 0 0.7rem;
+    font-size: 0.78rem;
+  }
+  .guide-launcher.is-open {
+    width: 2.85rem;
+    min-width: 2.85rem;
+    min-height: 2.85rem;
+    padding: 0;
+  }
   .guide-panel { bottom: calc(9.75rem + env(safe-area-inset-bottom)); }
 }
 .guide-tour-shade {
@@ -2887,3 +2900,107 @@ textarea:disabled {
 @media (prefers-reduced-motion: reduce) {
   .guide-panel, .guide-tour-card, .guide-spotlight, .guide-spotlight::after, .guide-tour-footer > span { animation: none; }
 }
+
+
+
+button[data-tour="tour-offer"] {
+  background: #e8f0ea;
+  color: #315f49;
+  border: 1.5px solid #315f49;
+  font-weight: 700;
+  margin-top: 0.5rem;
+}
+button[data-tour="tour-offer"]:hover {
+  background: #dce9e0;
+}
+
+/* SeparaciÃ³n entre botones de radio (1 km, 1.5 km, 2 km) */
+.radius-btn + .radius-btn {
+  margin-left: 0.5rem;
+}
+/* SeparaciÃ³n del botÃ³n que queda debajo (Ocultar mapa) */
+.radius-btn ~ button:not(.radius-btn) {
+  margin-top: 0.5rem;
+}
+/* Ayuda vecinal: ubicaciÃ³n + mapa en una fila, radios iguales y centrados */
+section .help-map-controls {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+section .help-map-controls .help-map-top-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+section .help-map-controls .help-map-top-row > button {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  justify-content: center;
+  padding-block: 0.5rem;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+}
+section .help-map-controls .help-radius-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+section .help-map-controls .help-radius-row > .radius-btn {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+@media (min-width: 641px) {
+  section .help-map-controls .help-map-top-row {
+    grid-template-columns: repeat(2, max-content);
+    justify-content: start;
+  }
+  section .help-map-controls .help-radius-row {
+    grid-template-columns: repeat(3, 5.5rem);
+    justify-content: start;
+  }
+}
+/* CategorÃ­a: mismo ancho que Buscar */
+section .help-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem;
+}
+section .help-filters > label {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 0.45rem;
+}
+section .help-filters > label > select,
+section .help-filters > label > input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+/* CategorÃ­a: flecha propia mÃ¡s hacia adentro */
+section .help-filters > label > select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.75rem;
+  text-overflow: ellipsis;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23526458' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.1rem center;
+  background-size: 1rem;
+}
+
+/* Resaltado amarillo al enfocar, igual que Buscar */
+select:focus,
+select:focus-visible {
+  outline: 3px solid #e7b84f;
+  outline-offset: 2px;
+}
+
