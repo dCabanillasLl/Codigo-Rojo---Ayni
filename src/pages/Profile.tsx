@@ -8,6 +8,7 @@ import type { Reputation, User } from '../types';
 import { neighborRank } from '../lib/ranks';
 import { useLanguage, type Language } from '../lib/language';
 import PhoneField from '../components/PhoneField';
+import NeighborRankIcon from '../components/NeighborRankIcon';
 
 export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBusy, signOutError }: { onLocation: () => void; onReviewHelp: () => void; onSignOut: () => void; signOutBusy: boolean; signOutError?: string }) {
   const { user, setUser, online } = useApp();
@@ -18,6 +19,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
   const [success, setSuccess] = useState('');
   const [emailCode, setEmailCode] = useState('');
   const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const rank = reputation.data ? neighborRank(reputation.data.colaboracionesConfirmadas) : null;
   if (!user) return <section className="profile-card max-w-2xl"><p className="eyebrow">TU CUENTA</p><h1 className="font-display mt-2 text-3xl font-bold">Mi perfil</h1><p className="mt-2">Inicia sesión para ver tu perfil, tus recomendaciones y tu actividad.</p></section>;
 
   async function updateProfile(event: FormEvent<HTMLFormElement>) {
@@ -97,16 +99,31 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
       <ErrorBox message={signOutError}/><button type="button" className="outline-btn profile-signout-button mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </article>
 
-    <article className="profile-card">
-      <p className="eyebrow">VISTO BUENO VECINAL</p><h2 className="font-display mt-2 text-2xl font-bold">Ayudas confirmadas</h2>
+    <article className="profile-card neighbor-reputation-panel" aria-labelledby="neighbor-reputation-title">
+      <header className="neighbor-reputation-heading">
+        <p className="eyebrow">VISTO BUENO VECINAL</p>
+        <h2 id="neighbor-reputation-title" className="font-display">Ayudas confirmadas</h2>
+      </header>
       <RemoteState {...reputation}/>
-      {reputation.data && <><div className="trust-card mt-4"><Icon name="star" size={21}/><div><b>Rango {neighborRank(reputation.data.colaboracionesConfirmadas).name}</b><p>Se obtiene por aportes completados y confirmados; no se puede asignar a uno mismo.</p></div></div><div className="mt-5 grid grid-cols-3 border-y border-[#e4e7e2] py-4"><div><b className="block text-xl">{reputation.data.colaboracionesConfirmadas}</b><span className="text-xs text-[#738078]">Ayudas completadas</span></div><div><b className="block text-xl">{reputation.data.vistosBuenos}</b><span className="text-xs text-[#738078]">Vistos buenos</span></div><div><b className="block text-xl">{reputation.data.promedio ?? '—'}</b><span className="text-xs text-[#738078]">Promedio</span></div></div>
-        <div className="profile-review-action"><div><b>¿Recibiste ayuda de un vecino?</b><p>Cuéntale al barrio cómo fue y ayuda a otros a decidir.</p></div><button type="button" className="outline-btn" onClick={onReviewHelp}><Icon name="star" size={17}/>Comentar una ayuda recibida</button></div>
+      {reputation.data && rank && <>
+        <div className="neighbor-rank-summary" data-rank={rank.name}>
+          <div className="neighbor-rank-heading"><NeighborRankIcon rank={rank.name}/><h3 className="font-display">Rango {rank.name}</h3></div>
+          <p>Se obtiene por aportes completados y confirmados; no se puede asignar a uno mismo.</p>
+        </div>
+        <dl className="neighbor-reputation-stats">
+          <div className="neighbor-reputation-stat"><dt>Ayudas completadas</dt><dd><span>{reputation.data.colaboracionesConfirmadas}</span><span className="neighbor-stat-icon"><Icon name="hand" size={22}/></span></dd></div>
+          <div className="neighbor-reputation-stat"><dt>Vistos buenos</dt><dd><span>{reputation.data.vistosBuenos}</span><span className="neighbor-stat-icon"><Icon name="thumbsUp" size={22}/></span></dd></div>
+          <div className="neighbor-reputation-stat"><dt>Promedio</dt><dd><span>{reputation.data.promedio ?? '—'}</span><span className="neighbor-stat-icon"><Icon name="star" size={21}/></span></dd></div>
+        </dl>
+        <div className="neighbor-review-action">
+          <div><b>¿Recibiste ayuda de un vecino?</b><p>Cuéntale al barrio cómo fue y ayuda a otros a decidir.</p></div>
+          <button type="button" className="neighbor-review-button" onClick={onReviewHelp}><Icon name="star" size={20}/><span>Comentar una ayuda recibida</span></button>
+        </div>
         {reputation.data.resenas.length === 0 ? <p className="profile-reviews-empty">Las opiniones sobre tus colaboraciones aparecerán aquí cuando tus vecinos confirmen las ayudas recibidas.</p> : <div className="profile-review-list">{reputation.data.resenas.map(review => <article className="profile-review-card" key={review.id}><div className="profile-review-meta"><b>{review.autor || 'Vecino'} · {review.calificacion}/5</b><small>{formatDate(review.creadoEn)}</small></div>{review.comentario && <p className="profile-review-comment">{review.comentario}</p>}<span className="profile-review-verified"><Icon name="shield" size={14}/>Ayuda confirmada dentro de AYNI</span>
           {review.miCalificacion != null ? <p className="profile-review-replied" role="status"><Icon name="check" size={14}/>Ya calificaste a este vecino · {review.miCalificacion}/5</p>
             : review.solicitudId && <button type="button" className="outline-btn profile-review-rate" onClick={() => { window.location.hash = `ayuda/${review.solicitudId}`; }}><Icon name="star" size={16}/>Calificar a {review.autor || 'este vecino'}</button>}
         </article>)}</div>}</>}
-      <p className="form-hint mt-4"><Icon name="shield" size={15}/>Las recomendaciones corresponden a colaboraciones confirmadas. No verifican identidad ni certifican oficios.</p>
+      <p className="neighbor-reputation-note"><Icon name="shield" size={16}/><span>Las recomendaciones corresponden a colaboraciones confirmadas. No verifican identidad ni certifican oficios.</span></p>
     </article>
   </section>;
 }
