@@ -149,6 +149,36 @@ posteriormente se cancelaron o vencieron. **Mis actividades** muestra al organiz
 sus avisos y el botón **Postergar o cancelar**. El organizador decide qué hacer según
 la participación; no hay un umbral que cancele actividades automáticamente.
 
+**Compartir por WhatsApp** abre un mensaje editable con la estructura «Mira este
+AVISO: título, publicado en AYNI», la fecha en hora de Lima, la dirección pública de
+la actividad y el enlace de Google Maps. Si AYNI tiene dirección web pública, se
+incluye un enlace directo al aviso. El botón del mensaje siempre abre WhatsApp
+directamente, incluso en Android o cuando hay un flyer. Para Android puedes configurarla con
+`VITE_PUBLIC_APP_URL` antes de compilar; se omiten enlaces locales que otros vecinos
+no podrían abrir.
+
+En la app Android actualizada, **Adjuntar flyer al mensaje de WhatsApp** permite
+abrir WhatsApp directamente con el mensaje personalizado y la imagen juntos.
+Se usa un plugin local `WhatsAppShare` con un intent dirigido a WhatsApp; también
+admite WhatsApp Business si no está instalado WhatsApp normal. Si ninguno está
+instalado, muestra un error y conserva el mensaje y la selección. El usuario elige
+el contacto y revisa el envío. Desmarcar el flyer abre solo el texto en WhatsApp.
+
+En la web o en versiones sin ese plugin, el mensaje abre WhatsApp directamente
+y **Compartir solo el flyer** abre el menú del dispositivo solo para la imagen.
+La imagen se prepara antes del clic para conservar el permiso del navegador.
+Cancelar ese menú no abre otro envío. También se puede abrir el flyer para
+guardarlo. Se aceptan JPG, PNG y WebP de hasta 5 MB.
+
+Android usa `@capacitor/filesystem`, `WhatsAppShare` y `@capacitor/share` como
+alternativa para la imagen sola, con archivos temporales en la caché de la app.
+El plugin directo solo permite imágenes dentro de `cache/ayni-share`, concede
+lectura del archivo elegido y consulta únicamente los dos paquetes de WhatsApp.
+Las copias de más de un día se limpian al preparar otro flyer.
+Después de compilar el frontend, ejecutar `npx cap sync android` y compilar el APK.
+Las pruebas de navegador simulan el puente nativo; hay que comprobar el envío final
+en un teléfono con WhatsApp.
+
 Para postergar se exige una fecha futura posterior a la original y un motivo. Se
 conservan las confirmaciones, que los vecinos pueden retirar, y el vencimiento anterior
 se sustituye por la nueva fecha. Para cancelar también se solicita el motivo y la
