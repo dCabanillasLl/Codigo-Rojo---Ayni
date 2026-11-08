@@ -46,10 +46,17 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
     los pedidos existentes tampoco permanezcan publicados indefinidamente.
 14. `011_notificaciones_correo.sql` añade la preferencia privada de avisos por correo,
     desactivada para todas las cuentas existentes hasta que cada persona la active.
+15. `012_verificacion_correo.sql` habilita códigos de confirmación de un solo uso,
+    almacenados como HMAC y con vencimiento de 10 minutos. Los correos existentes
+    empiezan sin verificar.
 
 Las migraciones con el mismo prefijo numérico surgieron en ramas paralelas. El runner
 las identifica por el nombre completo: conservar los nombres y los archivos ya
 aplicados, sin renumerarlos, permite integrar ambas bases sin repetir SQL.
+Para `011_notificaciones_correo.sql`, el runner también reconoce de forma segura el
+DDL ya aplicado con la versión histórica `008_notificaciones_correo.sql`: solo lo
+marca completado si comprueba que la columna existente tiene el tipo y valor por
+defecto esperados.
 
 El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
 de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum

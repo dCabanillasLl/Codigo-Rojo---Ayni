@@ -23,6 +23,7 @@ const files = [
   '010_vencimiento_solicitudes.sql',
   '011_notificaciones_actividades_eliminadas.sql',
   '011_notificaciones_correo.sql',
+  '012_verificacion_correo.sql',
 ];
 const sources = await Promise.all(files.map(async (name) => {
   let sql = await readFile(fileURLToPath(new URL(`../migrations/${name}`, import.meta.url)), 'utf8');
@@ -68,6 +69,26 @@ try {
   ) ENGINE=InnoDB`);
   for (const source of sources) {
     const [existing] = await connection.execute('SELECT checksum, estado FROM ayni_schema_migrations WHERE version = ?', [source.name]);
+    // The correo preference was applied as 008_notificaciones_correo.sql before
+    // parallel-branch migrations occupied that prefix. Reconcile a prior/partial
+    // run only when the live column exactly matches the intended definition.
+    if (source.name === '011_notificaciones_correo.sql') {
+      const [columns] = await connection.execute(`SELECT DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+        FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'notificaciones_correo'`);
+      if (columns.length) {
+        const column = columns[0];
+        if (String(column.DATA_TYPE).toLowerCase() !== 'tinyint' || column.IS_NULLABLE !== 'NO' || Number(column.COLUMN_DEFAULT) !== 0) {
+          throw new Error(`${source.name}: la columna notificaciones_correo existe con otra definición; revisar antes de continuar.`);
+        }
+        if (existing.length) {
+          await connection.execute("UPDATE ayni_schema_migrations SET checksum=?, estado='completada', aplicado_en=COALESCE(aplicado_en,CURRENT_TIMESTAMP) WHERE version=?", [source.hash, source.name]);
+        } else {
+          await connection.execute("INSERT INTO ayni_schema_migrations(version,checksum,estado,aplicado_en) VALUES (?,?,'completada',CURRENT_TIMESTAMP)", [source.name, source.hash]);
+        }
+        console.log(`Ya aplicada (esquema verificado): ${source.name}`);
+        continue;
+      }
+    }
     if (existing.length) {
       if (existing[0].estado !== 'completada') throw new Error(`${source.name}: ejecución parcial anterior. Revisar el esquema antes de continuar.`);
       if (!source.compatibleHashes.has(existing[0].checksum)) throw new Error(`${source.name}: el archivo cambió después de aplicarse.`);

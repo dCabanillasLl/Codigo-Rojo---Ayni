@@ -15,13 +15,16 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
   if (!user) return <section className="profile-card max-w-2xl"><p className="eyebrow">TU CUENTA</p><h1 className="font-display mt-2 text-3xl font-bold">Mi perfil</h1><p className="mt-2">Inicia sesión para ver tu perfil, tus recomendaciones y tu actividad.</p></section>;
 
   async function updateProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true); setError(''); setSuccess('');
     try {
       const correo = String(form.get('correo') || '').trim();
-      const notificacionesCorreo = form.get('notificacionesCorreo') === 'on';
+      const emailChanged = correo !== (user?.correo || '');
+      const notificacionesCorreo = !emailChanged && form.get('notificacionesCorreo') === 'on';
       if (notificacionesCorreo && !correo) { setError('Añade un correo electrónico para activar los avisos.'); setBusy(false); return; }
       const updated = await api<User>('/auth/me', { method: 'PATCH', body: {
         correo: correo || null,
@@ -29,9 +32,21 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
         telefono: String(form.get('telefono') || '').trim() || null,
         telefonoPublico: form.get('telefonoPublico') === 'on',
       } });
-      setUser(updated); refreshData(); setSuccess('Perfil actualizado.');
+      setUser(updated); refreshData(); setSuccess(emailChanged && correo ? 'Perfil actualizado. Confirma el correo para verificar que tienes acceso a él.' : 'Perfil actualizado.');
+      if (emailChanged && correo) { await api('/auth/email/verification', { method: 'POST', body: {} }); setEmailCodeSent(true); }
     } catch (cause) { setError(errorMessage(cause)); }
     finally { setBusy(false); }
+  }
+
+  async function sendEmailCode() {
+    setBusy(true); setError('');
+    try { await api('/auth/email/verification', { method: 'POST', body: {} }); setEmailCodeSent(true); setSuccess('Te enviamos un código de 6 dígitos. Revisa tu bandeja de entrada y spam.'); }
+    catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
+  }
+  async function confirmEmail() {
+    setBusy(true); setError('');
+    try { const updated = await api<User>('/auth/email/verify', { method: 'POST', body: { codigo: emailCode } }); setUser(updated); setEmailCode(''); setEmailCodeSent(false); setSuccess('Correo confirmado. Ya puedes activar los avisos por correo.'); refreshData(); }
+    catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   }
 
   return <section className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
@@ -42,7 +57,7 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
       <form className="form-stack mt-6" onSubmit={updateProfile}>
         <div className="form-columns profile-identity-fields"><Field label="Nombres"><input value={user.nombres} readOnly aria-readonly="true"/></Field><Field label="Apellidos"><input value={user.apellidos} readOnly aria-readonly="true"/></Field></div>
         <p className="profile-identity-note">Nombres y apellidos provienen del DNI verificado y no se pueden editar.</p>
-        <div className="profile-email-section"><Field label="Correo electrónico (opcional)" hint="Lo usaremos para avisarte cuando alguien responda a tu pedido o confirme una ayuda."><input name="correo" type="email" autoComplete="email" maxLength={254} defaultValue={user.correo || ''} placeholder="tu@correo.com"/></Field><label className="check-field"><input name="notificacionesCorreo" type="checkbox" defaultChecked={Boolean(user.notificacionesCorreo)}/>Recibir avisos por correo sobre mis pedidos y colaboraciones</label></div>
+        <div className="profile-email-section"><Field label="Correo electrónico (opcional)" hint="Confírmalo para demostrar que puedes recibir mensajes en esa dirección."><input name="correo" type="email" autoComplete="email" maxLength={254} defaultValue={user.correo || ''} placeholder="tu@correo.com"/></Field>{user.correo && <p className={user.correoVerificado ? 'success-message' : 'form-hint'} role="status">{user.correoVerificado ? 'Correo confirmado' : 'Correo pendiente de confirmar'}</p>}<label className="check-field"><input name="notificacionesCorreo" type="checkbox" defaultChecked={Boolean(user.notificacionesCorreo)} disabled={!user.correoVerificado}/>Recibir avisos por correo sobre mis pedidos y colaboraciones</label>{user.correo && !user.correoVerificado && <div className="email-verification-actions"><button type="button" className="outline-btn" disabled={!online || busy} onClick={() => void sendEmailCode()}>{emailCodeSent ? 'Reenviar código' : 'Enviar código de confirmación'}</button>{emailCodeSent && <div className="action-row"><input aria-label="Código de confirmación" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={emailCode} onChange={event => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" required/><button type="button" className="small-primary" disabled={busy || emailCode.length !== 6} onClick={() => void confirmEmail()}>Confirmar correo</button></div>}</div>}</div>
         <Field label="Teléfono para contacto (opcional)" hint="Para el enlace de WhatsApp, usa prefijo internacional; ejemplo: +51987654321."><input name="telefono" type="tel" maxLength={25} defaultValue={user.telefono || ''} placeholder="+51987654321"/></Field>
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>Permitir que contacten mi teléfono por WhatsApp desde mis publicaciones</label>
         <p className="form-hint">El teléfono se oculta por defecto. Si lo haces público, cualquier persona que vea una publicación tuya podrá abrir un chat de WhatsApp.</p>

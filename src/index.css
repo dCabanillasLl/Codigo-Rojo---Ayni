@@ -1736,6 +1736,9 @@ textarea:disabled {
 .profile-email-section { display: grid; gap: 0.75rem; padding: 1rem; border: 1px solid #e0e7dd; border-radius: 1rem; background: #f8f8f2; }
 .profile-email-section .check-field { margin: 0; }
 .profile-email-section .form-hint { margin: -0.45rem 0 0; }
+.email-verification-actions { display: grid; justify-items: start; gap: 10px; }
+.email-verification-actions > .action-row { width: 100%; flex-wrap: wrap; }
+.email-verification-actions input { min-width: 0; width: min(12rem, 100%); }
 .dni-name-fields { align-items: start; }
 .dni-name-fields .form-field input[readonly] { background: #f7f7f1; color: #43544a; }
 .dni-name-fields .form-field input[readonly]::placeholder { color: #98a39b; font-size: 0.9rem; }
