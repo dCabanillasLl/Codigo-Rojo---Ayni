@@ -1,15 +1,16 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { createHmac } from "node:crypto";
+import { createHmac, randomInt } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { config } from "../config.js";
-import { one, transaction } from "../db/index.js";
+import { one, query, transaction } from "../db/index.js";
 import { AppError, asyncHandler } from "../lib/http.js";
 import { idSchema, phoneSchema, registerSchema } from "../lib/validation.js";
 import { clearSession, requireAuth, setSession } from "../middlewares/auth.js";
+import { sendCommunityEmail } from "../services/email.js";
 
 const router = Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHeaders: "draft-7", legacyHeaders: false,
@@ -17,7 +18,7 @@ const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHe
 const dummyHash = bcrypt.hashSync("ayni-only-used-for-login-timing", 12);
 
 export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u.apellidos, u.correo, u.telefono,
-  u.notificaciones_correo AS notificacionesCorreo, u.telefono_publico AS telefonoPublico,
+  u.correo_verificado AS correoVerificado, u.notificaciones_correo AS notificacionesCorreo, u.telefono_publico AS telefonoPublico,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
   l.direccion AS direccion, l.latitud AS latitud, l.longitud AS longitud
   FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
@@ -85,6 +86,38 @@ router.get("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   res.json({ data: user });
 }));
 
+const emailLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: "draft-7", legacyHeaders: false });
+router.post("/auth/email/verification", requireAuth, emailLimiter, asyncHandler(async (req, res) => {
+  const account = await one<{ correo: string | null; correoVerificado: number }>("SELECT correo, correo_verificado AS correoVerificado FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo'", [req.userId]);
+  if (!account?.correo) throw new AppError(400, "EMAIL_REQUIRED", "Primero guarda tu correo en el perfil.");
+  if (Number(account.correoVerificado)) { res.json({ data: { verificado: true } }); return; }
+  if (!config.emailConfigured) throw new AppError(503, "EMAIL_NOT_CONFIGURED", "El envío de correo aún no está configurado en el servidor.");
+  const code = String(randomInt(100000, 1000000));
+  const codeHash = createHmac("sha256", config.jwtSecret).update(`${req.userId}:${code}`).digest("hex");
+  await query("UPDATE usuarios SET correo_codigo_hash = ?, correo_codigo_vence = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE) WHERE usuario_id = ?", [codeHash, req.userId]);
+  const sent = await sendCommunityEmail(account.correo, "Confirma tu correo de AYNI", `Tu código de confirmación es: ${code}\n\nVence en 10 minutos. Si no solicitaste este código, ignora este mensaje.`);
+  if (!sent.sent) {
+    const message = sent.providerCode === 'EAUTH' && config.emailProvider === 'gmail' ? "Google rechazó el acceso SMTP. Revisa GMAIL_USER y la contraseña de aplicación en backend/.env."
+      : sent.status === 401 ? "Resend rechazó la clave API. Revisa RESEND_API_KEY en backend/.env y reinicia el backend."
+      : sent.status === 403 ? "Resend rechazó el remitente. Verifica en Resend que el dominio de EMAIL_FROM esté aprobado para enviar."
+      : sent.status === 422 ? "Resend rechazó la dirección remitente o destinataria. Revisa el remitente y el dominio configurado."
+      : sent.status === 429 ? "Resend limitó temporalmente los envíos. Espera unos minutos antes de volver a intentar."
+      : "No se pudo enviar el correo. Revisa Logs en Resend y la conexión del backend.";
+    throw new AppError(503, "EMAIL_DELIVERY_FAILED", message);
+  }
+  res.json({ data: { enviado: true } });
+}));
+router.post("/auth/email/verify", requireAuth, emailLimiter, asyncHandler(async (req, res) => {
+  const { codigo } = z.object({ codigo: z.string().regex(/^\d{6}$/) }).strict().parse(req.body);
+  const account = await one<{ correo: string | null; correoVerificado: number; codigoHash: string | null; vence: Date | null }>(
+    "SELECT correo, correo_verificado AS correoVerificado, correo_codigo_hash AS codigoHash, correo_codigo_vence AS vence FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo'", [req.userId]);
+  if (!account?.correo || Number(account.correoVerificado)) throw new AppError(409, "EMAIL_NOT_PENDING", "No hay un correo pendiente de confirmar.");
+  const expected = createHmac("sha256", config.jwtSecret).update(`${req.userId}:${codigo}`).digest("hex");
+  if (!account.codigoHash || account.vence == null || new Date(account.vence).getTime() <= Date.now() || expected !== account.codigoHash) throw new AppError(400, "EMAIL_CODE_INVALID", "El código no es válido o venció. Solicita uno nuevo.");
+  await query("UPDATE usuarios SET correo_verificado = 1, correo_codigo_hash = NULL, correo_codigo_vence = NULL WHERE usuario_id = ?", [req.userId]);
+  res.json({ data: await one(`${userSelect} WHERE u.usuario_id = ?`, [req.userId]) });
+}));
+
 router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   const body = z.object({
     correo: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable().optional(),
@@ -108,6 +141,7 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     const resultingEmail = body.correo !== undefined ? body.correo : locked[0].correo;
     const wantsEmailNotifications = body.notificacionesCorreo ?? Boolean(locked[0].notificaciones_correo);
     if (wantsEmailNotifications && !resultingEmail) throw new AppError(400, "EMAIL_REQUIRED_FOR_NOTIFICATIONS", "Añade un correo electrónico para activar los avisos.");
+    if (wantsEmailNotifications && body.correo && body.correo !== locked[0].correo) throw new AppError(400, "EMAIL_MUST_BE_VERIFIED", "Confirma el correo nuevo antes de activar avisos por correo.");
     if (body.correo) {
       const [existingEmail] = await connection.execute<RowDataPacket[]>(
         "SELECT usuario_id FROM usuarios WHERE correo = ? AND usuario_id <> ? LIMIT 1 FOR UPDATE", [body.correo, req.userId]);
@@ -121,6 +155,9 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     const values: unknown[] = [];
     for (const key of ["correo", "telefono"] as const) {
       if (body[key] !== undefined) { fields.push(`${key} = ?`); values.push(body[key]); }
+    }
+    if (body.correo !== undefined && body.correo !== locked[0].correo) {
+      fields.push("correo_verificado = 0", "correo_codigo_hash = NULL", "correo_codigo_vence = NULL", "notificaciones_correo = 0");
     }
     if (body.notificacionesCorreo !== undefined || body.correo === null) {
       fields.push("notificaciones_correo = ?");

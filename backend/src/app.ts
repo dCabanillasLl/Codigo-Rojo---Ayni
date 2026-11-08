@@ -18,6 +18,7 @@ import community from "./routes/community.js";
 import identity from "./routes/identity.js";
 import locations from "./routes/locations.js";
 import notifications from './routes/notifications.js';
+import assistant from './routes/assistant.js';
 
 export const app = express();
 app.disable("x-powered-by");
@@ -48,12 +49,13 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
   await query('SELECT leida_en FROM notificaciones_avisos LIMIT 0');
   await query("SELECT telefono_publico FROM usuarios LIMIT 0");
   await query("SELECT notificaciones_correo FROM usuarios LIMIT 0");
+  await query("SELECT correo_verificado, correo_codigo_hash, correo_codigo_vence FROM usuarios LIMIT 0");
   await query("SELECT imagen, imagen_hash FROM publicaciones LIMIT 0");
   if (!config.jwtSecret) throw new AppError(503, "AUTH_NOT_CONFIGURED", "La autenticación todavía no está configurada.");
   res.json({ data: { estado: "ok", baseDeDatos: "conectada" } });
 }));
 app.use("/api", (req, res, next) => req.path === "/auth/logout" ? next() : optionalAuth(req, res, next));
-app.use("/api", identity, auth, catalog, publications, notices, community, locations, notifications);
+app.use("/api", identity, auth, catalog, publications, notices, community, locations, notifications, assistant);
 app.use((_req, _res, next) => next(new AppError(404, "NOT_FOUND", "La ruta solicitada no existe.")));
 app.use(errorHandler);
 export default app;
