@@ -10,6 +10,10 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
 - **Ofrecer algo:** publicar un producto o servicio, señalar dónde lo ofreces y,
   si quieres, añadir una foto. Puedes previsualizarla, cambiarla o quitarla al editar.
 - **Pedir ayuda:** describir lo que necesitas y elegir una ubicación para ese pedido.
+  Si ya iniciaste sesión y cargaste las categorías, puedes guardar el pedido sin
+  conexión. Se conserva al recargar y se envía al reconectar con la misma cuenta.
+  En la versión compilada también puedes volver a abrir la app y consultar las vistas
+  que cargaste previamente. Los mapas y las operaciones en el servidor necesitan internet.
 - **Colaborar:** responder a un pedido, acordar un aporte y confirmar su entrega.
   Un mismo pedido puede recibir ayuda de varios vecinos.
 - **Compartir recursos:** ofrecer donaciones o insumos y gestionar sus reservas.

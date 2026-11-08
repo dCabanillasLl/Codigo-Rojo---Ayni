@@ -250,6 +250,20 @@ npm --prefix backend run build
 npm --prefix backend test
 ```
 
+### Verificación sin conexión
+
+```sh
+npx playwright install chromium
+npm run test:offline
+```
+
+Comprueba diez escenarios en Chromium con una API ficticia aislada: recarga offline,
+caché, persistencia y sincronización de pedidos, cambios de cuenta, sesión vencida,
+reintentos sin duplicados y fallos de almacenamiento. No escribe en la base real.
+La recarga sin conexión está disponible en la versión compilada, después de una primera
+carga con internet. El servidor de desarrollo no instala el service worker.
+Instrucciones y límites: [Verificación offline](docs/VERIFICACION_OFFLINE.md).
+
 Las pruebas con MySQL son opt-in. Preparar una base local cuyo nombre comience por
 `ayni_test_`, aplicar sus migraciones y configurar sus variables separadamente.
 Activar `AYNI_TEST_DB=true` antes de ejecutar las pruebas de integración. Nunca apuntarlas
@@ -265,8 +279,10 @@ limpieza destructiva automática.
   El lugar que el organizador elige explícitamente para una actividad sí es público.
   Para las ubicaciones privadas, la API devuelve sector y distancia redondeada;
   el mapa muestra una zona aproximada, no el domicilio de un vecino.
-- La cola y caché usan IndexedDB porque este proyecto es web. No se migró a React Native
-  ni se añadió SQLite. Publicado significa persistido y confirmado por el servidor.
+- La cola de pedidos y las notificaciones locales usan SQLite en el navegador mediante
+  sql.js, guardado en IndexedDB. La caché de respuestas usa IndexedDB por cuenta;
+  el service worker guarda solo la aplicación compilada y su WebAssembly. Publicado
+  significa persistido y confirmado por el servidor; un pendiente todavía no está publicado.
 - Los vistos buenos proceden de colaboraciones confirmadas con calificación 4 o 5;
   las demás calificaciones siguen visibles como reseñas. Una reseña puede editarse.
   Las reseñas históricas de publicaciones se identifican como no verificadas.

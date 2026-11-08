@@ -33,6 +33,7 @@ async function operation<T>(store: 'cache' | 'pending', mode: IDBTransactionMode
 }
 export async function cacheRead<T>(key: string) { return operation<CacheRecord<T> | undefined>('cache', 'readonly', store => store.get(key)); }
 export async function cacheWrite<T>(key: string, data: T) { await operation('cache', 'readwrite', store => store.put({ key, data, savedAt: new Date().toISOString() })); }
+export async function cacheDelete(key: string) { await operation('cache', 'readwrite', store => store.delete(key)); }
 export async function forgetNoticeCache(ownerId: string, noticeId: string) {
   const db = await openDatabase();
   await new Promise<void>((resolve, reject) => {
@@ -127,9 +128,17 @@ function serialized<T>(action: () => Promise<T>): Promise<T> {
 function write<T>(action: (db: Database) => T): Promise<T> {
   return serialized(async () => {
     const db = await openSqlite();
+    let committed = false;
     db.run('BEGIN IMMEDIATE');
-    try { const result = action(db); db.run('COMMIT'); await persist(db); return result; }
-    catch (error) { try { db.run('ROLLBACK'); } catch { /* Transaction may already have committed. */ } throw error; }
+    try { const result = action(db); db.run('COMMIT'); committed = true; await persist(db); return result; }
+    catch (error) {
+      if (committed) {
+        // A failed IndexedDB write must not leave an unpersisted request in memory
+        // that another write could save and publish after we reported a failure.
+        db.close(); sqlite = undefined;
+      } else { try { db.run('ROLLBACK'); } catch { /* Preserve the original error. */ } }
+      throw error;
+    }
   });
 }
 function read<T>(action: (db: Database) => T): Promise<T> { return serialized(async () => action(await openSqlite())); }

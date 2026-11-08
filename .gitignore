@@ -10,6 +10,8 @@ build/
 .local-tools/
 .local-test-data/
 backend/coverage/
+test-results/
+playwright-report/
 .vite/
 vite.config.*.timestamp-*
 *.tsbuildinfo

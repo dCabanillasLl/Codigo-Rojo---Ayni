@@ -6,6 +6,12 @@ Error `{ "error": { "code": "...", "message": "...", "details": [...] } }`.
 
 ## Sesión y transporte
 
+Cuando se envía `X-AYNI-User`, también en GET, debe coincidir con la sesión activa.
+Una cuenta distinta o una sesión ausente devuelve 409 `SESSION_CHANGED`; el cliente
+descarta la caché privada de esa consulta. La cola offline conserva sus pedidos y
+verifica nuevamente la identidad antes de enviarlos. El service worker no almacena
+respuestas de API: solo los archivos públicos de la aplicación compilada.
+
 La sesión usa cookie HttpOnly. En fetch: `credentials: 'include'`.
 Toda mutación requiere `Content-Type: application/json`, `X-AYNI-Client: web` y un
 `Origin` incluido en `FRONTEND_ORIGIN`. El navegador añade Origin automáticamente.
