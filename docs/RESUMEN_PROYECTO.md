@@ -13,7 +13,9 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
 - **Colaborar:** responder a un pedido, acordar un aporte y confirmar su entrega.
   Un mismo pedido puede recibir ayuda de varios vecinos.
 - **Compartir recursos:** ofrecer donaciones o insumos y gestionar sus reservas.
-- **Publicar avisos:** compartir actividades e información vecinal.
+- **Publicar avisos:** compartir actividades e información vecinal, con un flyer
+  opcional que puedes subir desde tu celular. Los avisos nuevos requieren fecha y
+  hora de la actividad y dejan de mostrarse automáticamente al llegar ese momento.
 - **Construir confianza:** valorar colaboraciones confirmadas y consultar la reputación.
 
 ## Cómo funciona el mapa

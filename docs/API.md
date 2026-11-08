@@ -226,13 +226,28 @@ Conflictos de inventario, UUID o estado devuelven 409.
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
 | GET `/api/avisos` | Filtros comunes; público solo vigentes publicados → `{data: Aviso[]}` | 200 |
-| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,imagenUrl?,fechaEvento?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
+| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,fechaEvento,foto?,imagenUrl?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
 | GET `/api/avisos/:id` | Sin cuerpo → `{data: Aviso}` visible | 200 |
 | PATCH `/api/avisos/:id` | Campos editables → `{data: Aviso}` actualizado; solo autor | 200 |
+| GET `/api/avisos/:id/imagen?v=hash` | JPEG del flyer cargado, sujeto a visibilidad y vigencia | 200 |
 
 Aviso: `{id,autorId,autor,categoriaId,categoria,titulo,contenido,imagenUrl,estado,sectorId,
-sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` debe ser una URL HTTPS pública;
-se almacena la referencia, no se carga el archivo. Fechas ISO UTC o null.
+sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` en la respuesta
+puede ser una ruta `/api/avisos/:id/imagen?v=hash` o un enlace HTTPS anterior.
+`foto` recibe un data URI JPG, PNG o WebP de hasta 5 MB; se normaliza y almacena en
+MySQL mediante la migración 007. Omitirla al editar conserva la imagen; `null` la
+quita; una nueva reemplaza el flyer. También se conserva `imagenUrl` HTTPS como
+entrada compatible; no se pueden modificar archivo y enlace al mismo tiempo.
+POST/PATCH admiten JSON de hasta 8 MB después de autenticar, igual que publicaciones.
+
+`fechaEvento` es obligatoria y futura al crear (ISO con zona horaria); `venceEn` es
+opcional y, si se proporciona, también debe ser futuro. Se guardan como UTC. La
+primera de ambas fechas determina la retirada pública, incluso si el cliente consulta
+directamente el detalle o la imagen. Listados y detalle devuelven `Cache-Control:
+no-store`. El autor puede consultar el registro vencido y su imagen; los demás reciben
+404. El estado efectivo devuelto es `vencido`, sin borrar el registro ni requerir cron.
+Editar no permite quitar todas las fechas. Los avisos antiguos sin fechas se conservan.
+La interfaz filtra además avisos vencidos en su caché y al permanecer abierta.
 Estados `borrador|publicado|cancelado|vencido`. La interfaz distingue avisos vecinales
 de información oficial. Compartir utiliza enlaces/funciones del dispositivo; la API
 no envía WhatsApp ni mensajes en nombre de usuarios.

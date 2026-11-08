@@ -41,7 +41,7 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
   await query("SELECT 1 AS conectado");
   await query("SELECT client_request_id FROM solicitudes_ayuda LIMIT 0");
   await query("SELECT entregada_en, confirmada_en FROM ofertas_ayuda LIMIT 0");
-  await query("SELECT imagen_url FROM avisos LIMIT 0");
+  await query("SELECT imagen_url, imagen, imagen_hash FROM avisos LIMIT 0");
   await query("SELECT telefono_publico FROM usuarios LIMIT 0");
   await query("SELECT imagen, imagen_hash FROM publicaciones LIMIT 0");
   if (!config.jwtSecret) throw new AppError(503, "AUTH_NOT_CONFIGURED", "La autenticación todavía no está configurada.");
