@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { api, ApiError, errorMessage, refreshData } from './lib/api';
 import { markNotificationsRead as persistNotificationsRead, notificationList, pendingDelete, pendingList, pendingSave, saveNotification, type AppNotification, type PendingRequest } from './lib/storage';
 import { useOnline, useRemote } from './lib/hooks';
+import { postingSector } from './lib/location';
 import type { Area, Catalogs, HelpRequest, RequestInput, Sector, User } from './types';
 
 function storedUser(): User | null { try { return JSON.parse(sessionStorage.getItem('ayni-user') || 'null'); } catch { return null; } }
@@ -9,7 +10,7 @@ function storeUser(user: User | null) { try { if (user) sessionStorage.setItem('
 type AppState = {
   user: User | null; online: boolean; sessionLoading: boolean; sessionError: string;
   setUser: (user: User | null) => void; requireUser: () => boolean; authOpen: boolean; setAuthOpen: (value: boolean) => void;
-  sectors: ReturnType<typeof useRemote<Sector[]>>; catalogs: ReturnType<typeof useRemote<Catalogs>>;
+  postingSectorId: string; catalogs: ReturnType<typeof useRemote<Catalogs>>;
   area: Area; setArea: (area: Area) => void; notify: (text: string) => void;
   pending: PendingRequest[]; syncing: boolean; sync: () => Promise<void>; refreshPending: () => Promise<void>;
   notifications: AppNotification[]; unreadNotifications: number; markNotificationsRead: () => void;
@@ -26,17 +27,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const online = useOnline();
   const sectors = useRemote<Sector[]>('/sectores');
+  // Retain the legacy database association without asking users to select a sector.
+  const postingSectorId = postingSector(user?.sectorId, sectors.data);
   const catalogs = useRemote<Catalogs>('/catalogos');
-  const [area, setArea] = useState<Area>({ sectorId: user?.sectorId || '', coordinates: user?.latitud != null && user.longitud != null ? { latitude: Number(user.latitud), longitude: Number(user.longitud) } : null, radius: 1000 });
+  const [area, setArea] = useState<Area>({ coordinates: user?.latitud != null && user.longitud != null ? { latitude: Number(user.latitud), longitude: Number(user.longitud) } : null, radius: 1000 });
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [syncing, setSyncing] = useState(false);
   const syncingRef = useRef(false);
   const setUser = useCallback((value: User | null) => {
     const previous = userRef.current;
     updateUser(value); userRef.current = value; storeUser(value); setSessionError('');
-    if (value && (previous?.id !== value.id || previous.sectorId !== value.sectorId || previous.latitud !== value.latitud || previous.longitud !== value.longitud)) {
-      setArea(current => ({ ...current, sectorId: value.sectorId ?? '', coordinates: value.latitud != null && value.longitud != null ? { latitude: Number(value.latitud), longitude: Number(value.longitud) } : null }));
-    } else if (!value && previous) setArea({ sectorId: '', coordinates: null, radius: 1000 });
+    if (value && (previous?.id !== value.id || previous.latitud !== value.latitud || previous.longitud !== value.longitud)) {
+      setArea(current => ({ ...current, coordinates: value.latitud != null && value.longitud != null ? { latitude: Number(value.latitud), longitude: Number(value.longitud) } : null }));
+    } else if (!value && previous) setArea({ coordinates: null, radius: 1000 });
   }, []);
   useEffect(() => {
     let active = true;
@@ -103,7 +106,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
   const unreadNotifications = notifications.filter(item => !item.read).length;
-  return <Context.Provider value={{ user, setUser, online, sessionLoading, sessionError, requireUser: () => { if (user) return true; setAuthOpen(true); return false; }, authOpen, setAuthOpen, sectors, catalogs, area, setArea, notify, pending, syncing, sync, refreshPending, notifications, unreadNotifications, markNotificationsRead: markRead, submitRequest }}>
+  return <Context.Provider value={{ user, setUser, online, sessionLoading, sessionError, requireUser: () => { if (user) return true; setAuthOpen(true); return false; }, authOpen, setAuthOpen, postingSectorId, catalogs, area, setArea, notify, pending, syncing, sync, refreshPending, notifications, unreadNotifications, markNotificationsRead: markRead, submitRequest }}>
     {children}{toast && <div className="toast" role="status">{toast}</div>}
   </Context.Provider>;
 }

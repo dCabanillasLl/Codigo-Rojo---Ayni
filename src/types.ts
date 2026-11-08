@@ -15,4 +15,4 @@ export type Notice = { id: string; autorId: string; autor: string; categoriaId: 
 export type Resource = { id: string; propietarioId: string; propietario: string; titulo: string; unidad: string; cantidadTotal: number; reservada: number; entregada: number; disponible: number; sectorId: string; sectorNombre: string; distanciaMetros: number | null; actualizadoEn: string };
 export type Reservation = { id: string; recursoId: string; solicitanteId: string; solicitante: string; cantidad: number; estado: 'pendiente' | 'reservada' | 'entregada' | 'cancelada'; creadoEn: string };
 export type Reputation = { colaboracionesConfirmadas: number; vistosBuenos: number; promedio: number | null; resenas: Review[] };
-export type Area = { sectorId: string; coordinates: { latitude: number; longitude: number } | null; radius: number };
+export type Area = { coordinates: { latitude: number; longitude: number } | null; radius: number };

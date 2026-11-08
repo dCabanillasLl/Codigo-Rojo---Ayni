@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from './api';
 import { cacheRead, cacheWrite } from './storage';
-import type { Area } from '../types';
+export { areaQuery } from './location';
 
 export function useOnline() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -40,12 +40,6 @@ export function useRemote<T>(path: string | null, scope = 'public') {
     return () => { active = false; controller.abort(); };
   }, [path, scope, version]);
   return { data, loading, error, cachedAt, reload };
-}
-export function areaQuery(area: Area) {
-  const params = new URLSearchParams();
-  if (area.sectorId) params.set('sectorId', area.sectorId);
-  if (area.coordinates) { params.set('latitud', String(area.coordinates.latitude)); params.set('longitud', String(area.coordinates.longitude)); params.set('radio', String(area.radius)); }
-  return params;
 }
 export function useDebounced<T>(value: T, delay = 300) {
   const [result, setResult] = useState(value);

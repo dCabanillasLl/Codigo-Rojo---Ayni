@@ -14,10 +14,10 @@ type Recognition = { lang: string; continuous: boolean; interimResults: boolean;
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 
 export default function RequestForm({ onClose }: { onClose: () => void }) {
-  const { catalogs, sectors, area, online, submitRequest, notify } = useApp();
+  const { catalogs, postingSectorId, area, online, submitRequest, notify } = useApp();
   const { t } = useLanguage();
   const [description, setDescription] = useState('');
-  const [sectorId, setSectorId] = useState(area.sectorId);
+  const sectorId = postingSectorId;
   const [location, setLocation] = useState<LocationDraft>({ coordinates: area.coordinates, address: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,7 +76,7 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!sectorId) { setError('Elige la comunidad de tu pedido.'); return; }
+    if (!sectorId) { setError('No pudimos preparar la publicación. Vuelve a intentarlo con conexión.'); return; }
     if (policyMessage) { setError(policyMessage); return; }
     setBusy(true); setError(''); recognition.current?.stop();
     const data = new FormData(event.currentTarget);
@@ -97,12 +97,9 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
         <button type="button" className="outline-btn voice-listen-btn" disabled={!description.trim()} onClick={() => { if (!speak(description)) setError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones"/>Escuchar</button>
       </div>
       {recording && <p role="status" className="recording-message"><span className="recording-dot"/>{t('listening')} Habla con naturalidad; revisa el texto antes de publicarlo.</p>}
-      <div className="form-columns">
         <Field label="Tipo de ayuda"><select name="categoriaId" required defaultValue=""><option value="" disabled>Elige una opción</option>{catalogs.data?.ayuda.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>
-        <Field label="Comunidad del pedido"><select value={sectorId} onChange={event => setSectorId(event.target.value)} required><option value="" disabled>Elige tu comunidad</option>{sectors.data?.map(sector => <option key={sector.id} value={sector.id}>{sector.distrito} · {sector.nombre}</option>)}</select></Field>
-      </div>
-      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige un punto para este pedido. Tu perfil no cambia y otros vecinos ven solo una zona aproximada. Si lo omites, se usará la ubicación de tu perfil en esta comunidad, si existe.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
-      <RemoteState {...catalogs}/><RemoteState {...sectors}/>
+      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige un punto para este pedido. Tu perfil no cambia y otros vecinos ven solo una zona aproximada. Si lo omites, se usará la ubicación de tu perfil si existe.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
+      <RemoteState {...catalogs}/>
       {!online && <p className="offline-banner">Se guardará en este dispositivo y se enviará al recuperar conexión con tu sesión activa.</p>}
       {!catalogs.data?.ayuda.length && <ErrorBox message="Necesitamos cargar las categorías al menos una vez con conexión antes de crear pedidos."/>}
       <ErrorBox message={policyMessage}/>

@@ -5,6 +5,22 @@ import { locationSchema } from '../src/lib/validation.js';
 import { resolveLocation } from '../src/lib/location.js';
 import { contentHash, requireSameContent } from '../src/services/community-rules.js';
 import { searchAddresses } from '../src/services/geocoding.js';
+import { areaQuery, postingSector } from '../../src/lib/location.js';
+
+test('buscar por ubicación incluye puntos de cualquier sector y sin ubicación no aplica filtros geográficos', () => {
+  const legacyArea = { sectorId: '4', coordinates: { latitude: -12.074, longitude: -77.063 }, radius: 1500 };
+  const params = areaQuery(legacyArea);
+  assert.deepEqual(Object.fromEntries(params), { latitud: '-12.074', longitud: '-77.063', radio: '1500' });
+  assert.equal(areaQuery({ ...legacyArea, coordinates: null }).toString(), '');
+});
+
+test('publicar sin selector conserva la asociación del perfil o usa la zona base configurada', () => {
+  const sectors = [{ id: '4', nombre: 'Sector 4', distrito: 'Pueblo Libre', ciudad: 'Lima' }, { id: '9', nombre: 'Pueblo Libre', distrito: 'Pueblo Libre', ciudad: 'Lima' }];
+  assert.equal(postingSector('2', null), '2');
+  assert.equal(postingSector(null, sectors), '9');
+  assert.equal(postingSector(null, [...sectors].reverse()), '9');
+  assert.equal(postingSector(null, null), '');
+});
 
 test('el punto de una publicación exige ambas coordenadas válidas y rechaza campos ajenos', () => {
   assert.equal(locationSchema.safeParse({ latitud: -12.074 }).success, false);
