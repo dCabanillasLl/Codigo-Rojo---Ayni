@@ -8,7 +8,7 @@ import { idSchema, listSchema, locationSchema } from "../lib/validation.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { publicationJson } from '../middlewares/json.js';
 import { photoSchema, preparePhoto } from '../lib/photos.js';
-import { noticeDateSql, noticeExpired, validateNoticeDates } from '../lib/notices.js';
+import { normalizeNoticeAttendance, noticeAttendanceConfirmed, noticeDateSql, noticeExpired, validateNoticeDates } from '../lib/notices.js';
 import { notifyEventChange, type EventSnapshot } from '../services/notice-attendance.js';
 
 const router = Router();
@@ -58,11 +58,13 @@ router.get("/avisos", asyncHandler(async (req, res) => {
   if (filters.sectorId) { conditions.push("l.sector_id = ?"); params.push(filters.sectorId); }
   if (filters.categoriaId) { conditions.push("a.categoria_aviso_id = ?"); params.push(filters.categoriaId); }
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ data: await query(`${select}, ${geo.select}${joins} WHERE ${conditions.join(" AND ")} ORDER BY a.creado_en DESC LIMIT 100`, [req.userId ?? null, ...geo.selectParams, ...params]) });
+  const items = await query<{ miAsistencia: unknown }>(`${select}, ${geo.select}${joins} WHERE ${conditions.join(" AND ")} ORDER BY a.creado_en DESC LIMIT 100`, [req.userId ?? null, ...geo.selectParams, ...params]);
+  res.json({ data: items.map(normalizeNoticeAttendance) });
 }));
 
 router.get("/avisos/:id", asyncHandler(async (req, res) => {
-  const item = await one<{ autorId: string; miAsistencia: number; estado: string; fechaEvento: Date | null; venceEn: Date | null }>(`${select}${joins} WHERE a.aviso_id = ? AND u.estado_cuenta = 'activo'`, [req.userId ?? null, idSchema.parse(req.params.id)]);
+  const row = await one<{ autorId: string; miAsistencia: unknown; estado: string; fechaEvento: Date | null; venceEn: Date | null }>(`${select}${joins} WHERE a.aviso_id = ? AND u.estado_cuenta = 'activo'`, [req.userId ?? null, idSchema.parse(req.params.id)]);
+  const item = row ? normalizeNoticeAttendance(row) : undefined;
   if (!item || (item.autorId !== req.userId && !item.miAsistencia && (item.estado !== "publicado" || noticeExpired(item)))) {
     throw new AppError(404, "NOT_FOUND", "No encontramos este aviso vigente.");
   }
@@ -73,11 +75,11 @@ router.get("/avisos/:id", asyncHandler(async (req, res) => {
 router.get('/avisos/:id/imagen', asyncHandler(async (req, res) => {
   const id = idSchema.parse(req.params.id);
   const { v } = z.object({ v: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().parse(req.query);
-  const item = await one<{ imagen: Buffer | null; imagen_hash: string | null; autorId: string; miAsistencia: number; estado: string; fechaEvento: Date | null; venceEn: Date | null }>(
+  const item = await one<{ imagen: Buffer | null; imagen_hash: string | null; autorId: string; miAsistencia: unknown; estado: string; fechaEvento: Date | null; venceEn: Date | null }>(
     `SELECT a.imagen, a.imagen_hash, CAST(a.autor_id AS CHAR) AS autorId, a.estado, a.fecha_evento AS fechaEvento, a.vence_en AS venceEn,
      EXISTS(SELECT 1 FROM asistencias_avisos aa WHERE aa.aviso_id = a.aviso_id AND aa.usuario_id = ? AND aa.confirmada = 1) AS miAsistencia
      FROM avisos a JOIN usuarios u ON u.usuario_id = a.autor_id WHERE a.aviso_id = ? AND u.estado_cuenta = 'activo'`, [req.userId ?? null, id]);
-  if (!item?.imagen || !item.imagen_hash || (v && v !== item.imagen_hash) || (item.autorId !== req.userId && !item.miAsistencia && (item.estado !== 'publicado' || noticeExpired(item)))) throw new AppError(404, 'PHOTO_NOT_FOUND', 'Este flyer no está disponible.');
+  if (!item?.imagen || !item.imagen_hash || (v && v !== item.imagen_hash) || (item.autorId !== req.userId && !noticeAttendanceConfirmed(item.miAsistencia) && (item.estado !== 'publicado' || noticeExpired(item)))) throw new AppError(404, 'PHOTO_NOT_FOUND', 'Este flyer no está disponible.');
   res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=0, must-revalidate', 'Cross-Origin-Resource-Policy': 'cross-origin', ETag: `"${item.imagen_hash}"` });
   res.send(item.imagen);
 }));
@@ -96,7 +98,8 @@ router.post("/avisos", requireAuth, publicationJson, asyncHandler(async (req, re
     );
     return String(result.insertId);
   });
-  res.status(201).json({ data: await one(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]) });
+  const item = await one<{ miAsistencia: unknown }>(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]);
+  res.status(201).json({ data: item ? normalizeNoticeAttendance(item) : item });
 }));
 
 router.patch("/avisos/:id", requireAuth, publicationJson, asyncHandler(async (req, res) => {
@@ -131,7 +134,8 @@ router.patch("/avisos/:id", requireAuth, publicationJson, asyncHandler(async (re
     if (!notified) { changes.push('revision_evento = ?'); values.push(Number(rows[0].revision_evento || 0) + 1); }
     await connection.execute(`UPDATE avisos SET ${changes.join(", ")} WHERE aviso_id = ?`, [...values, id] as never[]);
   });
-  res.json({ data: await one(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]) });
+  const item = await one<{ miAsistencia: unknown }>(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]);
+  res.json({ data: item ? normalizeNoticeAttendance(item) : item });
 }));
 
 router.put('/avisos/:id/asistencia', requireAuth, asyncHandler(async (req, res) => {
@@ -176,7 +180,8 @@ router.post('/avisos/:id/cambios', requireAuth, asyncHandler(async (req, res) =>
       await connection.execute("UPDATE avisos SET estado = 'cancelado' WHERE aviso_id = ?", [id]);
     }
   });
-  res.json({ data: await one(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]) });
+  const updated = await one<{ miAsistencia: unknown }>(`${select}${joins} WHERE a.aviso_id = ?`, [req.userId, id]);
+  res.json({ data: updated ? normalizeNoticeAttendance(updated) : updated });
 }));
 
 router.delete('/avisos/:id', requireAuth, asyncHandler(async (req, res) => {

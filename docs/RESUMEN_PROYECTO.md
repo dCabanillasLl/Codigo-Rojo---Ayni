@@ -33,7 +33,8 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
   Esta opción pide confirmación antes de borrar. Al confirmar se eliminan la actividad,
   su flyer y las confirmaciones. Las notificaciones de cancelación pendientes se
   conservan para quienes todavía no se hayan conectado.
-- **Confirmar asistencia:** marcar **Asistiré** y consultar las actividades en
+- **Confirmar asistencia:** pulsar **Confirmar asistencia** y usar **Quitar confirmación**
+  si se cambia de opinión. Consultar las actividades en
   **Mis asistencias**. Cada anuncio muestra cuántos vecinos confirmaron.
 - **Gestionar actividades:** desde **Mis actividades**, el creador puede postergar
   para una fecha posterior o cancelar, indicando el motivo. Quienes siguen confirmados

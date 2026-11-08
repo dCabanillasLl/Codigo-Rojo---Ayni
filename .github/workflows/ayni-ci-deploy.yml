@@ -72,6 +72,15 @@ jobs:
       - name: Ejecutar pruebas unitarias del backend
         run: npm --prefix backend test
 
+      - name: Habilitar triggers en MySQL desechable
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_PWD: ayni-ci-root-only-password
+        # Las migraciones 015+ crean triggers; el ajuste solo afecta a este contenedor temporal.
+        run: >-
+          docker exec --env MYSQL_PWD="$MYSQL_PWD" "$MYSQL_CONTAINER"
+          mysql --user=root --execute="SET GLOBAL log_bin_trust_function_creators = 1;"
+
       - name: Crear esquema desechable y aplicar migraciones
         working-directory: backend
         run: node scripts/migrate.mjs --baseline --apply
