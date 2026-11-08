@@ -4,7 +4,7 @@ import sqliteWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 
 type CacheRecord<T> = { key: string; data: T; savedAt: string };
 export type PendingRequest = { id: string; ownerId: string; body: RequestInput; createdAt: string; error?: string; blocked?: boolean };
-export type AppNotification = { id: string; ownerId: string; text: string; createdAt: string; read: boolean };
+export type AppNotification = { id: string; ownerId: string; text: string; createdAt: string; read: boolean; avisoId?: string };
 let database: Promise<IDBDatabase> | undefined;
 function openDatabase() {
   if (!database) database = new Promise<IDBDatabase>((resolve, reject) => {

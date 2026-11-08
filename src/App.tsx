@@ -34,7 +34,7 @@ function navigate(page: Destination, id?: string) {
 
 export default function App() {
   const { t } = useLanguage();
-  const { user, setUser, online, sessionLoading, sessionError, authOpen, setAuthOpen, requireUser, notify, notifications, unreadNotifications, markNotificationsRead } = useApp();
+  const { user, setUser, online, sessionLoading, sessionError, authOpen, setAuthOpen, requireUser, notify, notifications, notificationsError, unreadNotifications, markNotificationsRead } = useApp();
   const [route, setRoute] = useState(readRoute);
   const [helpOpen, setHelpOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
@@ -76,7 +76,7 @@ export default function App() {
       {sessionError && <p className="offline-banner" role="status">{sessionError} · {sessionLoading ? 'Verificando sesión…' : 'Los datos del servidor pueden no estar disponibles.'}</p>}
       {route.page === 'cerca' && <Nearby detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
       {route.page === 'ayuda' && <Help detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
-      {route.page === 'avisos' && <Notices/>}
+      {route.page === 'avisos' && <Notices view={route.detailId}/>}
       {route.page === 'perfil' && <Profile onLocation={() => setLocationOpen(true)} onSignOut={() => void signOut()} signOutBusy={signOutBusy} signOutError={profileError}/>}
     </main>
 
@@ -87,7 +87,7 @@ export default function App() {
     </nav>
     {helpOpen && <RequestForm onClose={() => setHelpOpen(false)}/>}
     {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)} saveToProfile={route.page === 'perfil'}/>}
-    {notificationsOpen && <NotificationCenter notifications={notifications} onClose={() => setNotificationsOpen(false)}/>}
+    {notificationsOpen && <NotificationCenter notifications={notifications} error={notificationsError} onClose={() => setNotificationsOpen(false)}/>}
     {authOpen && <AuthModal/>}
     <GuideBot onNavigate={navigate} onAsk={() => { if (requireUser()) setHelpOpen(true); }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }} onLocation={() => { if (requireUser()) setLocationOpen(true); }}/>
   </div>;

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError, errorMessage, refreshData } from './lib/api';
-import { markNotificationsRead as persistNotificationsRead, notificationList, pendingDelete, pendingList, pendingSave, saveNotification, type AppNotification, type PendingRequest } from './lib/storage';
+import { cacheRead, cacheWrite, markNotificationsRead as persistNotificationsRead, notificationList, pendingDelete, pendingList, pendingSave, saveNotification, type AppNotification, type PendingRequest } from './lib/storage';
 import { useOnline, useRemote } from './lib/hooks';
 import { postingSector } from './lib/location';
 import type { Area, Catalogs, HelpRequest, RequestInput, Sector, User } from './types';
@@ -13,7 +13,7 @@ type AppState = {
   postingSectorId: string; catalogs: ReturnType<typeof useRemote<Catalogs>>;
   area: Area; setArea: (area: Area) => void; notify: (text: string) => void;
   pending: PendingRequest[]; syncing: boolean; sync: () => Promise<void>; refreshPending: () => Promise<void>;
-  notifications: AppNotification[]; unreadNotifications: number; markNotificationsRead: () => void;
+  notifications: AppNotification[]; notificationsError: string; unreadNotifications: number; markNotificationsRead: () => void;
   submitRequest: (body: RequestInput) => Promise<'published' | 'pending'>;
 };
 const Context = createContext<AppState | null>(null);
@@ -25,6 +25,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authOpen, setAuthOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [serverNotifications, setServerNotifications] = useState<{ ownerId: string; items: AppNotification[] } | null>(null);
+  const [notificationsError, setNotificationsError] = useState('');
   const online = useOnline();
   const sectors = useRemote<Sector[]>('/sectores');
   // Retain the legacy database association without asking users to select a sector.
@@ -61,6 +63,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }).catch(() => undefined);
     return () => { active = false; };
   }, [user?.id]);
+  useEffect(() => {
+    const ownerId = user?.id;
+    if (!ownerId || sessionLoading) return;
+    let active = true, fetching = false;
+    const controller = new AbortController();
+    const key = `${ownerId}:/notificaciones`;
+    const receive = async () => {
+      if (fetching || !active) return;
+      fetching = true;
+      try {
+        const items = await api<AppNotification[]>('/notificaciones', { signal: controller.signal, expectedUserId: ownerId });
+        if (!active || userRef.current?.id !== ownerId) return;
+        setServerNotifications({ ownerId, items }); setNotificationsError('');
+        await cacheWrite(key, items).catch(() => undefined);
+      } catch (error) {
+        if (!active || userRef.current?.id !== ownerId) return;
+        setNotificationsError(errorMessage(error));
+        if (error instanceof ApiError && ([401, 403].includes(error.status) || error.code === 'SESSION_CHANGED')) { setServerNotifications(null); return; }
+        const cached = await cacheRead<AppNotification[]>(key).catch(() => undefined);
+        if (active && cached) setServerNotifications(current => current?.ownerId === ownerId ? current : { ownerId, items: cached.data });
+      } finally { fetching = false; }
+    };
+    void receive();
+    const refresh = () => { if (document.visibilityState === 'visible') void receive(); };
+    const timer = online ? window.setInterval(refresh, 20_000) : undefined;
+    window.addEventListener('focus', refresh); window.addEventListener('ayni:refresh', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { active = false; controller.abort(); window.clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('ayni:refresh', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [user?.id, online, sessionLoading]);
   const notify = useCallback((text: string) => {
     setToast(text);
     const ownerId = userRef.current?.id;
@@ -76,7 +107,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!ownerId) return;
     setNotifications(current => current.map(item => item.ownerId === ownerId ? { ...item, read: true } : item));
     void persistNotificationsRead(ownerId).catch(() => undefined);
-  }, []);
+    const items = serverNotifications && serverNotifications.ownerId === ownerId ? serverNotifications.items : [];
+    const ids = items.filter(item => !item.read).map(item => item.id);
+    if (ownerId && ids.length) void api('/notificaciones/leidas', { method: 'POST', body: { ids }, expectedUserId: ownerId }).then(() => {
+      if (userRef.current?.id !== ownerId) return;
+      setServerNotifications(current => current?.ownerId === ownerId ? { ...current, items: current.items.map(item => ids.includes(item.id) ? { ...item, read: true } : item) } : current);
+      refreshData();
+    }).catch(error => { if (userRef.current?.id === ownerId) setNotificationsError(errorMessage(error)); });
+  }, [serverNotifications]);
   const refreshPending = useCallback(async () => { const owner = userRef.current?.id; if (!owner) { setPending([]); return; } const list = await pendingList(owner).catch(() => []); if (owner === userRef.current?.id) setPending(list); }, []);
   useEffect(() => { void refreshPending(); }, [user?.id, refreshPending]);
   const sync = useCallback(async () => {
@@ -119,8 +157,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await pendingDelete(entry.id); await refreshPending(); throw error;
     }
   };
-  const unreadNotifications = notifications.filter(item => !item.read).length;
-  return <Context.Provider value={{ user, setUser, online, sessionLoading, sessionError, requireUser: () => { if (user) return true; setAuthOpen(true); return false; }, authOpen, setAuthOpen, postingSectorId, catalogs, area, setArea, notify, pending, syncing, sync, refreshPending, notifications, unreadNotifications, markNotificationsRead: markRead, submitRequest }}>
+  const allNotifications = [...notifications, ...(user && serverNotifications?.ownerId === user.id ? serverNotifications.items : [])].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 100);
+  const unreadNotifications = allNotifications.filter(item => !item.read).length;
+  return <Context.Provider value={{ user, setUser, online, sessionLoading, sessionError, requireUser: () => { if (user) return true; setAuthOpen(true); return false; }, authOpen, setAuthOpen, postingSectorId, catalogs, area, setArea, notify, pending, syncing, sync, refreshPending, notifications: allNotifications, notificationsError: user ? notificationsError : '', unreadNotifications, markNotificationsRead: markRead, submitRequest }}>
     {children}{toast && <div className="toast" role="status">{toast}</div>}
   </Context.Provider>;
 }

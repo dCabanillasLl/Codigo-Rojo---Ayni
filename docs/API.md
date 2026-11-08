@@ -241,13 +241,64 @@ Conflictos de inventario, UUID o estado devuelven 409.
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
 | GET `/api/avisos` | Filtros comunes; público solo vigentes publicados → `{data: Aviso[]}` | 200 |
-| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,imagenUrl?,fechaEvento?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
+| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,fechaEvento,foto?,imagenUrl?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
 | GET `/api/avisos/:id` | Sin cuerpo → `{data: Aviso}` visible | 200 |
 | PATCH `/api/avisos/:id` | Campos editables → `{data: Aviso}` actualizado; solo autor | 200 |
+| GET `/api/avisos/:id/imagen?v=hash` | JPEG del flyer cargado, sujeto a visibilidad y vigencia | 200 |
 
 Aviso: `{id,autorId,autor,categoriaId,categoria,titulo,contenido,imagenUrl,estado,sectorId,
-sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` debe ser una URL HTTPS pública;
-se almacena la referencia, no se carga el archivo. Fechas ISO UTC o null.
+sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` en la respuesta
+puede ser una ruta `/api/avisos/:id/imagen?v=hash` o un enlace HTTPS anterior.
+`foto` recibe un data URI JPG, PNG o WebP de hasta 5 MB; se normaliza y almacena en
+MySQL mediante la migración 007. Omitirla al editar conserva la imagen; `null` la
+quita; una nueva reemplaza el flyer. También se conserva `imagenUrl` HTTPS como
+entrada compatible; no se pueden modificar archivo y enlace al mismo tiempo.
+POST/PATCH admiten JSON de hasta 8 MB después de autenticar, igual que publicaciones.
+
+`fechaEvento` es obligatoria y futura al crear (ISO con zona horaria); `venceEn` es
+opcional y, si se proporciona, también debe ser futuro. Se guardan como UTC. La
+primera de ambas fechas determina la retirada pública, incluso si el cliente consulta
+directamente el detalle o la imagen. Listados y detalle devuelven `Cache-Control:
+no-store`. El autor puede consultar el registro vencido y su imagen; los demás reciben
+404. El estado efectivo devuelto es `vencido`, sin borrar el registro ni requerir cron.
+Editar no permite quitar todas las fechas. Los avisos antiguos sin fechas se conservan.
+La interfaz filtra además avisos vencidos en su caché y al permanecer abierta.
 Estados `borrador|publicado|cancelado|vencido`. La interfaz distingue avisos vecinales
 de información oficial. Compartir utiliza enlaces/funciones del dispositivo; la API
 no envía WhatsApp ni mensajes en nombre de usuarios.
+
+### Asistencia y cambios de actividades
+
+Los avisos incluyen `totalAsistentes`, `miAsistencia`, `revisionEvento` y `motivoCambio`.
+`ultimoCambioEvento` distingue `postergado`, `reprogramado`, `cancelado` y `retirado`
+(nullable para registros anteriores; migración 009). Permite mostrar etiquetas de
+estado sin confundir una actualización de vencimiento con una postergación. El estado
+de publicación permanece `publicado` tras postergar; cancelación y vencimiento tienen
+prioridad sobre la etiqueta del último cambio.
+El total cuenta confirmaciones de cuentas activas; no se exponen listas de nombres.
+`GET /api/avisos?asistire=1` requiere sesión y devuelve las actividades confirmadas,
+incluidas canceladas o vencidas. Es incompatible con `mios=1`. El organizador y los
+asistentes confirmados también pueden consultar su detalle e imagen tras la retirada;
+el resto recibe 404.
+
+| Método y ruta | Entrada / operación | Éxito |
+|---|---|---|
+| PUT `/api/avisos/:id/asistencia` | `{asistire:boolean}`; confirma o retira la propia asistencia, sin duplicados | 200 |
+| POST `/api/avisos/:id/cambios` | `{accion:"postergar",fechaEvento,motivo,revisionEvento}` o `{accion:"cancelar",motivo,revisionEvento}`; solo organizador | 200 |
+| GET `/api/notificaciones` | Últimas 100 notificaciones de la propia cuenta: `{data:[{id,text,createdAt,read,avisoId}]}` | 200 |
+| POST `/api/notificaciones/leidas` | `{ids:string[]}` de hasta 100 UUID; marca solo notificaciones de la propia cuenta | 200 |
+
+No se permite confirmar la propia actividad ni una actividad cancelada, retirada o
+vencida. Retirar una confirmación sigue siendo posible tras el vencimiento o cancelación.
+Postergar exige fecha futura posterior a la anterior; conserva confirmaciones y limpia
+el `venceEn` anterior. Cancelar retira el aviso público. El motivo admite 3–500 caracteres.
+Una revisión desactualizada devuelve 409 `EVENT_CHANGED`; una actividad retirada devuelve
+409 `EVENT_NOT_AVAILABLE`. Reintentar el mismo cambio ya aplicado no duplica notificaciones.
+
+Las confirmaciones y los cambios bloquean la fila del aviso para serializar operaciones
+concurrentes. El cambio y las notificaciones a asistentes confirmados activos se guardan
+en la misma transacción. La edición directa por PATCH también notifica cambios de fechas
+o retirada del evento. Migración requerida: 008. No hay envío a servicios externos.
+Las notificaciones usan `Cache-Control: no-store`, comprobación de `X-AYNI-User` y caché
+local por cuenta. El cliente consulta cada 20 segundos mientras está visible y al volver
+a la app; permite recuperar notificaciones guardadas durante una desconexión.

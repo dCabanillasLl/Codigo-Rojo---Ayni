@@ -24,11 +24,21 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 7. `006_fotos_publicaciones.sql` añade una foto opcional (`imagen` y `imagen_hash`)
    a cada producto o servicio. Las filas existentes permanecen sin foto. Se almacena
    el JPEG normalizado y su huella; las consultas de listados no descargan el BLOB.
-8. `007_vencimiento_solicitudes.sql` asigna fecha límite a solicitudes antiguas sin
-   vencimiento y marca como vencidas las que ya superaron el plazo. Aplicar para que
-   los pedidos existentes tampoco permanezcan publicados indefinidamente.
-9. `008_notificaciones_correo.sql` añade la preferencia privada de avisos por correo,
-   desactivada para todas las cuentas existentes hasta que cada persona la active.
+8. `007_fotos_avisos.sql` añade una imagen opcional normalizada y su huella a cada
+   aviso. Conserva sus fechas y enlaces externos anteriores. No borra ni vence filas.
+   La vigencia se aplica al consultar, según `fecha_evento` y `vence_en`, sin cron.
+9. `008_asistencia_avisos_notificaciones.sql` añade las confirmaciones por actividad y
+   usuario, la revisión del evento y las notificaciones persistentes de cambios.
+   Cada cambio y sus notificaciones se guardan en una misma transacción. La combinación
+   actividad/revisión/destinatario es única para evitar avisos duplicados.
+10. `009_estado_cambio_actividad.sql` conserva el tipo del último cambio de actividad
+    para distinguir la etiqueta de postergación de otras actualizaciones. No modifica
+    las fechas, estados ni publicaciones existentes.
+11. `010_vencimiento_solicitudes.sql` asigna fecha límite a solicitudes antiguas sin
+    vencimiento y marca como vencidas las que ya superaron el plazo. Aplicar para que
+    los pedidos existentes tampoco permanezcan publicados indefinidamente.
+12. `011_notificaciones_correo.sql` añade la preferencia privada de avisos por correo,
+    desactivada para todas las cuentas existentes hasta que cada persona la active.
 
 El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
 de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum
@@ -54,5 +64,6 @@ confirmaciones NULL; sus reseñas no se convierten en verificadas.
   Reintentar devuelve el original; reutilizar el UUID con otro contenido produce 409.
 - El teléfono permanece privado por defecto. Solo se publica en las fichas del vecino
   después de guardar un número internacional y activar su consentimiento en el perfil.
-- Los flyers de avisos son referencias HTTPS a imágenes alojadas externamente; AYNI no
-  recibe ni procesa archivos de imagen.
+- Los flyers nuevos pueden cargarse como JPG, PNG o WebP de hasta 5 MB. Se guarda el
+  JPEG normalizado (hasta 1600 px y 2 MB) sin metadatos. Los enlaces HTTPS anteriores
+  se conservan por compatibilidad. El archivo no se devuelve en los listados JSON.
