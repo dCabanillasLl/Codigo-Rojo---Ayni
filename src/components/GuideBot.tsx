@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { api } from '../lib/api';
 import Icon, { type IconName } from './Icon';
 
 type Destination = 'cerca' | 'ayuda' | 'avisos';
@@ -33,6 +34,7 @@ function newMessage(from: Message['from'], text: string, extra: Partial<Message>
 export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: GuideBotProps) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [thinking, setThinking] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     newMessage('bot', '¡Hola! Soy tu guía de AYNI. Elige lo que quieres hacer y te acompaño paso a paso.'),
   ]);
@@ -144,10 +146,10 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
     return 'fallback';
   }
 
-  function send(event: FormEvent<HTMLFormElement>) {
+  async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = input.trim();
-    if (!value) return;
+    if (!value || thinking) return;
     setInput('');
     const intent = classify(value);
     const userMessage = newMessage('you', value);
@@ -163,13 +165,35 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
       location: { key: 'location', label: 'Configurar ubicación', icon: 'pin' },
     };
     const replyText = intent === 'fallback'
-      ? 'Puedo acompañarte en una tarea. Prueba “quiero buscar”, “necesito ayuda”, “quiero ayudar”, “avisos” o “enséñame AYNI”.'
+      ? ''
       : intent === 'nearby' ? '¡Vamos a buscar por tu zona! Abre Cerca de mí para ver las opciones disponibles.'
         : intent === 'ask' ? 'Te acompaño a crear tu pedido. Cuenta qué necesitas y revisa el texto antes de publicarlo.'
           : intent === 'offer' ? '¡Gracias por querer colaborar! Mira los pedidos y elige cómo puedes apoyar.'
             : intent === 'notices' ? 'Abre los avisos de tu barrio para ver novedades.'
               : 'Vamos a configurar tu ubicación para mostrarte resultados más cercanos.';
-    setMessages(current => [...current, userMessage, newMessage('bot', replyText, intent === 'fallback' ? {} : { action: replies[intent] })]);
+    if (intent !== 'fallback') {
+      setMessages(current => [...current, userMessage, newMessage('bot', replyText, { action: replies[intent] })]);
+      return;
+    }
+
+    const history = [...messages, userMessage].slice(-8).map(message => ({
+      role: message.from === 'you' ? 'user' as const : 'model' as const,
+      text: message.text,
+    }));
+    setMessages(current => [...current, userMessage]);
+    setThinking(true);
+    try {
+      const result = await api<{ answer: string }>('/assistant/chat', {
+        method: 'POST',
+        body: { messages: history },
+        timeoutMs: 16_000,
+      });
+      setMessages(current => [...current, newMessage('bot', result.answer)]);
+    } catch {
+      setMessages(current => [...current, newMessage('bot', 'Aún no puedo responder esa pregunta. Prueba una opción rápida o pregúntame cómo buscar, pedir ayuda, ofrecer ayuda o ver avisos.')]);
+    } finally {
+      setThinking(false);
+    }
   }
 
   return <>
@@ -181,6 +205,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
           <p className="guide-message-text">{message.text}</p>
           {message.action && <button type="button" className="guide-card-action" onClick={() => runAction(message.action!.key)}><Icon name={message.action.icon} size={17}/>{message.action.label}<Icon name="arrow" size={16}/></button>}
         </div>)}
+        {thinking && <div className="guide-message bot" role="status"><p className="guide-message-text">Estoy pensando cómo ayudarte…</p></div>}
         {messages.length === 1 && <div className="guide-home-actions" aria-label="Elige qué quieres hacer">
           {homeActions.map(action => <button type="button" className="guide-home-card" key={action.key} onClick={() => selectAction(action)}><span className="guide-home-icon"><Icon name={action.icon} size={18}/></span><span className="guide-home-copy"><b>{action.label}</b><small>{action.description}</small></span><Icon name="chevron" size={16}/></button>)}
         </div>}
@@ -188,8 +213,8 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onLocation }: Gui
       <div className="guide-quick-actions" aria-label="Sugerencias rápidas">
         {homeActions.filter(action => ['nearby', 'ask', 'tutorial'].includes(action.key)).map(action => <button type="button" key={action.key} className="guide-chip" onClick={() => selectAction(action)}>{action.label}</button>)}
       </div>
-      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta</label><input id="guide-question" value={input} onChange={event => setInput(event.target.value)} placeholder="¿En qué te ayudo?" maxLength={240}/><button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={!input.trim()}><Icon name="arrow" size={19}/></button></form>
-      <p className="guide-privacy-note">Guía automática sencilla. Tus mensajes no salen de este dispositivo.</p>
+      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta</label><input id="guide-question" value={input} onChange={event => setInput(event.target.value)} placeholder="Pregunta sobre cómo usar AYNI" maxLength={600} disabled={thinking}/><button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={!input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
+      <p className="guide-privacy-note">Las preguntas abiertas se procesan con Gemini de Google. No escribas tu DNI, dirección ni contraseñas.</p>
     </section>}
     <button type="button" className={`guide-launcher ${open ? 'is-open' : ''}`} aria-label={open ? 'Cerrar guía AYNI' : 'Abrir guía AYNI'} aria-expanded={open} onClick={() => setOpen(value => !value)}>
       {open ? <Icon name="close" size={23}/> : <><Icon name="hands" size={22}/><span>¿Te ayudo?</span></>}

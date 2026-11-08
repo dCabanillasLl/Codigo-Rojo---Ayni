@@ -10,6 +10,10 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
 - **Ofrecer algo:** publicar un producto o servicio, señalar dónde lo ofreces y,
   si quieres, añadir una foto. Puedes previsualizarla, cambiarla o quitarla al editar.
 - **Pedir ayuda:** describir lo que necesitas y elegir una ubicación para ese pedido.
+  Si ya iniciaste sesión y cargaste las categorías, puedes guardar el pedido sin
+  conexión. Se conserva al recargar y se envía al reconectar con la misma cuenta.
+  En la versión compilada también puedes volver a abrir la app y consultar las vistas
+  que cargaste previamente. Los mapas y las operaciones en el servidor necesitan internet.
 - **Colaborar:** responder a un pedido, acordar un aporte y confirmar su entrega.
   Un mismo pedido puede recibir ayuda de varios vecinos.
 - **Compartir recursos:** ofrecer donaciones o insumos y gestionar sus reservas.
@@ -48,7 +52,13 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
 
 En **Cerca de ti**, el diseño conserva el saludo, la zona, el buscador y los filtros.
 Los productos y servicios con ubicación aparecen al mismo tiempo en un mapa dentro
-de su propio bloque. Debajo están sus tarjetas, con descripción, precio y opciones
+de la pantalla **Cerca de mí**, junto con un filtro visual: puedes elegir **Todo**,
+**Productos** o **Servicios** y abrir **Filtros** para seleccionar categoría, distancia
+o tus propias publicaciones. Las opciones seleccionadas se resaltan con color y se
+muestran como etiquetas que puedes quitar; **Limpiar todo** restablece la búsqueda.
+El mapa y las tarjetas muestran los mismos resultados.
+
+El mapa se mantiene en su propio bloque. Debajo están sus tarjetas, con descripción, precio y opciones
 de contacto. El mapa ajusta la vista para incluir los puntos de los resultados cargados;
 no necesitas ir cambiando de publicación.
 Tocar un icono abre su información. Los pedidos tienen su propio mapa en **Ayuda vecinal**.

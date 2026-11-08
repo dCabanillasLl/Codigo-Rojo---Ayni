@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { offlineBuild } from './scripts/offline-build.ts';
 
 // A fresh clone also works without the optional Figma workspace metadata.
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,7 @@ export default defineConfig(({ mode }) => {
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: "/src/**/*.stories.{ts,tsx,js,jsx}" }),
       figmaLinkedPackageSourcemaps(),
+      offlineBuild(),
     ],
     resolve: {
       alias: {

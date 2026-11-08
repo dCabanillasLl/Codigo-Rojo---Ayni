@@ -1,6 +1,12 @@
 import type { RequestHandler } from "express";
 import { AppError } from "../lib/http.js";
 
+export const verifyExpectedUser: RequestHandler = (req, _res, next) => {
+  const expected = req.get('X-AYNI-User');
+  if (expected && expected !== req.userId) { next(new AppError(409, 'SESSION_CHANGED', 'La cuenta activa cambió. Actualiza tu sesión antes de continuar.')); return; }
+  next();
+};
+
 export function protectMutations(origins: string[]): RequestHandler {
   return (req, _res, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) { next(); return; }

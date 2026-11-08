@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "dev:api": "npm --prefix backend run dev",
     "test:api": "npm --prefix backend test",
+    "test:offline": "npm run build && playwright test -c playwright.offline.config.ts",
     "preview": "vite preview",
     "format": "oxfmt"
   },
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.20.5",
