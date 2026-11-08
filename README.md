@@ -250,6 +250,30 @@ npm --prefix backend run build
 npm --prefix backend test
 ```
 
+## Integración continua y despliegue
+
+`.github/workflows/ayni-ci-deploy.yml` valida cada pull request hacia `main` y cada
+push a `main` (incluido un merge): compila frontend y backend, ejecuta las pruebas
+unitarias y crea un MySQL desechable en GitHub Actions para aplicar el esquema y
+probar el recorrido de API entre vecinos. No necesita Docker instalado en las laptops
+y no usa Aiven para las pruebas.
+
+La base MySQL de producción permanece en Aiven. Sus credenciales TLS se configuran
+solo en el entorno del backend en producción; el workflow no se conecta ni aplica
+migraciones a esa base. El frontend está alojado en AWS. El workflow dispara el hook de
+Render para la API; la publicación del frontend requiere configurar el servicio de AWS
+que usa el proyecto.
+
+Para habilitar el despliegue de la API tras un merge a `main`, crea un deploy hook del
+servicio backend en Render y guárdalo en GitHub, en **Settings → Secrets and variables → Actions**:
+
+- `RENDER_BACKEND_DEPLOY_HOOK`: hook del servicio de la API.
+
+Desactiva el auto-deploy directo de la API en Render para que el workflow la despliegue
+solo después de que compilaciones y pruebas pasen. Configura el auto-deploy de AWS desde
+`main` cuando confirmemos el servicio usado. Las migraciones de producción a Aiven se
+revisan y aplican por separado.
+
 ### Verificación sin conexión
 
 ```sh

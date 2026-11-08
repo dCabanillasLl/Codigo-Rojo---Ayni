@@ -154,10 +154,16 @@ try {
         continue;
       }
     }
-    if (source.name === '014_resenas_reciprocas.sql' && existing.length && existing[0].estado === 'iniciada') {
+    if (source.name === '014_resenas_reciprocas.sql' && (!existing.length || existing[0].estado === 'iniciada')) {
+      if (existing.length && !source.compatibleHashes.has(existing[0].checksum)) {
+        throw new Error(`${source.name}: el archivo cambió después de iniciarse; revisar antes de continuar.`);
+      }
+      if (!existing.length) {
+        await connection.execute("INSERT INTO ayni_schema_migrations(version,checksum,estado) VALUES (?,?,'iniciada')", [source.name, source.hash]);
+      }
       await completeReciprocalReviewMigration();
       await connection.execute("UPDATE ayni_schema_migrations SET checksum=?, estado='completada', aplicado_en=CURRENT_TIMESTAMP WHERE version=?", [source.hash, source.name]);
-      console.log(`Recuperada y completada: ${source.name}`);
+      console.log(`${existing.length ? 'Recuperada y completada' : 'Aplicada de forma segura'}: ${source.name}`);
       continue;
     }
     if (existing.length) {
