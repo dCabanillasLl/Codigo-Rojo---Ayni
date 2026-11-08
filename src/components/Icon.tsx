@@ -24,9 +24,13 @@ export type IconName =
   | "calendar"
   | "package"
   | "alert"
-  | "plus";
+  | "plus"
+  | "eye"
+  | "eyeOff";
 
 const paths: Record<IconName, React.ReactNode> = {
+  eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,
+  eyeOff: <><path d="m3 3 18 18M10.6 5.1A12 12 0 0 1 12 5c6.5 0 10 7 10 7a19 19 0 0 1-3 4M6.2 6.2A20 20 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.8-1.6M10 10a3 3 0 0 0 4 4"/></>,
   home: (
     <>
       <path d="m3 11 9-8 9 8" />

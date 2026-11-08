@@ -7,6 +7,7 @@ import { useRemote } from '../lib/hooks';
 import type { Reputation, User } from '../types';
 import { neighborRank } from '../lib/ranks';
 import { useLanguage, type Language } from '../lib/language';
+import PhoneField from '../components/PhoneField';
 
 export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBusy, signOutError }: { onLocation: () => void; onReviewHelp: () => void; onSignOut: () => void; signOutBusy: boolean; signOutError?: string }) {
   const { user, setUser, online } = useApp();
@@ -87,7 +88,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
             </>}
           </div>}
         </div>
-        <Field label="Teléfono para contacto (opcional)" hint="Para el enlace de WhatsApp, usa prefijo internacional; ejemplo: +51987654321."><input name="telefono" type="tel" maxLength={25} defaultValue={user.telefono || ''} placeholder="+51987654321"/></Field>
+        <PhoneField key={user.id} label="Celular para contacto (opcional)" defaultValue={user.telefono} hint="Se guardará con +51 para el enlace de WhatsApp."/>
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>Permitir que contacten mi teléfono por WhatsApp desde mis publicaciones</label>
         <p className="form-hint">El teléfono se oculta por defecto. Si lo haces público, cualquier persona que vea una publicación tuya podrá abrir un chat de WhatsApp.</p>
         <ErrorBox message={error}/>{success && <p className="success-message" role="status">{success}</p>}

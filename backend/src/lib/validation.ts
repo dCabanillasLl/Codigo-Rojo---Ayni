@@ -8,7 +8,9 @@ export const locationSchema = z.object({
 }).strict();
 export const passwordSchema = z.string().min(8, "Usa al menos 8 caracteres").max(72)
   .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "La contraseña excede los 72 bytes permitidos");
-export const phoneSchema = z.string().trim().regex(/^\+?[0-9]{8,15}$/, "Usa entre 8 y 15 dígitos, con prefijo internacional opcional");
+export const phoneSchema = z.string().trim()
+  .regex(/^(?:\+?51)?9[0-9]{8}$/, "Ingresa un celular peruano de 9 dígitos que empiece con 9; el prefijo es +51.")
+  .transform(value => `+51${value.slice(-9)}`);
 export const registerSchema = z.object({
   nombres: z.string().trim().min(2).max(80),
   apellidos: z.string().trim().min(2).max(100),

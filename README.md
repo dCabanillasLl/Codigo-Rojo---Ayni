@@ -250,6 +250,19 @@ npm --prefix backend run build
 npm --prefix backend test
 ```
 
+Los formularios de acceso y registro permiten mostrar u ocultar la contraseña con el
+icono del ojo. El registro exige repetirla y comprobar que ambas coincidan.
+En registro y perfil, el celular es opcional: el prefijo +51 aparece fijo y se ingresan
+nueve dígitos que empiecen con 9. Al pegar un número completo con +51, se separa el
+prefijo automáticamente. La API valida y guarda el celular en formato `+51987654321`.
+
+Para probar estos formularios en Chromium con datos ficticios, sin usar la base real:
+
+```sh
+npx playwright install chromium
+npm run test:account
+```
+
 ## Integración continua y despliegue
 
 `.github/workflows/ayni-ci-deploy.yml` valida cada pull request hacia `main` y cada

@@ -1674,6 +1674,30 @@ textarea:disabled {
   font-size: 0.9rem;
   font-weight: 700;
 }
+.password-control { position: relative; min-width: 0; }
+.form-field .password-control input { padding-right: 3.6rem; }
+.password-toggle {
+  position: absolute; right: 0.2rem; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 44px; height: 44px;
+  padding: 0; border: 0; border-radius: 0.6rem; background: transparent;
+  color: #526b5c; cursor: pointer; touch-action: manipulation;
+}
+.password-toggle:hover,
+.password-toggle[aria-pressed="true"] { color: #246344; background: #edf5ee; }
+.password-toggle:focus-visible { outline: 2px solid #357a50; outline-offset: 1px; }
+.phone-control {
+  display: flex; align-items: stretch; min-width: 0;
+  border: 1px solid #d9dfda; border-radius: 0.8rem; background: #fff;
+  overflow: hidden;
+}
+.phone-control:focus-within { outline: 2px solid #357a50; outline-offset: 2px; }
+.phone-prefix {
+  display: flex; align-items: center; flex: 0 0 auto;
+  padding: 0 0.85rem; border-right: 1px solid #d9dfda;
+  background: #f5f8f4; color: #33483d; font-size: 1rem; pointer-events: none;
+}
+.form-field .field-validation-error { color: #ad3434; }
+.form-field input[aria-invalid="true"] { border-color: #ad3434; }
 .form-stack {
   display: grid;
   gap: 1rem;
@@ -1705,6 +1729,10 @@ textarea:disabled {
 .form-field textarea,
 .modal-content textarea {
   min-height: 6rem;
+}
+.form-field .phone-control > input {
+  flex: 1 1 0%; width: 0; min-width: 0; padding: 0.7rem 0.85rem;
+  border: 0; border-radius: 0; outline: none; box-shadow: none;
 }
 .form-field small,
 .form-hint {
@@ -1751,10 +1779,12 @@ textarea:disabled {
 }
 .auth-form { display: grid; gap: 1rem; }
 .auth-form .form-field { gap: 0.5rem; }
-.auth-form .form-field > span { font-size: 0.9rem; }
+.auth-form .form-field > span,
+.auth-form .form-field > label { font-size: 0.9rem; }
 .auth-registration-form { gap: 1.15rem; }
 .auth-registration-form > .form-columns { gap: 0.85rem; }
-.auth-registration-form .form-field > span { font-size: 0.86rem; }
+.auth-registration-form .form-field > span,
+.auth-registration-form .form-field > label { font-size: 0.86rem; }
 .auth-registration-form .form-field input { min-height: 3.1rem; }
 .auth-registration-form > .consent-row { padding: 0.8rem 0.9rem; border: 1px solid #e3e9e1; border-radius: 0.85rem; background: #f8f8f2; }
 .auth-registration-form > .success-text { padding: 0.7rem 0.85rem; border-radius: 0.8rem; background: #eaf3e9; line-height: 1.45; }
