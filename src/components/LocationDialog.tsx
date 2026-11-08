@@ -6,10 +6,9 @@ import LocationPicker from './LocationPicker';
 import type { LocationDraft, User } from '../types';
 
 export function LocationDialog({ onClose, saveToProfile = false }: { onClose: () => void; saveToProfile?: boolean }) {
-  const { user, setUser, sectors, area, setArea, online, notify } = useApp();
+  const { user, setUser, postingSectorId, area, setArea, online, notify } = useApp();
   const profilePoint = user?.latitud != null && user.longitud != null ? { latitude: Number(user.latitud), longitude: Number(user.longitud) } : null;
   const [location, setLocation] = useState<LocationDraft>({ coordinates: saveToProfile ? profilePoint : area.coordinates || profilePoint, address: saveToProfile ? user?.direccion || '' : '' });
-  const [sectorId, setSectorId] = useState((saveToProfile ? user?.sectorId : area.sectorId) || user?.sectorId || '');
   const [radius, setRadius] = useState(area.radius);
   const [saveProfile, setSaveProfile] = useState(saveToProfile);
   const [busy, setBusy] = useState(false);
@@ -18,11 +17,11 @@ export function LocationDialog({ onClose, saveToProfile = false }: { onClose: ()
     event.preventDefault(); setBusy(true); setError('');
     try {
       if (saveProfile && user) {
-        if (!sectorId || !location.coordinates) throw new Error('Elige tu comunidad y un punto antes de guardarlo en tu perfil.');
-        const updated = await api<User>('/auth/me', { method: 'PATCH', body: { sectorId, direccion: location.address.trim() || 'Punto elegido en el mapa', latitud: location.coordinates.latitude, longitud: location.coordinates.longitude } });
+        if (!postingSectorId || !location.coordinates) throw new Error('Elige un punto antes de guardarlo en tu perfil.');
+        const updated = await api<User>('/auth/me', { method: 'PATCH', body: { sectorId: postingSectorId, direccion: location.address.trim() || 'Punto elegido en el mapa', latitud: location.coordinates.latitude, longitud: location.coordinates.longitude } });
         setUser(updated);
       }
-      setArea({ sectorId, coordinates: location.coordinates, radius }); refreshData();
+      setArea({ coordinates: location.coordinates, radius }); refreshData();
       notify(saveProfile ? 'Ubicación guardada en tu perfil. La dirección exacta es privada.' : 'Zona de búsqueda actualizada. Ya puedes explorar a tus vecinos.');
       onClose();
     } catch (cause) { setError(errorMessage(cause)); }
@@ -31,14 +30,13 @@ export function LocationDialog({ onClose, saveToProfile = false }: { onClose: ()
   return <Modal title="Elige tu ubicación" onClose={onClose} wide>
     <p className="form-intro">Busca servicios y pedidos cerca de un punto. También puedes guardar tu ubicación en el perfil para usarla en tus próximas publicaciones.</p>
     <form className="form-stack location-form" onSubmit={save}>
-      <Field label="Comunidad"><select value={sectorId} onChange={event => setSectorId(event.target.value)} required><option value="" disabled>Elige tu comunidad</option>{sectors.data?.map(sector => <option key={sector.id} value={sector.id}>{sector.distrito} · {sector.nombre}</option>)}</select></Field>
       <LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/>
-      {location.coordinates && <button type="button" className="text-action" onClick={() => { setLocation({ coordinates: null, address: '' }); setSaveProfile(false); }}>Consultar solo mi comunidad, sin filtrar por distancia</button>}
+      {location.coordinates && <button type="button" className="text-action" onClick={() => { setLocation({ coordinates: null, address: '' }); setSaveProfile(false); }}>Ver todas las publicaciones, sin filtrar por distancia</button>}
       <Field label="Distancia de búsqueda"><select value={radius} onChange={event => setRadius(Number(event.target.value))}>{[1000, 1500, 2000].map(value => <option key={value} value={value}>{value / 1000} km a la redonda</option>)}</select></Field>
       {user && <label className="check-field"><input type="checkbox" checked={saveProfile} onChange={event => setSaveProfile(event.target.checked)}/>Guardar también como mi ubicación en el perfil</label>}
-      <p className="form-hint">Otros vecinos verán una zona aproximada. Si eliges solo una comunidad, podrás consultar sus publicaciones sin filtrar por distancia.</p>
+      <p className="form-hint">Otros vecinos verán una zona aproximada. Sin un punto elegido, puedes consultar las publicaciones sin filtrar por distancia.</p>
       <ErrorBox message={error}/>
-      <button type="submit" className="record-button justify-center" disabled={busy || !sectorId || (saveProfile && (!online || !location.coordinates))}>{busy ? 'Guardando…' : 'Usar esta ubicación'}</button>
+      <button type="submit" className="record-button justify-center" disabled={busy || (saveProfile && (!postingSectorId || !online || !location.coordinates))}>{busy ? 'Guardando…' : 'Usar esta ubicación'}</button>
     </form>
   </Modal>;
 }

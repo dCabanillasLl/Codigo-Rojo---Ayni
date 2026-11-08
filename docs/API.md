@@ -104,6 +104,11 @@ Los listados devuelven arrays, máximo 100 registros. Filtros comunes: `q`, `sec
 1000). Coordenadas siempre juntas; bounding box y distancia geográfica se calculan
 en servidor. `distanciaMetros` se redondea a 50 m y es null cuando no se conoce.
 Los filtros de sector y radio se combinan si se proporcionan ambos.
+La interfaz no muestra selectores de comunidad o sector ni envía `sectorId` en las
+búsquedas. Usa coordenadas y radio, o consulta sin filtro geográfico cuando no hay
+un punto elegido. Los campos de sector se conservan por compatibilidad con los datos
+existentes: al crear se usa la asociación del perfil o la zona base configurada y al
+editar una publicación se mantiene su asociación anterior.
 `mios=1` exige sesión y permite consultar estados no publicados propios.
 
 ## Publicaciones

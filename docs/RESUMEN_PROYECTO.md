@@ -49,7 +49,10 @@ que tenías antes de abrir la ventana.
 Se guarda en tu perfil para buscar cerca de ti desde el inicio; seleccionar el punto
 es opcional si prefieres registrarte únicamente con una referencia escrita.
 Las publicaciones sin coordenadas no pueden mostrarse como puntos ni calcular su
-cercanía, pero siguen apareciendo en las tarjetas cuando se consulta por comunidad.
+cercanía, pero siguen apareciendo en las tarjetas cuando se consulta sin distancia.
+No hay que elegir comunidad ni sector en ningún formulario. Las búsquedas usan el
+punto del mapa y el radio elegido; sin ubicación se muestran las publicaciones sin
+filtro geográfico. Los vínculos internos de datos existentes se conservan automáticamente.
 
 ## Ejemplo
 

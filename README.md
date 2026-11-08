@@ -102,15 +102,17 @@ publicaciones. Las demás rutas conservan el límite de 64 KB.
   También puedes registrarte solo con una referencia escrita. Al escribir una calle
   aparecen sugerencias; al elegir un punto o usar GPS se completa una dirección
   aproximada que puedes revisar y corregir antes de crear la cuenta.
-- En **Tu zona**, elige una comunidad y usa GPS, busca una dirección en Perú o
+- En **Tu zona**, usa GPS, busca una dirección en Perú o
   selecciona un punto en el mapa. El GPS requiere permiso y HTTPS o localhost.
   Con teclado, enfoca el mapa, mueve el centro con las flechas y pulsa Enter.
-- El punto de búsqueda filtra servicios y pedidos dentro de la comunidad y un
-  radio de 1, 1.5 o 2 km. Puedes consultar solo la comunidad, sin radio.
+- El punto de búsqueda filtra servicios y pedidos dentro de un
+  radio de 1, 1.5 o 2 km, sin restringir por comunidad o sector.
+  Sin un punto elegido, se consulta sin filtro geográfico. Los formularios no piden
+  comunidad ni sector; las asociaciones existentes de la base se conservan internamente.
   Buscar en otro lugar no cambia el perfil; la casilla de guardado lo hace explícito.
 - Al crear un pedido u ofrecer un producto o servicio puedes elegir otro punto
   propio de esa publicación. Si lo omites, se usa tu ubicación de perfil cuando
-  pertenece a la misma comunidad. Los pedidos offline conservan el punto elegido.
+  está disponible. Los pedidos offline conservan el punto elegido.
 - **Cerca de mí** conserva el diseño con saludo, ubicación, buscador y filtros.
   El mapa de productos y servicios aparece dentro de un bloque con bordes redondeados,
   y debajo se muestran las tarjetas de todos los productos y servicios de la búsqueda.
@@ -152,7 +154,7 @@ y [búsqueda](https://operations.osmfoundation.org/policies/nominatim/) antes de
 ### Colaboración entre vecinos
 
 1. Registrar dos vecinos en dos perfiles distintos del navegador (o uno normal y otro
-   privado). Elegir sector; compartir ubicación es opcional.
+   privado). Compartir ubicación es opcional; no se solicita elegir un sector.
 2. Con el primero, publicar un servicio o producto y una solicitud de ayuda.
 3. Con el segundo, encontrar el pedido y describir qué aporte puede realizar.
 4. El solicitante acepta. Pueden aceptarse varios colaboradores.

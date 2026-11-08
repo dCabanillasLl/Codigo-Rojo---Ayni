@@ -13,7 +13,7 @@ const homeActions: Array<MessageAction & { description: string }> = [
   { key: 'nearby', label: 'Buscar cerca', description: 'Productos y servicios del barrio', icon: 'search' },
   { key: 'ask', label: 'Pedir ayuda', description: 'Cuenta qué necesitas', icon: 'hands' },
   { key: 'offer', label: 'Ofrecer ayuda', description: 'Apoya a un vecino', icon: 'heart' },
-  { key: 'notices', label: 'Ver avisos', description: 'Novedades de la comunidad', icon: 'megaphone' },
+  { key: 'notices', label: 'Ver avisos', description: 'Novedades del barrio', icon: 'megaphone' },
   { key: 'location', label: 'Configurar ubicación', description: 'Mejora lo que ves cerca', icon: 'pin' },
   { key: 'tutorial', label: 'Enséñame AYNI', description: 'Guía rápida en 4 pasos', icon: 'check' },
 ];
