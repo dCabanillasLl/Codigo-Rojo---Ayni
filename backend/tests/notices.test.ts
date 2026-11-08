@@ -11,11 +11,25 @@ import { defaultJson } from '../src/middlewares/json.js';
 import { protectMutations } from '../src/middlewares/security.js';
 import { errorHandler } from '../src/middlewares/errors.js';
 import { noticeExpired, validateNoticeDates } from '../src/lib/notices.js';
-import { noticeVisible, localDateTimeInput } from '../../src/lib/notices.js';
+import { noticeStatus, noticeVisible, localDateTimeInput } from '../../src/lib/notices.js';
 
 after(async () => { await pool.end(); });
 const origin = 'http://localhost:8444';
 const headers = { Origin: origin, 'X-AYNI-Client': 'web', 'X-Test-User': '1' };
+
+test('las etiquetas distinguen postergaciones y priorizan cancelación o vencimiento sobre cambios anteriores', () => {
+  const now = Date.parse('2030-01-01T00:00:00Z');
+  const item = { estado: 'publicado', fechaEvento: '2030-02-01T00:00:00Z', venceEn: null, revisionEvento: 0, ultimoCambioEvento: null as string | null };
+  assert.equal(noticeStatus(item, now).label, 'VIGENTE');
+  const postponed = { ...item, revisionEvento: 1, ultimoCambioEvento: 'postergado' };
+  assert.equal(noticeStatus(postponed, now).label, 'POSTERGADO');
+  assert.equal(noticeStatus({ ...postponed, estado: 'cancelado' }, now).label, 'CANCELADO');
+  assert.equal(noticeStatus(postponed, Date.parse(item.fechaEvento)).label, 'VENCIDO');
+  assert.equal(noticeStatus({ ...postponed, venceEn: '2029-12-31T23:00:00Z' }, now).label, 'VENCIDO');
+  assert.equal(noticeStatus({ ...postponed, ultimoCambioEvento: 'reprogramado' }, now).label, 'REPROGRAMADO');
+  assert.equal(noticeStatus({ ...postponed, ultimoCambioEvento: null }, now).label, 'ACTUALIZADO');
+  assert.equal(noticeStatus({ ...item, estado: 'borrador' }, now).label, 'BORRADOR');
+});
 
 test('los avisos vencen exactamente en la fecha de actividad o en un vencimiento anterior, también en caché', () => {
   const date = '2030-01-10T15:30:00-05:00';
