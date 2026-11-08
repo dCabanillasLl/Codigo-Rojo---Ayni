@@ -21,11 +21,11 @@ export function listingSymbol(item: { categoria?: string; titulo?: string; urgen
   const topic = normalize(`${item.categoria || ''} ${item.titulo || ''}`);
   if (/\b(bicicleta\w*|bici\w*|ciclismo)\b/.test(topic)) return 'bicycle';
   if (/\b(mascota\w*|perro\w*|gato\w*|veterinari\w*)\b/.test(topic)) return 'animals';
-  if (/\b(alimento\w*|comida\w*|pan|panes|arroz|cocina\w*|desayuno\w*)\b/.test(topic)) return 'food';
-  if (/\b(reparaci\w*|herramienta\w*|gasfiter\w*|escalera\w*|taladro\w*|carpinter\w*|electricista\w*)\b/.test(topic)) return 'repair';
+  if (/\b(alimento\w*|comida\w*|pan|panes|arroz|cafe\w*|azucar|leche|cocina\w*|desayuno\w*|mercado)\b/.test(topic)) return 'food';
+  if (/\b(reparaci\w*|herramienta\w*|gasfiter\w*|escalera\w*|taladro\w*|carpinter\w*|electricista\w*|fosforo\w*|foco\w*|linterna\w*)\b/.test(topic)) return 'repair';
   if (/\b(clase\w*|aprendiz\w*|ensen\w*|profesor\w*|matematica\w*|libro\w*)\b/.test(topic)) return 'learning';
   if (/\b(tecnologia|computador\w*|laptop\w*|celular\w*)\b/.test(topic)) return 'technology';
-  if (/\b(hogar|mueble\w*|limpieza)\b/.test(topic)) return 'home';
+  if (/\b(hogar|mueble\w*|limpieza|mudanza\w*|mudarse|traslado\w*)\b/.test(topic)) return 'home';
   if (/\b(donacion\w*|donar|regalo\w*)\b/.test(topic)) return 'donation';
   if (/\b(prestamo\w*|intercambio\w*)\b/.test(topic)) return 'exchange';
   return kind;

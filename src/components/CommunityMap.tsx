@@ -121,14 +121,21 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     const pinById = new Map(pins.map(pin => [pin.id, pin]));
     layout.forEach(position => {
       const pin = pinById.get(position.id)!;
-      const displayPoint = instance.containerPointToLatLng([position.x, position.y]);
+      let displayPoint = instance.containerPointToLatLng([position.x, position.y]);
+      let displaced = position.displaced;
+      const anchorPoint = L.latLng(pin.point.latitude, pin.point.longitude);
+      // Keep spread-out pins inside the same radius fence as their real map point.
+      if (radius && origin && L.latLng(origin.latitude, origin.longitude).distanceTo(displayPoint) > radius) {
+        displayPoint = anchorPoint;
+        displaced = false;
+      }
       const selected = pin.id === selectedId;
       const kind = pin.kind || 'service', symbol = pin.symbol || kind;
-      if (position.displaced) {
+      if (displaced) {
         L.polyline([[pin.point.latitude, pin.point.longitude], displayPoint], { color: '#687c70', weight: 1.5, opacity: 0.65, dashArray: '3 4', interactive: false }).addTo(group);
         L.circleMarker([pin.point.latitude, pin.point.longitude], { radius: 3, color: '#fff', fillColor: '#687c70', fillOpacity: 1, weight: 1, interactive: false }).addTo(group);
       }
-      const icon = L.divIcon({ className: `community-pin ${kind}-pin ${symbol === 'urgent' ? 'urgent-pin' : ''} ${selected ? 'is-selected' : ''}`, html: markerHtml(kind, symbol), iconSize: [40, 46], iconAnchor: [20, 43] });
+      const icon = L.divIcon({ className: `community-pin ${kind}-pin symbol-${symbol} ${symbol === 'urgent' ? 'urgent-pin' : ''} ${selected ? 'is-selected' : ''}`, html: markerHtml(kind, symbol), iconSize: [40, 46], iconAnchor: [20, 43] });
       const name = `${kindLabels[kind]} · ${pin.category || mapSymbols[symbol].label}: ${pin.title}`;
       const marker = L.marker(displayPoint, { icon, title: name, alt: name, keyboard: true, riseOnHover: true, zIndexOffset: selected ? 500 : 0 });
       const text = document.createElement('span'); text.textContent = name;

@@ -17,7 +17,7 @@ const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHe
 const dummyHash = bcrypt.hashSync("ayni-only-used-for-login-timing", 12);
 
 export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u.apellidos, u.correo, u.telefono,
-  u.telefono_publico AS telefonoPublico,
+  u.notificaciones_correo AS notificacionesCorreo, u.telefono_publico AS telefonoPublico,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
   l.direccion AS direccion, l.latitud AS latitud, l.longitud AS longitud
   FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
@@ -87,8 +87,8 @@ router.get("/auth/me", requireAuth, asyncHandler(async (req, res) => {
 
 router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   const body = z.object({
-    nombres: z.string().trim().min(2).max(80).optional(),
-    apellidos: z.string().trim().min(2).max(100).optional(),
+    correo: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable().optional(),
+    notificacionesCorreo: z.boolean().optional(),
     telefono: phoneSchema.nullable().optional(),
     telefonoPublico: z.boolean().optional(),
     sectorId: idSchema.optional(),
@@ -99,20 +99,32 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     .refine((value) => (value.latitud === undefined) === (value.longitud === undefined), "Proporciona ambas coordenadas")
     .parse(req.body);
   await transaction(async (connection) => {
-    const [locked] = await connection.execute<RowDataPacket[]>(`SELECT u.usuario_id, u.telefono,
+    const [locked] = await connection.execute<RowDataPacket[]>(`SELECT u.usuario_id, u.telefono, u.correo, u.notificaciones_correo,
       CAST(l.sector_id AS CHAR) AS sector_id, l.direccion, l.latitud, l.longitud
       FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
       WHERE u.usuario_id = ? AND u.estado_cuenta = 'activo' FOR UPDATE`, [req.userId]);
     if (!locked.length) throw new AppError(401, "UNAUTHENTICATED", "Inicia sesión para continuar.");
     const resultingPhone = body.telefono !== undefined ? body.telefono : locked[0].telefono;
+    const resultingEmail = body.correo !== undefined ? body.correo : locked[0].correo;
+    const wantsEmailNotifications = body.notificacionesCorreo ?? Boolean(locked[0].notificaciones_correo);
+    if (wantsEmailNotifications && !resultingEmail) throw new AppError(400, "EMAIL_REQUIRED_FOR_NOTIFICATIONS", "Añade un correo electrónico para activar los avisos.");
+    if (body.correo) {
+      const [existingEmail] = await connection.execute<RowDataPacket[]>(
+        "SELECT usuario_id FROM usuarios WHERE correo = ? AND usuario_id <> ? LIMIT 1 FOR UPDATE", [body.correo, req.userId]);
+      if (existingEmail.length) throw new AppError(409, "EMAIL_ALREADY_REGISTERED", "Ese correo ya está asociado a otra cuenta.");
+    }
     if (body.telefonoPublico === true && !resultingPhone) throw new AppError(400, "PHONE_REQUIRED", "Añade un teléfono antes de mostrarlo como contacto.");
     if (body.telefonoPublico === true && !/^\+[1-9]\d{7,14}$/.test(String(resultingPhone))) {
       throw new AppError(400, "PHONE_INTERNATIONAL_FORMAT_REQUIRED", "Para crear el enlace de WhatsApp, guarda el teléfono con prefijo internacional, por ejemplo +51987654321.");
     }
     const fields: string[] = [];
     const values: unknown[] = [];
-    for (const key of ["nombres", "apellidos", "telefono"] as const) {
+    for (const key of ["correo", "telefono"] as const) {
       if (body[key] !== undefined) { fields.push(`${key} = ?`); values.push(body[key]); }
+    }
+    if (body.notificacionesCorreo !== undefined || body.correo === null) {
+      fields.push("notificaciones_correo = ?");
+      values.push(body.correo === null ? false : body.notificacionesCorreo ?? false);
     }
     if (body.telefonoPublico !== undefined || body.telefono === null) {
       fields.push("telefono_publico = ?");

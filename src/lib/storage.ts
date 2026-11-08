@@ -4,7 +4,7 @@ import sqliteWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 
 type CacheRecord<T> = { key: string; data: T; savedAt: string };
 export type PendingRequest = { id: string; ownerId: string; body: RequestInput; createdAt: string; error?: string; blocked?: boolean };
-export type AppNotification = { id: string; text: string; createdAt: string; read: boolean };
+export type AppNotification = { id: string; ownerId: string; text: string; createdAt: string; read: boolean; avisoId?: string | null };
 let database: Promise<IDBDatabase> | undefined;
 function openDatabase() {
   if (!database) database = new Promise<IDBDatabase>((resolve, reject) => {
@@ -33,6 +33,25 @@ async function operation<T>(store: 'cache' | 'pending', mode: IDBTransactionMode
 }
 export async function cacheRead<T>(key: string) { return operation<CacheRecord<T> | undefined>('cache', 'readonly', store => store.get(key)); }
 export async function cacheWrite<T>(key: string, data: T) { await operation('cache', 'readwrite', store => store.put({ key, data, savedAt: new Date().toISOString() })); }
+export async function forgetNoticeCache(ownerId: string, noticeId: string) {
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction('cache', 'readwrite');
+    const cursor = transaction.objectStore('cache').openCursor();
+    cursor.onsuccess = () => {
+      const entry = cursor.result; if (!entry) return;
+      const record = entry.value as CacheRecord<unknown>;
+      const prefixes = [`${ownerId}:/avisos`, 'public:/avisos'];
+      const prefix = prefixes.find(value => record.key === value || record.key.startsWith(`${value}?`) || record.key.startsWith(`${value}/`));
+      if (prefix && Array.isArray(record.data)) entry.update({ ...record, data: record.data.filter(item => item?.id !== noticeId) });
+      else if (prefix && record.key.split('?')[0] === `${prefix}/${noticeId}`) entry.delete();
+      entry.continue();
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(new Error('No se pudo actualizar la caché local.'));
+    transaction.onabort = transaction.onerror;
+  });
+}
 
 let sqliteFileDatabase: Promise<IDBDatabase> | undefined;
 let sqlite: Promise<Database> | undefined;
@@ -76,8 +95,16 @@ function openSqlite() {
       created_at TEXT NOT NULL, blocked INTEGER NOT NULL DEFAULT 0
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY, text TEXT NOT NULL, created_at TEXT NOT NULL, is_read INTEGER NOT NULL DEFAULT 0
+      id TEXT PRIMARY KEY, owner_id TEXT NOT NULL DEFAULT '', text TEXT NOT NULL,
+      created_at TEXT NOT NULL, is_read INTEGER NOT NULL DEFAULT 0
     )`);
+    // Keep histories from the shared device private. Legacy rows have no safe owner,
+    // so leave them unassigned and never display them to an account.
+    const notificationColumns = rows<{ name: string }>(db, 'PRAGMA table_info(notifications)');
+    if (!notificationColumns.some(column => column.name === 'owner_id')) {
+      db.run("ALTER TABLE notifications ADD COLUMN owner_id TEXT NOT NULL DEFAULT ''");
+      await persist(db);
+    }
     // Move any requests saved by the previous IndexedDB queue into SQLite once.
     const legacy = await operation<PendingRequest[]>('pending', 'readonly', store => store.getAll());
     if (legacy.length) {
@@ -123,13 +150,13 @@ export async function pendingSave(record: PendingRequest) {
 }
 export async function pendingDelete(id: string) { await write(db => db.run('DELETE FROM pending_requests WHERE id = ?', [id])); }
 export async function saveNotification(notification: AppNotification) {
-  await write(db => db.run(`INSERT INTO notifications (id, text, created_at, is_read) VALUES (?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET text=excluded.text, created_at=excluded.created_at, is_read=excluded.is_read`,
-  [notification.id, notification.text, notification.createdAt, notification.read ? 1 : 0]));
+  await write(db => db.run(`INSERT INTO notifications (id, owner_id, text, created_at, is_read) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET owner_id=excluded.owner_id, text=excluded.text, created_at=excluded.created_at, is_read=excluded.is_read`,
+  [notification.id, notification.ownerId, notification.text, notification.createdAt, notification.read ? 1 : 0]));
 }
-export async function notificationList() {
-  return read(db => rows<{ id: string; text: string; created_at: string; is_read: number }>(db,
-    'SELECT id, text, created_at, is_read FROM notifications ORDER BY created_at DESC LIMIT 100')
-    .map(item => ({ id: item.id, text: item.text, createdAt: item.created_at, read: item.is_read === 1 })));
+export async function notificationList(ownerId: string) {
+  return read(db => rows<{ id: string; owner_id: string; text: string; created_at: string; is_read: number }>(db,
+    'SELECT id, owner_id, text, created_at, is_read FROM notifications WHERE owner_id = ? ORDER BY created_at DESC LIMIT 100', [ownerId])
+    .map(item => ({ id: item.id, ownerId: item.owner_id, text: item.text, createdAt: item.created_at, read: item.is_read === 1 })));
 }
-export async function markNotificationsRead() { await write(db => db.run('UPDATE notifications SET is_read = 1 WHERE is_read = 0')); }
+export async function markNotificationsRead(ownerId: string) { await write(db => db.run('UPDATE notifications SET is_read = 1 WHERE owner_id = ? AND is_read = 0', [ownerId])); }

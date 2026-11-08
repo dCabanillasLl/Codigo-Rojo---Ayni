@@ -88,7 +88,80 @@ publicación; no necesita archivos locales persistentes ni un servicio externo d
 La publicación y la foto se guardan en la misma transacción. No se modifican fotos de
 otros vecinos y las imágenes de publicaciones no públicas solo son accesibles por su dueño.
 El proxy de producción debe permitir cuerpos JSON de hasta 8 MB en POST/PATCH de
-publicaciones. Las demás rutas conservan el límite de 64 KB.
+publicaciones y avisos. Las demás rutas conservan el límite de 64 KB.
+
+### Flyers y vigencia de avisos
+
+En **Crear aviso** puedes subir un flyer JPG, PNG o WebP de hasta 5 MB, con vista
+previa y opción para quitarlo antes de publicar. La tarjeta muestra el flyer completo
+sin recortarlo y permite abrirlo en otra pestaña. La carga es opcional.
+La migración `007_fotos_avisos.sql` añade el almacenamiento de imágenes normalizadas
+con las mismas validaciones de las fotos de productos; los enlaces externos existentes
+siguen funcionando.
+
+Los avisos nuevos requieren fecha y hora futuras en la hora local del dispositivo.
+Al llegar ese momento dejan de aparecer públicamente y su estado devuelto pasa a
+`vencido`; no se elimina el registro. Si existe un `venceEn` anterior, se retira antes.
+La API controla la vigencia en listados, detalles e imágenes. La pantalla también
+retira los avisos que vencen mientras permanece abierta o al volver del segundo plano,
+incluidos los datos guardados sin conexión. No necesita cron ni un servidor de tareas.
+Los avisos antiguos sin ninguna fecha conservan su visibilidad hasta que su autor
+configure una fecha o los cancele; no se les asigna una fecha inventada.
+
+### Confirmación de asistencia y cambios de actividad
+
+Al crear un aviso, **Lugar de la actividad** permite elegir una sugerencia de dirección
+o abrir un mapa en una ventana con GPS, pin arrastrable y zoom táctil. El mapa no
+ocupa espacio permanente en el formulario. Confirmar copia la selección; volver
+conserva el lugar anterior y los demás campos. El punto es obligatorio para publicar
+un aviso nuevo y se guarda como una ubicación independiente del perfil.
+
+El lugar y la referencia seleccionados serán públicos; el formulario lo indica antes
+de publicar. La tarjeta muestra la dirección y **Ver ubicación**, con acceso a Google
+Maps. La migración `010_ubicacion_publica_actividades.sql` diferencia ese lugar de las
+ubicaciones privadas: las referencias heredadas por avisos antiguos no se publican
+automáticamente. Cambiar después el punto por API notifica a los asistentes confirmados.
+
+El organizador dispone de **Editar actividad o ubicación** en sus tarjetas. El
+formulario carga título, descripción, categoría, flyer, fecha y lugar actuales. Puede
+reemplazar o quitar el flyer y cambiar el lugar con el mismo selector de mapa.
+Guardar envía únicamente los campos modificados: editar texto no borra la foto,
+el lugar ni cambia una fecha pasada; volver o cerrar descarta los cambios pendientes.
+Los cambios de fecha o ubicación notifican a los asistentes confirmados. Cambiar la
+fecha exige una fecha futura y elimina el vencimiento anterior. Una actividad cancelada
+no permite edición: el organizador puede eliminarla permanentemente. Un control de revisión evita sobrescribir otra edición:
+si la actividad cambió, cerrar y abrir de nuevo el formulario carga la versión actual.
+
+Los avisos cancelados no muestran **Compartir por WhatsApp**. Solo su organizador
+ve **Eliminar permanentemente**, que requiere confirmar que la acción no se puede
+deshacer. Se elimina el registro, su flyer y la asistencia; también el lugar público
+si ya no lo utiliza ningún otro registro. Nunca se borra una ubicación privada del
+perfil. La migración `011_notificaciones_actividades_eliminadas.sql` conserva las
+notificaciones pendientes con referencia nula, para que la cancelación llegue a los
+asistentes al reconectarse. No se borran actividades reales al aplicar la migración.
+El cliente actualiza su lista y su caché local al eliminar.
+
+Los vecinos con sesión pueden marcar **Asistiré** o retirar su confirmación. Las
+tarjetas muestran el total de confirmaciones, sin publicar nombres de los asistentes.
+**Mis asistencias** permite seguir las actividades confirmadas, incluidas las que
+posteriormente se cancelaron o vencieron. **Mis actividades** muestra al organizador
+sus avisos y el botón **Postergar o cancelar**. El organizador decide qué hacer según
+la participación; no hay un umbral que cancele actividades automáticamente.
+
+Para postergar se exige una fecha futura posterior a la original y un motivo. Se
+conservan las confirmaciones, que los vecinos pueden retirar, y el vencimiento anterior
+se sustituye por la nueva fecha. Para cancelar también se solicita el motivo y la
+actividad se retira del listado público. Ambos cambios notifican a quienes siguen
+confirmados, incluidos los cambios de fecha/estado realizados mediante PATCH.
+
+La migración `008_asistencia_avisos_notificaciones.sql` guarda confirmaciones y
+notificaciones por usuario. El cambio y sus notificaciones son transaccionales;
+reintentar la misma operación no duplica confirmaciones ni notificaciones.
+La campana consulta las novedades cada 20 segundos mientras la app está visible y
+al recuperar conexión o volver a la app. Las notificaciones pendientes se conservan
+en el servidor y la caché se separa por cuenta. Se entregan dentro de AYNI, sin push
+del sistema operativo, correo ni WhatsApp. No se necesita mantener la app abierta
+para conservar una notificación pendiente, pero sí abrirla con conexión para recibirla.
 
 ### Ubicación y mapa comunitario
 
@@ -131,7 +204,7 @@ publicaciones. Las demás rutas conservan el límite de 64 KB.
   los símbolos. Cada detalle permite abrir la zona en Google Maps. Las publicaciones
   sin coordenadas no aparecen como puntos; se indica su cantidad sobre el mapa.
   Un filtro por distancia requiere coordenadas. Puedes añadirlas al editar un servicio.
-- La API pública entrega `mapaLatitud` y `mapaLongitud` redondeadas a tres decimales
+- Para productos, servicios y pedidos, la API pública entrega `mapaLatitud` y `mapaLongitud` redondeadas a tres decimales
   (una cuadrícula de aproximadamente 110 m), nunca el punto exacto ni la referencia
   privada. La distancia se calcula con el punto privado y se redondea a 50 m.
 
@@ -188,7 +261,9 @@ limpieza destructiva automática.
 - JWT de duración limitada en cookie HttpOnly; no se guardan tokens en localStorage.
   Las mutaciones validan origen y cabecera propia. La cola también comprueba el usuario
   esperado para impedir publicar borradores de otra cuenta.
-- Las ubicaciones exactas son privadas. La API devuelve sector y distancia redondeada;
+- Las ubicaciones exactas del perfil y de productos, servicios y pedidos son privadas.
+  El lugar que el organizador elige explícitamente para una actividad sí es público.
+  Para las ubicaciones privadas, la API devuelve sector y distancia redondeada;
   el mapa muestra una zona aproximada, no el domicilio de un vecino.
 - La cola y caché usan IndexedDB porque este proyecto es web. No se migró a React Native
   ni se añadió SQLite. Publicado significa persistido y confirmado por el servidor.

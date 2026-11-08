@@ -6,9 +6,9 @@ import AddressAutocomplete, { type AddressSuggestion } from './AddressAutocomple
 import Icon from './Icon';
 import { ErrorBox, Field } from './UI';
 
-export default function LocationPicker({ value, onChange, online, disabled = false, initialCenter, addressField, onBusyChange }: {
+export default function LocationPicker({ value, onChange, online, disabled = false, initialCenter, addressField, onBusyChange, publicVenue = false }: {
   value: LocationDraft; onChange: (value: LocationDraft) => void; online: boolean; disabled?: boolean; initialCenter?: Coordinates | null;
-  addressField?: { label: string; name: string; required?: boolean }; onBusyChange?: (busy: boolean) => void;
+  addressField?: { label: string; name: string; required?: boolean }; onBusyChange?: (busy: boolean) => void; publicVenue?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [suggesting, setSuggesting] = useState(false);
@@ -19,9 +19,11 @@ export default function LocationPicker({ value, onChange, online, disabled = fal
   const [message, setMessage] = useState('');
   const controller = useRef<AbortController | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const geoTimer = useRef<number | undefined>(undefined);
+  const geoWatch = useRef<number | undefined>(undefined);
   const sequence = useRef(0);
   const current = useRef({ value, onChange, disabled }); current.current = { value, onChange, disabled };
-  useEffect(() => () => { sequence.current++; controller.current?.abort(); window.clearTimeout(timer.current); }, []);
+  useEffect(() => () => { sequence.current++; controller.current?.abort(); window.clearTimeout(timer.current); window.clearTimeout(geoTimer.current); if (geoWatch.current !== undefined) navigator.geolocation?.clearWatch(geoWatch.current); }, []);
   useEffect(() => {
     if (!value.coordinates) {
       sequence.current++; controller.current?.abort(); window.clearTimeout(timer.current);
@@ -31,6 +33,8 @@ export default function LocationPicker({ value, onChange, online, disabled = fal
   useEffect(() => { onBusyChange?.(locating || suggesting || resolving); return () => onBusyChange?.(false); }, [locating, suggesting, resolving, onBusyChange]);
   function cancelLocation() {
     sequence.current++; controller.current?.abort(); window.clearTimeout(timer.current); setLocating(false); setResolving(false);
+    window.clearTimeout(geoTimer.current);
+    if (geoWatch.current !== undefined) { navigator.geolocation?.clearWatch(geoWatch.current); geoWatch.current = undefined; }
     return sequence.current;
   }
   function chooseAddress(place: AddressSuggestion) {
@@ -64,14 +68,29 @@ export default function LocationPicker({ value, onChange, online, disabled = fal
     if (!navigator.geolocation) { setError('Tu navegador no permite detectar ubicación. Puedes buscar una dirección o elegirla en el mapa.'); return; }
     if (!window.isSecureContext) { setError('El GPS necesita HTTPS o localhost. Puedes elegir el punto en el mapa.'); return; }
     const operation = cancelLocation(); setLocating(true); setError(''); setMessage('');
-    navigator.geolocation.getCurrentPosition(position => {
-      if (sequence.current !== operation) return;
-      pick({ latitude: position.coords.latitude, longitude: position.coords.longitude }, position.coords.accuracy);
+    let best: GeolocationPosition | null = null;
+    let finished = false;
+    const stopWatch = () => {
+      if (geoWatch.current !== undefined) { navigator.geolocation.clearWatch(geoWatch.current); geoWatch.current = undefined; }
+      window.clearTimeout(geoTimer.current); geoTimer.current = undefined;
+    };
+    const finish = (position: GeolocationPosition | null) => {
+      if (finished || sequence.current !== operation) return;
+      finished = true; stopWatch(); setLocating(false);
+      if (position) pick({ latitude: position.coords.latitude, longitude: position.coords.longitude }, position.coords.accuracy);
+      else setError('No pudimos obtener una ubicación precisa. Busca tu dirección o ajusta el pin en el mapa.');
+    };
+    geoWatch.current = navigator.geolocation.watchPosition(position => {
+      if (sequence.current !== operation || finished) return;
+      if (!best || position.coords.accuracy < best.coords.accuracy) best = position;
+      setMessage(`Buscando la mejor señal GPS… precisión actual ±${Math.max(1, Math.round(best.coords.accuracy))} m`);
+      if (best.coords.accuracy <= 15) finish(best);
     }, cause => {
-      if (sequence.current !== operation) return;
-      setLocating(false);
+      if (sequence.current !== operation || finished) return;
+      finished = true; stopWatch(); setLocating(false);
       setError(cause.code === 1 ? 'No se autorizó la ubicación. Puedes buscar una dirección o seleccionar el punto en el mapa.' : 'No pudimos detectar el GPS. Busca una dirección o elige el punto en el mapa.');
-    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+    }, { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });
+    geoTimer.current = window.setTimeout(() => finish(best), 12000);
   }
   return <div className="location-picker">
     <AddressAutocomplete label={addressField?.label || 'Buscar dirección o calle'} name={addressField?.name} required={addressField?.required} value={addressField ? value.address : query} onChange={addressField ? updateAddress : text => { cancelLocation(); setQuery(text); }} onSelect={chooseAddress} bias={value.coordinates || initialCenter} online={online} disabled={disabled} onBusyChange={setSuggesting}/>
@@ -82,7 +101,7 @@ export default function LocationPicker({ value, onChange, online, disabled = fal
     {resolving && <p className="success-text" role="status">Completando la dirección del punto seleccionado…</p>}
     <p className="form-hint">{value.coordinates ? `Punto seleccionado: ${value.coordinates.latitude.toFixed(5)}, ${value.coordinates.longitude.toFixed(5)}.` : 'Aún no hay un punto elegido.'} Con teclado: enfoca el mapa, muévelo con las flechas y pulsa Enter.</p>
     {accuracy != null && value.coordinates && <p className="location-accuracy" role="status">Precisión del GPS: aproximadamente ±{Math.max(1, Math.round(accuracy))} m.</p>}
-    {!addressField && <Field label="Dirección o referencia privada" hint="Se completa al elegir un punto. Puedes corregirla antes de guardar."><input value={value.address} onChange={event => updateAddress(event.target.value)} maxLength={255} placeholder="Calle, número o referencia" disabled={disabled}/></Field>}
+    {!addressField && <Field label={publicVenue ? 'Dirección o referencia de la actividad' : 'Dirección o referencia privada'} hint="Se completa al elegir un punto. Puedes corregirla antes de guardar."><input value={value.address} onChange={event => updateAddress(event.target.value)} maxLength={255} placeholder="Calle, número o referencia" disabled={disabled}/></Field>}
     {message && <p className="success-text" role="status">{message}</p>}
     <ErrorBox message={error}/>
   </div>;

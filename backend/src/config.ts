@@ -51,6 +51,8 @@ export const config = {
   jwtSecret,
   dniHashSecret,
   apiPeruKey: process.env.APIPERU_API_KEY ?? "",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  emailFrom: process.env.EMAIL_FROM ?? "",
   cookieSecure,
   trustProxy: bool(process.env.TRUST_PROXY),
   dbConfigured: Boolean(host && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME),

@@ -25,7 +25,7 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 | POST `/api/auth/login` | `{identificador: DNI,contrasena}` (la API mantiene compatibilidad con correo para clientes antiguos) → `{data: Usuario}` y cookie HttpOnly | 200 |
 | POST `/api/identity/dni/lookup` | `{dni,consentimiento:true}` → `{data:{nombres,apellidos,proof,venceEnSegundos}}`; devuelve solo nombres y apellidos, no dirección ni ubigeos. Máximo 8 consultas/15 min/IP. | 200 |
 | GET `/api/auth/me` | Sin cuerpo → `{data: Usuario}` de la sesión | 200 |
-| PATCH `/api/auth/me` | `{nombres?,apellidos?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
+| PATCH `/api/auth/me` | `{correo?,notificacionesCorreo?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
 | POST `/api/auth/logout` | `{}` → `{data:{cerrado:true}}`, elimina cookie | 200 |
 
 Usuario: `{id,nombres,apellidos,correo|null,telefono,telefonoPublico,sectorId,sectorNombre,direccion,latitud,longitud}`. Dirección y coordenadas solo se devuelven en las respuestas autenticadas de la propia cuenta; nunca se incluyen en listados o fichas vecinales. Correo y teléfono
@@ -47,6 +47,14 @@ dirección desde GPS usa BigDataCloud client-side; devuelve localidad aproximada
 Errores adicionales: `DNI_LOOKUP_NOT_CONFIGURED`,
 `DNI_PROVIDER_UNAVAILABLE`, `DNI_PROVIDER_AUTH_FAILED`, `DNI_NOT_FOUND`,
 `DNI_PROOF_INVALID`, `INVALID_DNI`.
+
+Nombres y apellidos se fijan con la consulta verificada del DNI y no se pueden modificar
+desde el perfil ni desde PATCH `/auth/me`. El correo es opcional y único. La preferencia
+`notificacionesCorreo` se activa explícitamente y requiere un correo válido. AYNI envía
+avisos cuando alguien ofrece ayuda, una propuesta cambia de estado, se marca una entrega
+o se confirma su recepción. Se necesita `RESEND_API_KEY`, un remitente verificado en
+Resend (`EMAIL_FROM`) y aplicar `008_notificaciones_correo.sql`; sin configuración del
+proveedor se guarda el perfil, pero no se entrega correo.
 
 ## Catálogos
 
@@ -154,18 +162,25 @@ Errores específicos: `PRICE_REQUIRED`, `INVALID_PRICE`, `INVALID_SECTOR`.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/api/solicitudes` | Filtros comunes; `participando=1` para colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
+| GET `/api/solicitudes` | Filtros comunes; excluye los pedidos propios del listado vecinal. `mios=1` consulta pedidos propios; `participando=1`, colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
 | POST `/api/solicitudes` | `{clientRequestId,categoriaId,sectorId,descripcion,titulo?,urgencia?}` → `{data: Solicitud}` | 201 o 200 si reintento |
 | GET `/api/solicitudes/:id` | Sin cuerpo → `{data: Solicitud}` | 200 |
 | PATCH `/api/solicitudes/:id` | `{accion:'completar'}` o `{accion:'cancelar',motivo}` → `{data: Solicitud}`; solo solicitante | 200 |
 
 Solicitud: `{id,solicitanteId,solicitante,categoriaId,categoria,sectorId,sectorNombre,
-titulo,descripcion,urgencia,estado,creadoEn,distanciaMetros,clientRequestId}`.
+titulo,descripcion,urgencia,estado,creadoEn,venceEn,distanciaMetros,clientRequestId}`.
 Urgencia `normal|urgente`; estados `abierta|en_curso|completada|cancelada|vencida`.
 La creación guarda UUID + huella del contenido: mismo usuario/UUID/contenido devuelve
 el original; distinto contenido produce 409. No se debe generar otro UUID al reintentar.
 Completar requiere resolver aportes aceptados pendientes de recepción; las propuestas
 pendientes se rechazan al cerrar. Cancelar requiere motivo.
+
+La vigencia se asigna automáticamente por categoría: apoyo urgente 24 horas, un favor
+3 días, y préstamos, donaciones e intercambios 7 días. Al vencer, un pedido abierto pasa
+a `vencida`, deja de aparecer en el mapa vecinal y sus propuestas pendientes se rechazan;
+el dueño puede consultar y cerrar su pedido desde `mios=1`. Si ya estaba `en_curso`, deja
+de aceptar nuevas ofertas y sale del listado público al vencer, pero las personas que ya
+acordaron la ayuda pueden terminarla y el dueño puede confirmar el resultado.
 
 El servidor genera el título a partir de la descripción. La categoría “Apoyo urgente” asigna
 la urgencia automáticamente. Se rechazan solicitudes que mencionen drogas, alcohol, dinero
@@ -226,13 +241,109 @@ Conflictos de inventario, UUID o estado devuelven 409.
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
 | GET `/api/avisos` | Filtros comunes; público solo vigentes publicados → `{data: Aviso[]}` | 200 |
-| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,imagenUrl?,fechaEvento?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
+| POST `/api/avisos` | `{categoriaId,titulo,contenido,sectorId,fechaEvento,ubicacion,foto?,imagenUrl?,venceEn?,estado?}` → `{data: Aviso}` | 201 |
 | GET `/api/avisos/:id` | Sin cuerpo → `{data: Aviso}` visible | 200 |
 | PATCH `/api/avisos/:id` | Campos editables → `{data: Aviso}` actualizado; solo autor | 200 |
+| GET `/api/avisos/:id/imagen?v=hash` | JPEG del flyer cargado, sujeto a visibilidad y vigencia | 200 |
 
 Aviso: `{id,autorId,autor,categoriaId,categoria,titulo,contenido,imagenUrl,estado,sectorId,
-sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` debe ser una URL HTTPS pública;
-se almacena la referencia, no se carga el archivo. Fechas ISO UTC o null.
+sectorNombre,distanciaMetros,fechaEvento,venceEn,creadoEn}`. `imagenUrl` en la respuesta
+puede ser una ruta `/api/avisos/:id/imagen?v=hash` o un enlace HTTPS anterior.
+`foto` recibe un data URI JPG, PNG o WebP de hasta 5 MB; se normaliza y almacena en
+MySQL mediante la migración 007. Omitirla al editar conserva la imagen; `null` la
+quita; una nueva reemplaza el flyer. También se conserva `imagenUrl` HTTPS como
+entrada compatible; no se pueden modificar archivo y enlace al mismo tiempo.
+POST/PATCH admiten JSON de hasta 8 MB después de autenticar, igual que publicaciones.
+
+`fechaEvento` es obligatoria y futura al crear (ISO con zona horaria); `venceEn` es
+opcional y, si se proporciona, también debe ser futuro. Se guardan como UTC. La
+primera de ambas fechas determina la retirada pública, incluso si el cliente consulta
+directamente el detalle o la imagen. Listados y detalle devuelven `Cache-Control:
+no-store`. El autor puede consultar el registro vencido y su imagen; los demás reciben
+404. El estado efectivo devuelto es `vencido`, sin borrar el registro ni requerir cron.
+Editar no permite quitar todas las fechas. Los avisos antiguos sin fechas se conservan.
+La interfaz filtra además avisos vencidos en su caché y al permanecer abierta.
+
+`ubicacion:{latitud,longitud,direccion?}` es obligatoria para crear un aviso nuevo.
+Ambas coordenadas deben ser numéricas, finitas y estar dentro de los límites
+geográficos; `direccion` admite hasta 255 caracteres. El servidor crea un lugar
+independiente y lo marca como público con la migración 010. No hereda ni modifica la
+dirección del perfil. Si falta el punto devuelve 400 `EVENT_LOCATION_REQUIRED`.
+
+Los avisos devuelven `direccionActividad`, `latitudActividad` y `longitudActividad`:
+son el lugar exacto elegido explícitamente para la actividad, visible en su tarjeta,
+mapa y enlace a Google Maps. Los tres son null en avisos anteriores cuya ubicación
+podría proceder del perfil privado. Se mantienen las restricciones de visibilidad
+del aviso: la ubicación no hace públicos los avisos cancelados o vencidos.
+
+PATCH admite `ubicacion` para cambiar el punto solo por el autor; cada cambio crea
+una ubicación nueva y notifica a los asistentes confirmados. Omitirla conserva el
+lugar anterior, incluso si se reenvía el mismo `sectorId`. Cambiar el sector interno
+exige un punto explícito para evitar heredar por error una ubicación de perfil.
+`ultimoCambioEvento:"ubicacion"` representa este cambio y se presenta como ACTUALIZADO.
+
+La interfaz de edición está disponible solo para el autor y envía únicamente los campos
+modificados. PATCH admite además `revisionEvento?:number` para comprobar la revisión
+que el usuario abrió: si no coincide, devuelve 409 `EVENT_CHANGED` sin guardar. Todas
+las ediciones incrementan la revisión, incluso texto o flyer; solo cambios de fecha,
+estado o ubicación generan notificaciones. Reenviar únicamente la revisión no es una
+edición válida. Omitir fecha, foto o ubicación los conserva sin modificar. Esto permite
+corregir el texto de actividades vencidas sin reactivarlas ni exigir una fecha nueva.
+Las actividades canceladas no admiten PATCH, ni siquiera del autor: devuelve 409
+`EVENT_CANCELLED`. No se permite modificar su lugar, texto, flyer o reactivarlas por
+edición. La interfaz oculta el acceso al editor y mantiene la eliminación permanente.
+
+`DELETE /api/avisos/:id` requiere sesión del autor y JSON
+`{confirmar:true,revisionEvento:number}`. Solo permite borrar registros en estado
+`cancelado`; en otro estado devuelve 409 `EVENT_NOT_CANCELLED`. Una revisión antigua
+devuelve 409 `EVENT_CHANGED`; otro usuario recibe 403. Devuelve
+`{data:{eliminado:true}}` y admite reintentos si el registro ya no existe.
+La protección de origen, cabecera propia y comprobación de `X-AYNI-User` también
+se aplican a DELETE; CORS incluye ese método.
+
+La eliminación es transaccional: borra la fila del aviso, el flyer y sus asistencias
+por cascada. Borra el lugar público solo si ningún perfil, producto, servicio, pedido,
+aviso o recurso lo referencia. No elimina ubicaciones privadas heredadas. La migración
+011 cambia la referencia de notificaciones a `ON DELETE SET NULL`: se conserva su
+texto y lectura pendiente, con `avisoId:null`, sin enlace a una actividad inexistente.
+La interfaz oculta compartir por WhatsApp para cancelados y solo ofrece la eliminación
+al organizador, con confirmación explícita previa.
 Estados `borrador|publicado|cancelado|vencido`. La interfaz distingue avisos vecinales
 de información oficial. Compartir utiliza enlaces/funciones del dispositivo; la API
 no envía WhatsApp ni mensajes en nombre de usuarios.
+
+### Asistencia y cambios de actividades
+
+Los avisos incluyen `totalAsistentes`, `miAsistencia`, `revisionEvento` y `motivoCambio`.
+`ultimoCambioEvento` distingue `postergado`, `reprogramado`, `cancelado` y `retirado`
+(nullable para registros anteriores; migración 009). Permite mostrar etiquetas de
+estado sin confundir una actualización de vencimiento con una postergación. El estado
+de publicación permanece `publicado` tras postergar; cancelación y vencimiento tienen
+prioridad sobre la etiqueta del último cambio.
+El total cuenta confirmaciones de cuentas activas; no se exponen listas de nombres.
+`GET /api/avisos?asistire=1` requiere sesión y devuelve las actividades confirmadas,
+incluidas canceladas o vencidas. Es incompatible con `mios=1`. El organizador y los
+asistentes confirmados también pueden consultar su detalle e imagen tras la retirada;
+el resto recibe 404.
+
+| Método y ruta | Entrada / operación | Éxito |
+|---|---|---|
+| PUT `/api/avisos/:id/asistencia` | `{asistire:boolean}`; confirma o retira la propia asistencia, sin duplicados | 200 |
+| POST `/api/avisos/:id/cambios` | `{accion:"postergar",fechaEvento,motivo,revisionEvento}` o `{accion:"cancelar",motivo,revisionEvento}`; solo organizador | 200 |
+| GET `/api/notificaciones` | Últimas 100 notificaciones de la propia cuenta: `{data:[{id,text,createdAt,read,avisoId}]}` | 200 |
+| POST `/api/notificaciones/leidas` | `{ids:string[]}` de hasta 100 UUID; marca solo notificaciones de la propia cuenta | 200 |
+
+No se permite confirmar la propia actividad ni una actividad cancelada, retirada o
+vencida. Retirar una confirmación sigue siendo posible tras el vencimiento o cancelación.
+Postergar exige fecha futura posterior a la anterior; conserva confirmaciones y limpia
+el `venceEn` anterior. Cancelar retira el aviso público. El motivo admite 3–500 caracteres.
+Una revisión desactualizada devuelve 409 `EVENT_CHANGED`; una actividad retirada devuelve
+409 `EVENT_NOT_AVAILABLE`. Reintentar el mismo cambio ya aplicado no duplica notificaciones.
+
+Las confirmaciones y los cambios bloquean la fila del aviso para serializar operaciones
+concurrentes. El cambio y las notificaciones a asistentes confirmados activos se guardan
+en la misma transacción. La edición directa por PATCH también notifica cambios de fechas
+o retirada del evento. Migración requerida: 008. No hay envío a servicios externos.
+Las notificaciones usan `Cache-Control: no-store`, comprobación de `X-AYNI-User` y caché
+local por cuenta. El cliente consulta cada 20 segundos mientras está visible y al volver
+a la app; permite recuperar notificaciones guardadas durante una desconexión.

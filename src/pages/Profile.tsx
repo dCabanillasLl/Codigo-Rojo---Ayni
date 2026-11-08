@@ -20,8 +20,12 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
   async function updateProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true); setError(''); setSuccess('');
     try {
+      const correo = String(form.get('correo') || '').trim();
+      const notificacionesCorreo = form.get('notificacionesCorreo') === 'on';
+      if (notificacionesCorreo && !correo) { setError('Añade un correo electrónico para activar los avisos.'); setBusy(false); return; }
       const updated = await api<User>('/auth/me', { method: 'PATCH', body: {
-        nombres: String(form.get('nombres')).trim(), apellidos: String(form.get('apellidos')).trim(),
+        correo: correo || null,
+        notificacionesCorreo,
         telefono: String(form.get('telefono') || '').trim() || null,
         telefonoPublico: form.get('telefonoPublico') === 'on',
       } });
@@ -36,7 +40,9 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
       <div className="profile-location-card mt-5"><div className="profile-location-copy"><span className="eyebrow">MI UBICACIÓN PRIVADA</span><p>{user.direccion || 'Agrega una dirección o detecta tu ubicación con GPS.'}</p><small>Tu dirección exacta no se comparte con otros vecinos.</small></div><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={16}/>{user.direccion ? 'Editar ubicación' : 'Configurar ubicación'}</button></div>
       <div className="mt-5"><Field label={t('language')}><select value={language} onChange={event => setLanguage(event.target.value as Language)}><option value="es">Español</option><option value="en">English</option><option value="qu">Quechua sureño</option></select></Field><p className="form-hint">{t('languageNote')}</p></div>
       <form className="form-stack mt-6" onSubmit={updateProfile}>
-        <div className="form-columns"><Field label="Nombres"><input name="nombres" required minLength={2} maxLength={80} defaultValue={user.nombres}/></Field><Field label="Apellidos"><input name="apellidos" required minLength={2} maxLength={100} defaultValue={user.apellidos}/></Field></div>
+        <div className="form-columns profile-identity-fields"><Field label="Nombres"><input value={user.nombres} readOnly aria-readonly="true"/></Field><Field label="Apellidos"><input value={user.apellidos} readOnly aria-readonly="true"/></Field></div>
+        <p className="profile-identity-note">Nombres y apellidos provienen del DNI verificado y no se pueden editar.</p>
+        <div className="profile-email-section"><Field label="Correo electrónico (opcional)" hint="Lo usaremos para avisarte cuando alguien responda a tu pedido o confirme una ayuda."><input name="correo" type="email" autoComplete="email" maxLength={254} defaultValue={user.correo || ''} placeholder="tu@correo.com"/></Field><label className="check-field"><input name="notificacionesCorreo" type="checkbox" defaultChecked={Boolean(user.notificacionesCorreo)}/>Recibir avisos por correo sobre mis pedidos y colaboraciones</label></div>
         <Field label="Teléfono para contacto (opcional)" hint="Para el enlace de WhatsApp, usa prefijo internacional; ejemplo: +51987654321."><input name="telefono" type="tel" maxLength={25} defaultValue={user.telefono || ''} placeholder="+51987654321"/></Field>
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>Permitir que contacten mi teléfono por WhatsApp desde mis publicaciones</label>
         <p className="form-hint">El teléfono se oculta por defecto. Si lo haces público, cualquier persona que vea una publicación tuya podrá abrir un chat de WhatsApp.</p>
