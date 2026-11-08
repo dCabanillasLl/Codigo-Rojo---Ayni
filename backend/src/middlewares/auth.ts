@@ -7,7 +7,7 @@ import { AppError, asyncHandler } from "../lib/http.js";
 declare global { namespace Express { interface Request { userId: string; } } }
 
 export const sessionCookie = "ayni_session";
-const cookieOptions: CookieOptions = { httpOnly: true, secure: config.cookieSecure, sameSite: "lax", path: "/api" };
+const cookieOptions: CookieOptions = { httpOnly: true, secure: config.cookieSecure, sameSite: config.cookieSecure ? "none" : "lax", path: "/api" };
 
 export function setSession(res: Response, userId: string) {
   if (!config.jwtSecret) throw new AppError(503, "AUTH_NOT_CONFIGURED", "La autenticación todavía no está configurada.");
