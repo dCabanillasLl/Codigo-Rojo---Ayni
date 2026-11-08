@@ -3,9 +3,9 @@ import { apiAssetUrl } from '../lib/api';
 import { ErrorBox } from './UI';
 import Icon from './Icon';
 
-export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange, disabled = false }: {
+export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange, disabled = false, label = 'Foto del producto o servicio' }: {
   value: string | null | undefined; currentUrl?: string | null;
-  onChange: (photo: string | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean;
+  onChange: (photo: string | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean; label?: string;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -42,7 +42,7 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
     }
   }
   return <div className="photo-picker">
-    <label htmlFor={id} className="photo-picker-label">Foto del producto o servicio <span>(opcional)</span></label>
+    <label htmlFor={id} className="photo-picker-label">{label} <span>(opcional)</span></label>
     <p id={`${id}-hint`} className="form-hint">Puedes publicar sin foto. Aceptamos JPG, PNG y WebP de hasta 5 MB.</p>
     <input ref={input} id={id} type="file" accept="image/jpeg,image/png,image/webp" aria-describedby={`${id}-hint`} disabled={disabled || reading} onChange={event => void choose(event)}/>
     {reading && <p className="form-hint" role="status">Preparando vista previa…</p>}

@@ -88,7 +88,25 @@ publicación; no necesita archivos locales persistentes ni un servicio externo d
 La publicación y la foto se guardan en la misma transacción. No se modifican fotos de
 otros vecinos y las imágenes de publicaciones no públicas solo son accesibles por su dueño.
 El proxy de producción debe permitir cuerpos JSON de hasta 8 MB en POST/PATCH de
-publicaciones. Las demás rutas conservan el límite de 64 KB.
+publicaciones y avisos. Las demás rutas conservan el límite de 64 KB.
+
+### Flyers y vigencia de avisos
+
+En **Crear aviso** puedes subir un flyer JPG, PNG o WebP de hasta 5 MB, con vista
+previa y opción para quitarlo antes de publicar. La tarjeta muestra el flyer completo
+sin recortarlo y permite abrirlo en otra pestaña. La carga es opcional.
+La migración `007_fotos_avisos.sql` añade el almacenamiento de imágenes normalizadas
+con las mismas validaciones de las fotos de productos; los enlaces externos existentes
+siguen funcionando.
+
+Los avisos nuevos requieren fecha y hora futuras en la hora local del dispositivo.
+Al llegar ese momento dejan de aparecer públicamente y su estado devuelto pasa a
+`vencido`; no se elimina el registro. Si existe un `venceEn` anterior, se retira antes.
+La API controla la vigencia en listados, detalles e imágenes. La pantalla también
+retira los avisos que vencen mientras permanece abierta o al volver del segundo plano,
+incluidos los datos guardados sin conexión. No necesita cron ni un servidor de tareas.
+Los avisos antiguos sin ninguna fecha conservan su visibilidad hasta que su autor
+configure una fecha o los cancele; no se les asigna una fecha inventada.
 
 ### Ubicación y mapa comunitario
 
