@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import Icon from './Icon';
 
+const modalScrollLocks = new Set<symbol>();
+let originalBodyOverflow = '';
+
 export function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -9,9 +12,15 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
     const previous = document.activeElement as HTMLElement | null;
     const dialog = ref.current;
     dialog?.showModal();
-    const previousOverflow = document.body.style.overflow;
+    const scrollLock = Symbol('modal');
+    if (!modalScrollLocks.size) originalBodyOverflow = document.body.style.overflow;
+    modalScrollLocks.add(scrollLock);
     document.body.style.overflow = 'hidden';
-    return () => { dialog?.close(); document.body.style.overflow = previousOverflow; previous?.focus(); };
+    return () => {
+      dialog?.close(); modalScrollLocks.delete(scrollLock);
+      if (!modalScrollLocks.size) document.body.style.overflow = originalBodyOverflow;
+      if (previous?.isConnected) previous.focus();
+    };
   }, []);
   return <dialog ref={ref} className={`help-modal modal-dialog ${wide ? 'modal-wide' : ''}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); closeRef.current(); }} onClick={event => { if (event.target === event.currentTarget) closeRef.current(); }}>
     <div className="modal-header"><div><p className="eyebrow">AYNI · TU BARRIO TE ACOMPAÑA</p><h2 id={titleId} className="font-display">{title}</h2></div><button type="button" className="icon-button" aria-label="Cerrar" onClick={onClose}><Icon name="close" /></button></div>
