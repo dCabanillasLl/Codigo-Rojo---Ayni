@@ -32,7 +32,7 @@ export const patchOffer = endpoint(async (req, res) => {
 export const putOfferReview = endpoint(async (req, res) => {
   res.json({ data: await saveReview(req.userId!, idSchema.parse(req.params.id), reviewSchema.parse(req.body)) });
 });
-export const readReputation = endpoint(async (req, res) => { res.json({ data: await getReputation(idSchema.parse(req.params.id)) }); });
+export const readReputation = endpoint(async (req, res) => { res.json({ data: await getReputation(idSchema.parse(req.params.id), req.userId) }); });
 export const readResources = endpoint(async (req, res) => { res.json({ data: await listResources(listSchema.parse(req.query), req.userId) }); });
 export const postResource = endpoint(async (req, res) => { res.status(201).json({ data: await createResource(req.userId!, resourceSchema.parse(req.body)) }); });
 export const readResource = endpoint(async (req, res) => { res.json({ data: await getResource(idSchema.parse(req.params.id)) }); });

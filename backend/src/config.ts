@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
+import { isIP } from "node:net";
 
 const bool = (value: string | undefined, fallback = false) => {
   if (value === undefined) return fallback;
@@ -47,6 +48,8 @@ const emailProvider = process.env.EMAIL_PROVIDER ?? "gmail";
 if (emailProvider !== "gmail" && emailProvider !== "resend") throw new Error("EMAIL_PROVIDER debe ser gmail o resend.");
 const gmailUser = process.env.GMAIL_USER ?? "";
 const gmailAppPassword = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
+const gmailDnsServers = (process.env.GMAIL_DNS_SERVERS ?? "").split(",").map(value => value.trim()).filter(Boolean);
+if (gmailDnsServers.some(server => !isIP(server))) throw new Error("GMAIL_DNS_SERVERS debe contener direcciones IP separadas por coma.");
 const emailFrom = process.env.EMAIL_FROM ?? (gmailUser ? `AYNI <${gmailUser}>` : "");
 if (emailProvider === "gmail" && emailFrom && gmailUser) {
   const fromAddress = emailFrom.match(/<([^<>]+)>/)?.[1] ?? emailFrom;
@@ -65,6 +68,7 @@ export const config = {
   emailProvider,
   gmailUser,
   gmailAppPassword,
+  gmailDnsServers,
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   emailFrom,
   emailConfigured: emailProvider === "gmail"

@@ -26,9 +26,12 @@ EMAIL_PROVIDER=gmail
 GMAIL_USER=ayni.proyectocodigorojo@gmail.com
 GMAIL_APP_PASSWORD=PEGA_AQUI_LA_CLAVE_DE_16_CARACTERES
 EMAIL_FROM=AYNI <ayni.proyectocodigorojo@gmail.com>
+# Opcional, si Node/Nodemailer no resuelve el servidor Gmail:
+GMAIL_DNS_SERVERS=1.1.1.1
 ```
 
 En `GMAIL_APP_PASSWORD` pega la contraseña de aplicación, no la contraseña habitual de Google. No uses comillas. No pongas la clave en `src/`, `VITE_*` ni en este documento.
+`GMAIL_DNS_SERVERS` es opcional; solo configúralo si las consultas de Node fallan aunque Windows pueda resolver Gmail. Puedes usar un DNS que hayas comprobado, como `1.1.1.1`.
 
 Guarda el archivo, cierra el editor y reinicia el backend:
 

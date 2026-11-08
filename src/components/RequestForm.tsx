@@ -89,7 +89,7 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
   }
   return <Modal title={t('ask')} onClose={onClose} wide>
     <p className="form-intro">{t('describe')}</p>
-    <p className="request-policy-note"><Icon name="shield" size={16}/>No se permiten pedidos de drogas, alcohol, dinero ni contenido sexual.</p>
+    <p className="request-policy-note"><Icon name="shield" size={16}/>No se permiten pedidos de drogas, alcohol, dinero, contenido sexual, insultos ni lenguaje discriminatorio.</p>
     <form className="form-stack request-form" onSubmit={submit}>
       <Field label="Tu pedido"><div className="request-textarea-wrap"><textarea ref={descriptionRef} className="request-area" value={description} onChange={event => setDescription(event.target.value)} required minLength={5} maxLength={4000} placeholder="Por ejemplo: necesito una escalera por una hora mañana por la mañana." rows={4}/>{description && <button type="button" className="clear-request" aria-label="Borrar todo el texto del pedido" title="Borrar texto" onClick={() => { setDescription(''); descriptionRef.current?.focus(); }}><Icon name="close" size={16}/></button>}</div></Field>
       <div className="request-voice-tools" aria-label="Opciones de voz">

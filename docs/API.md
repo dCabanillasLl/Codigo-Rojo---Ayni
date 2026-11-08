@@ -171,7 +171,7 @@ Errores específicos: `PRICE_REQUIRED`, `INVALID_PRICE`, `INVALID_SECTOR`.
 
 | Método y ruta | Entrada / operación | Éxito |
 |---|---|---|
-| GET `/api/solicitudes` | Filtros comunes; excluye los pedidos propios del listado vecinal. `mios=1` consulta pedidos propios; `participando=1`, colaboraciones del usuario → `{data: Solicitud[]}` | 200 |
+| GET `/api/solicitudes` | Filtros comunes; excluye los pedidos propios del listado vecinal. `mios=1` consulta pedidos propios; `participando=1`, colaboraciones del usuario e incluye `miAporteEstado` → `{data: Solicitud[]}` | 200 |
 | POST `/api/solicitudes` | `{clientRequestId,categoriaId,sectorId,descripcion,titulo?,urgencia?}` → `{data: Solicitud}` | 201 o 200 si reintento |
 | GET `/api/solicitudes/:id` | Sin cuerpo → `{data: Solicitud}` | 200 |
 | PATCH `/api/solicitudes/:id` | `{accion:'completar'}` o `{accion:'cancelar',motivo}` → `{data: Solicitud}`; solo solicitante | 200 |
@@ -202,11 +202,23 @@ o contenido sexual, tanto en la app como en el servidor; el servidor es la valid
 | GET `/api/solicitudes/:id/ofertas` | Sin cuerpo → `{data: Oferta[]}`; solicitante ve todas y voluntario las propias | 200 |
 | POST `/api/solicitudes/:id/ofertas` | `{mensaje}` → `{data: Oferta}`; no ofrecerse a uno mismo | 201 o 200 si ya existe la misma propuesta |
 | PATCH `/api/ofertas/:id` | `{accion:'aceptar'|'rechazar'|'retirar'|'entregar'|'confirmar'}` → `{data: Oferta}` | 200 |
-| PUT `/api/ofertas/:id/resena` | `{calificacion,comentario?}` → `{data: Resena}`; solicitante tras confirmar recepción | 200 |
-| GET `/api/usuarios/:id/reputacion` | Sin cuerpo → `{data:{colaboracionesConfirmadas,vistosBuenos,promedio,resenas}}` | 200 |
+| PUT `/api/ofertas/:id/resena` | `{calificacion,comentario?}` → `{data: Resena}`; cualquiera de los dos participantes, tras confirmar la colaboración | 200 |
+| GET `/api/usuarios/:id/reputacion` | Sin cuerpo → `{data:{colaboracionesConfirmadas,vistosBuenos,promedio,resenas}}`; cada reseña incluye `solicitudId` y `ofertaId`, y `miCalificacion` para el dueño del perfil | 200 |
 
 Oferta: `{id,solicitudId,voluntarioId,voluntario,mensaje,estado,entregaPendiente,
-confirmadaEn,resena}`. Se conservan ENUM originales:
+confirmadaEn,resena,resenaColaborador}`. `resena` es la valoración del solicitante al colaborador;
+`resenaColaborador` es la valoración recíproca del colaborador al solicitante. Cada
+participante puede crear o editar una reseña por colaboración completada y confirmada;
+la base impide reseñas duplicadas del mismo autor para la misma colaboración. En el perfil,
+una reseña recibida permite abrir el pedido y calificar al vecino; al calificar, el botón
+se reemplaza por la calificación propia y no se crea una respuesta adicional.
+La primera puede reconocer la ayuda; la recíproca puede comentar, por ejemplo, la devolución
+de un objeto prestado. Las puntuaciones de ambos sentidos participan en el promedio del evaluado.
+Cada propuesta genera una notificación privada al solicitante con
+el nombre del vecino y el texto de lo que ofrece. La entrega, aceptación, confirmación y
+reseña también notifican a la otra persona e incluyen el pedido/aporte relacionado.
+Las notificaciones llevan `solicitudId` y `ofertaId` para abrir esa colaboración.
+Se conservan ENUM originales:
 
 - `pendiente`: propuesta; solicitante acepta/rechaza y voluntario retira.
 - `aceptada`: aporte acordado. Voluntario marca entrega, solicitante confirma recepción.
@@ -216,9 +228,12 @@ confirmadaEn,resena}`. Se conservan ENUM originales:
 
 Varias ofertas pueden aceptarse. Las transiciones se realizan en transacciones con
 bloqueo del pedido; entregar/confirmar no completa automáticamente la necesidad.
-Una sola reseña editable por colaboración, calificación 1–5. Vistos buenos cuentan
+Una reseña editable por participante de cada colaboración, calificación 1–5. Vistos buenos cuentan
 calificaciones 4–5 de colaboraciones confirmadas. Las identidades se derivan de la
-solicitud y la oferta; el cliente no elige al autor ni al evaluado.
+solicitud y la oferta; el cliente no elige al autor ni al evaluado. La migración `014` conserva
+las reseñas actuales como valoraciones del solicitante y agrega autor/evaluado para las nuevas.
+Pedidos, propuestas y comentarios aplican las restricciones de AYNI y bloquean sustancias,
+dinero, contenido sexual, insultos y lenguaje discriminatorio tanto en el cliente como en API.
 Estados incompatibles o cierre con aportes pendientes producen 409; actor incorrecto, 403.
 
 ## Recursos compartidos
@@ -339,7 +354,7 @@ el resto recibe 404.
 |---|---|---|
 | PUT `/api/avisos/:id/asistencia` | `{asistire:boolean}`; confirma o retira la propia asistencia, sin duplicados | 200 |
 | POST `/api/avisos/:id/cambios` | `{accion:"postergar",fechaEvento,motivo,revisionEvento}` o `{accion:"cancelar",motivo,revisionEvento}`; solo organizador | 200 |
-| GET `/api/notificaciones` | Últimas 100 notificaciones de la propia cuenta: `{data:[{id,text,createdAt,read,avisoId}]}` | 200 |
+| GET `/api/notificaciones` | Últimas 100 notificaciones privadas de la propia cuenta: `{data:[{id,text,createdAt,read,avisoId,solicitudId,ofertaId,tipo}]}` | 200 |
 | POST `/api/notificaciones/leidas` | `{ids:string[]}` de hasta 100 UUID; marca solo notificaciones de la propia cuenta | 200 |
 
 No se permite confirmar la propia actividad ni una actividad cancelada, retirada o
@@ -355,7 +370,8 @@ en la misma transacción. La edición directa por PATCH también notifica cambio
 o retirada del evento. Migración requerida: 008. No hay envío a servicios externos.
 Las notificaciones usan `Cache-Control: no-store`, comprobación de `X-AYNI-User` y caché
 local por cuenta. El cliente consulta cada 20 segundos mientras está visible y al volver
-a la app; permite recuperar notificaciones guardadas durante una desconexión.
+a la app; permite recuperar notificaciones guardadas durante una desconexión. Migración
+requerida para notificaciones de colaboraciones y reseñas: `013_notificaciones_interacciones.sql`.
 
 ### Guía Gemini
 

@@ -10,10 +10,11 @@ import { ListingsMap } from '../ServicesMap';
 import CommunityMap from '../components/CommunityMap';
 import { googleMapsUrl, mapPoint } from '../lib/location';
 import { listingSymbol, mapSymbols } from '../lib/map-symbols';
+import { blockedRequestReason } from '../lib/request-policy';
 
-export default function Help({ onAsk, onLocation, detailId }: { onAsk: () => void; onLocation: () => void; detailId?: string }) {
+export default function Help({ onAsk, onLocation, detailId, initialTab }: { onAsk: () => void; onLocation: () => void; detailId?: string; initialTab?: 'mios' }) {
   const { user, area, setArea, catalogs, requireUser, notify, pending, syncing, sync, online } = useApp();
-  const [tab, setTab] = useState('todos');
+  const [tab, setTab] = useState(initialTab || 'todos');
   const [showMap, setShowMap] = useState(true);
   const [selected, setSelected] = useState('');
   const [search, setSearch] = useState('');
@@ -51,8 +52,16 @@ export default function Help({ onAsk, onLocation, detailId }: { onAsk: () => voi
         <p className="mt-3 flex items-center gap-2 text-sm text-[#748078]"><Icon name="pin" size={16}/>{distance(request.distanciaMetros, 'Distancia no disponible')}</p>
         <p className="mt-2 flex items-center gap-2 text-xs text-[#748078]"><Icon name="clock" size={14}/>{formatDate(request.creadoEn)}</p>
         {request.venceEn && <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-[#9b5b39]"><Icon name="clock" size={14}/>{request.estado === 'vencida' ? 'Venció' : 'Recibimos propuestas hasta'} {formatDate(request.venceEn)}</p>}
-        <span className={`state-badge mt-3 state-${request.estado}`}>{statusLabel(request.estado)}</span>
-        <button className="offer-button" onClick={() => { window.location.hash = `ayuda/${request.id}`; }}>{request.solicitanteId === user?.id ? 'Ver mi pedido' : 'Ver pedido y colaborar'}<Icon name="arrow" size={17}/></button>
+        {(() => {
+          const cardState = tab === 'aportes' ? request.miAporteEstado || request.estado : request.estado;
+          const isConfirmedContribution = tab === 'aportes' && request.miAporteEstado === 'completada';
+          const cardLabel = isConfirmedContribution ? 'Aporte confirmado' : statusLabel(cardState);
+          const actionLabel = request.solicitanteId === user?.id ? 'Ver mi pedido'
+            : tab === 'aportes' ? isConfirmedContribution ? 'Ver aporte y reseña' : 'Ver mi colaboración'
+              : 'Ver pedido y colaborar';
+          return <><span className={`state-badge mt-3 state-${cardState}`}>{cardLabel}</span>
+            <button className="offer-button" onClick={() => { window.location.hash = `ayuda/${request.id}`; }}>{actionLabel}<Icon name="arrow" size={17}/></button></>;
+        })()}
       </article>)}</div>
     </>}
     {detailId && <RequestDetail id={detailId} onClose={() => { window.location.hash = 'ayuda'; }}/>} 
@@ -67,6 +76,11 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
+  const reviewPolicy = blockedRequestReason(reviewComment);
+  const offerPolicy = blockedRequestReason(offerMessage);
   const item = request.data;
   const point = item ? mapPoint(item) : null;
   const owner = item?.solicitanteId === user?.id;
@@ -79,7 +93,7 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
     catch (error) { setError(errorMessage(error)); return false; }
     finally { setBusy(false); }
   }
-  async function offer(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); await mutate(`/solicitudes/${id}/ofertas`, { mensaje: data.get('mensaje') }, 'Tu propuesta se envió al vecino', 'POST'); }
+  async function offer(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (offerPolicy) { setError(offerPolicy); return; } const sentMessage = offerMessage; if (await mutate(`/solicitudes/${id}/ofertas`, { mensaje: sentMessage }, 'Tu propuesta se envió al vecino', 'POST')) setOfferMessage(''); }
   async function cancel(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); if (await mutate(`/solicitudes/${id}`, { accion: 'cancelar', motivo: data.get('motivo') }, 'Pedido cancelado')) setCancelling(false); }
   return <Modal title={item?.titulo || 'Pedido de ayuda'} onClose={onClose} wide>
     <RemoteState {...request}/>
@@ -102,18 +116,20 @@ function RequestDetail({ id, onClose }: { id: string; onClose: () => void }) {
         <p className="mt-3 whitespace-pre-wrap">{contribution.mensaje}</p>
         <div className="action-row mt-3">
           {owner && open && contribution.estado === 'pendiente' && <><button className="small-primary" disabled={busy || !online} onClick={() => void mutate(`/ofertas/${contribution.id}`,{ accion:'aceptar' },'Colaboración aceptada')}>Aceptar aporte</button><button className="outline-btn" disabled={busy || !online} onClick={() => void mutate(`/ofertas/${contribution.id}`,{ accion:'rechazar' },'Propuesta rechazada')}>Rechazar</button></>}
-          {owner && contribution.estado === 'aceptada' && contribution.entregaPendiente && <button className="small-primary" disabled={busy || !online} onClick={async () => { if (await mutate(`/ofertas/${contribution.id}`,{ accion:'confirmar' },'Recepción confirmada. Deja una reseña para reconocer a tu vecino.')) setReviewing(contribution.id); }}>Confirmar que lo recibí</button>}
+          {owner && contribution.estado === 'aceptada' && contribution.entregaPendiente && <button className="small-primary" disabled={busy || !online} onClick={async () => { if (await mutate(`/ofertas/${contribution.id}`,{ accion:'confirmar' },'Recepción confirmada. Puedes valorar a tu vecino.')) { setReviewing(contribution.id); setReviewRating(contribution.resena?.calificacion || 5); setReviewComment(contribution.resena?.comentario || ''); } }}>Confirmar que lo recibí</button>}
           {owner && open && contribution.estado === 'aceptada' && !contribution.entregaPendiente && <button className="outline-btn" disabled={busy || !online} onClick={() => void mutate(`/ofertas/${contribution.id}`,{ accion:'rechazar' },'Colaboración cancelada')}>Cancelar colaboración</button>}
           {contribution.voluntarioId === user?.id && contribution.estado === 'aceptada' && !contribution.entregaPendiente && <button className="small-primary" disabled={busy || !online} onClick={() => void mutate(`/ofertas/${contribution.id}`,{ accion:'entregar' },'El vecino ya puede confirmar que recibió tu aporte')}>Ya entregué mi aporte</button>}
           {contribution.voluntarioId === user?.id && ['pendiente','aceptada'].includes(contribution.estado) && !contribution.entregaPendiente && <button className="outline-btn" disabled={busy || !online} onClick={() => void mutate(`/ofertas/${contribution.id}`,{ accion:'retirar' },'Retiraste tu colaboración')}>Retirar mi aporte</button>}
-          {owner && contribution.estado === 'completada' && <button className="outline-btn" onClick={() => setReviewing(reviewing === contribution.id ? null : contribution.id)}><Icon name="star" size={16}/>{contribution.resena ? 'Editar mi recomendación' : 'Valorar esta ayuda'}</button>}
+          {contribution.estado === 'completada' && (owner || contribution.voluntarioId === user?.id) && <button className="outline-btn" onClick={() => { const ownReview = owner ? contribution.resena : contribution.resenaColaborador; setReviewRating(ownReview?.calificacion || 5); setReviewComment(ownReview?.comentario || ''); setReviewing(reviewing === contribution.id ? null : contribution.id); }}><Icon name="star" size={16}/>{(owner ? contribution.resena : contribution.resenaColaborador) ? 'Editar mi valoración' : owner ? 'Valorar al vecino que me ayudó' : 'Valorar a quien pidió ayuda'}</button>}
         </div>
-        {contribution.resena && <p className="review-note"><Icon name="star" size={15}/>{contribution.resena.calificacion}/5 · {contribution.resena.comentario || 'Ayuda valorada'}</p>}
-        {reviewing === contribution.id && <form className="form-stack mt-4" onSubmit={async event => { event.preventDefault(); const data = new FormData(event.currentTarget); if (await mutate(`/ofertas/${contribution.id}/resena`, { calificacion: Number(data.get('calificacion')), comentario: String(data.get('comentario') || '') }, 'Tu valoración quedó guardada', 'PUT')) setReviewing(null); }}>
-          <Field label="¿Cómo fue la ayuda?" hint="Tu reseña se suma al promedio del vecino. Las valoraciones de 4 o 5 también cuentan como Visto Bueno Vecinal."><select name="calificacion" defaultValue={contribution.resena?.calificacion || 5}>{[5,4,3,2,1].map(rating => <option key={rating} value={rating}>{rating} de 5{rating >= 4 ? ' · Visto Bueno Vecinal' : ''}</option>)}</select></Field><Field label="Cuéntale a tu barrio (opcional)"><textarea name="comentario" maxLength={1200} rows={3} defaultValue={contribution.resena?.comentario || ''}/></Field><button className="small-primary" disabled={busy || !online}>Guardar valoración</button>
+        {contribution.resena && <p className="review-note"><Icon name="star" size={15}/>{owner ? 'Tu valoración al colaborador' : 'Valoración que recibiste'} · {contribution.resena.calificacion}/5{contribution.resena.comentario ? ` · ${contribution.resena.comentario}` : ''}</p>}
+        {contribution.resenaColaborador && <p className="review-note"><Icon name="star" size={15}/>{owner ? 'Valoración que recibiste' : 'Tu valoración al solicitante'} · {contribution.resenaColaborador.calificacion}/5{contribution.resenaColaborador.comentario ? ` · ${contribution.resenaColaborador.comentario}` : ''}</p>}
+        {reviewing === contribution.id && <form className="form-stack mt-4 request-review-form" onSubmit={async event => { event.preventDefault(); if (reviewPolicy) { setError(reviewPolicy); return; } if (await mutate(`/ofertas/${contribution.id}/resena`, { calificacion: reviewRating, comentario: reviewComment }, 'Tu valoración quedó guardada', 'PUT')) setReviewing(null); }}>
+          <div className="request-review-heading"><Icon name="star" size={19}/><div><b>{owner ? 'Cuéntale al barrio cómo te ayudó' : 'Cuéntale al barrio cómo cuidó tu aporte'}</b><p>Tu opinión ayuda a otros vecinos a decidir con confianza.</p></div></div>
+          <Field label="Califica esta colaboración" hint={`${reviewRating} de 5 · La calificación influye en el promedio: 1–2 lo bajan; 4–5 cuentan como Visto Bueno Vecinal.`}><div className="review-stars" role="group" aria-label="Califica la colaboración de 1 a 5 estrellas">{[1,2,3,4,5].map(rating => <button key={rating} type="button" aria-pressed={reviewRating >= rating} aria-label={`${rating} de 5 estrellas`} onClick={() => setReviewRating(rating)}><Icon name="star" size={25} /></button>)}</div></Field><Field label="Deja un comentario (opcional)" hint={owner ? 'Puedes contar si el vecino fue amable, puntual o si algo salió mal. Mantén un lenguaje respetuoso.' : 'Por ejemplo: devolvió la escalera en buen estado y a tiempo, o explica si hubo un problema. Mantén un lenguaje respetuoso.'}><textarea name="comentario" maxLength={1200} rows={3} value={reviewComment} onChange={event => setReviewComment(event.target.value)}/></Field><ErrorBox message={reviewPolicy || ''}/><button className="small-primary" disabled={busy || !online || Boolean(reviewPolicy)}>Guardar valoración</button>
         </form>}
       </article>)}
-      {user && !owner && open && !offers.loading && !offers.error && !ownOffer && <form className="form-stack request-offer-form" onSubmit={offer}><Field label="¿Qué puedes aportar?" hint="Cuéntale al vecino cómo puedes ayudar y cuándo. No compartas tu dirección exacta."><textarea name="mensaje" required minLength={3} maxLength={1200} placeholder="Puedo prestarte una escalera mañana por la tarde." rows={3}/></Field><button className="record-button justify-center" disabled={busy || !online}>Ofrecer mi ayuda<Icon name="hands"/></button></form>}
+      {user && !owner && open && !offers.loading && !offers.error && !ownOffer && <form className="form-stack request-offer-form" onSubmit={offer}><Field label="¿Qué puedes aportar?" hint="Cuéntale al vecino cómo puedes ayudar y cuándo. No compartas tu dirección exacta. Usa un lenguaje respetuoso."><textarea name="mensaje" required minLength={3} maxLength={1200} value={offerMessage} onChange={event => setOfferMessage(event.target.value)} placeholder="Puedo prestarte una escalera mañana por la tarde." rows={3}/></Field><ErrorBox message={offerPolicy || ''}/><button className="record-button justify-center" disabled={busy || !online || Boolean(offerPolicy)}>Ofrecer mi ayuda<Icon name="hands"/></button></form>}
       {owner && offers.data?.length === 0 && <p className="form-intro">Todavía no hay propuestas. Puedes compartir tu pedido con el barrio.</p>}
       {!online && <p className="offline-banner">Puedes consultar lo guardado. Para aceptar o confirmar aportes, recupera la conexión.</p>}
     </div>}

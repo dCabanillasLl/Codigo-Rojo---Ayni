@@ -25,6 +25,7 @@ const files = [
   '011_notificaciones_correo.sql',
   '012_verificacion_correo.sql',
   '013_notificaciones_interacciones.sql',
+  '014_resenas_reciprocas.sql',
 ];
 const sources = await Promise.all(files.map(async (name) => {
   let sql = await readFile(fileURLToPath(new URL(`../migrations/${name}`, import.meta.url)), 'utf8');
@@ -58,6 +59,69 @@ const connection = await mysql.createConnection({
   multipleStatements: true,
 });
 let locked = false;
+async function completeReciprocalReviewMigration() {
+  const hasColumn = async (name) => {
+    const [rows] = await connection.execute(`SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'resenas_colaboracion' AND COLUMN_NAME = ?`, [name]);
+    return rows.length > 0;
+  };
+  const hasIndex = async (name) => {
+    const [rows] = await connection.execute(`SELECT 1 FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'resenas_colaboracion' AND INDEX_NAME = ?`, [name]);
+    return rows.length > 0;
+  };
+  const hasForeignKey = async (name) => {
+    const [rows] = await connection.execute(`SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+      WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'resenas_colaboracion'
+        AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'`, [name]);
+    return rows.length > 0;
+  };
+
+  if (!await hasColumn('autor_id') || !await hasColumn('evaluado_id')) {
+    const addAutor = !await hasColumn('autor_id');
+    const addEvaluado = !await hasColumn('evaluado_id');
+    await connection.query(`ALTER TABLE resenas_colaboracion
+      ${addAutor ? 'ADD COLUMN autor_id BIGINT UNSIGNED NULL AFTER oferta_id' : ''}
+      ${addAutor && addEvaluado ? ',' : ''}
+      ${addEvaluado ? `ADD COLUMN evaluado_id BIGINT UNSIGNED NULL ${addAutor ? 'AFTER autor_id' : 'AFTER oferta_id'}` : ''}`);
+  }
+  await connection.query(`UPDATE resenas_colaboracion r
+    JOIN ofertas_ayuda o ON o.oferta_id = r.oferta_id
+    JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id
+    SET r.autor_id = s.solicitante_id, r.evaluado_id = o.voluntario_id
+    WHERE r.autor_id IS NULL OR r.evaluado_id IS NULL`);
+  await connection.query(`ALTER TABLE resenas_colaboracion
+    MODIFY COLUMN autor_id BIGINT UNSIGNED NOT NULL,
+    MODIFY COLUMN evaluado_id BIGINT UNSIGNED NOT NULL`);
+
+  const oldUnique = await hasIndex('uq_resena_colaboracion_oferta');
+  const newUnique = await hasIndex('uq_resena_colaboracion_autor');
+  const oldOfferForeignKey = await hasForeignKey('fk_resena_colaboracion_oferta');
+  // Add the replacement before detaching the FK from its legacy supporting
+  // index. MySQL rejects dropping that index while the FK still depends on it.
+  if (!newUnique) {
+    await connection.query('ALTER TABLE resenas_colaboracion ADD UNIQUE KEY uq_resena_colaboracion_autor (oferta_id, autor_id)');
+  }
+  if (!await hasIndex('ix_resena_colaboracion_evaluado')) {
+    await connection.query('ALTER TABLE resenas_colaboracion ADD KEY ix_resena_colaboracion_evaluado (evaluado_id, creado_en)');
+  }
+  if (oldUnique && oldOfferForeignKey) {
+    await connection.query('ALTER TABLE resenas_colaboracion DROP FOREIGN KEY fk_resena_colaboracion_oferta');
+  }
+  if (oldUnique) await connection.query('ALTER TABLE resenas_colaboracion DROP INDEX uq_resena_colaboracion_oferta');
+  if (!await hasForeignKey('fk_resena_colaboracion_oferta')) {
+    await connection.query(`ALTER TABLE resenas_colaboracion ADD CONSTRAINT fk_resena_colaboracion_oferta FOREIGN KEY (oferta_id)
+      REFERENCES ofertas_ayuda (oferta_id) ON UPDATE CASCADE ON DELETE RESTRICT`);
+  }
+  if (!await hasForeignKey('fk_resena_colaboracion_autor')) {
+    await connection.query(`ALTER TABLE resenas_colaboracion ADD CONSTRAINT fk_resena_colaboracion_autor
+      FOREIGN KEY (autor_id) REFERENCES usuarios (usuario_id) ON UPDATE CASCADE ON DELETE RESTRICT`);
+  }
+  if (!await hasForeignKey('fk_resena_colaboracion_evaluado')) {
+    await connection.query(`ALTER TABLE resenas_colaboracion ADD CONSTRAINT fk_resena_colaboracion_evaluado
+      FOREIGN KEY (evaluado_id) REFERENCES usuarios (usuario_id) ON UPDATE CASCADE ON DELETE RESTRICT`);
+  }
+}
 try {
   const [locks] = await connection.execute("SELECT GET_LOCK(CONCAT(DATABASE(), ':ayni-migrations'), 10) AS acquired");
   if (Number(locks[0].acquired) !== 1) throw new Error('Otra migración está en curso.');
@@ -89,6 +153,12 @@ try {
         console.log(`Ya aplicada (esquema verificado): ${source.name}`);
         continue;
       }
+    }
+    if (source.name === '014_resenas_reciprocas.sql' && existing.length && existing[0].estado === 'iniciada') {
+      await completeReciprocalReviewMigration();
+      await connection.execute("UPDATE ayni_schema_migrations SET checksum=?, estado='completada', aplicado_en=CURRENT_TIMESTAMP WHERE version=?", [source.hash, source.name]);
+      console.log(`Recuperada y completada: ${source.name}`);
+      continue;
     }
     if (existing.length) {
       if (existing[0].estado !== 'completada') throw new Error(`${source.name}: ejecución parcial anterior. Revisar el esquema antes de continuar.`);

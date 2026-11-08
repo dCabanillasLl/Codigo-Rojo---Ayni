@@ -6,7 +6,7 @@ import { AppError } from '../lib/http.js';
 import { locationSchema } from '../lib/validation.js';
 import { publicMapColumns } from '../lib/location.js';
 import { sendCommunityEmail } from './email.js';
-import { assertAllowedRequestText, generateRequestTitle } from '../lib/request-policy.js';
+import { assertAllowedCommunityText, assertAllowedRequestText, generateRequestTitle } from '../lib/request-policy.js';
 import { approximateDistance, createLocation, geoClause, idSchema, insert, publicName, row, rows, uuidSchema, type ListOptions } from './community-data.js';
 import { assertCanCloseRequest, assertRequestActive, contentHash, requireSameContent, transitionOffer, type OfferState, type RequestState } from './community-rules.js';
 
@@ -35,11 +35,17 @@ export const reviewSchema = z.object({
   comentario: z.string().trim().max(1200).optional(),
 }).strict();
 
+function notificationExcerpt(value: string, maxLength = 240): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  const characters = Array.from(normalized);
+  return characters.length > maxLength ? `${characters.slice(0, maxLength - 1).join('').trimEnd()}…` : normalized;
+}
+
 async function notifyInteraction(connection: PoolConnection, recipientId: string, requestId: string, offerId: string, type: string, text: string) {
   await connection.execute(`INSERT INTO notificaciones_interacciones
     (notificacion_id, usuario_id, solicitud_id, oferta_id, tipo, texto)
     VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE texto = VALUES(texto)`,
-  [randomUUID(), recipientId, requestId, offerId, type, text]);
+  [randomUUID(), recipientId, requestId, offerId, type, notificationExcerpt(text, 500)]);
 }
 
 interface RequestLock {
@@ -62,6 +68,7 @@ interface PublicRequest {
   descripcion: string; urgencia: string; estado: RequestState; creadoEn: Date; venceEn: Date | null;
   distanciaMetros: number | string | null; clientRequestId: string | null;
   motivoCancelacion: string | null;
+  miAporteEstado?: OfferState | null;
 }
 const requestColumns = `CAST(s.solicitud_id AS CHAR) AS id,
   CAST(s.solicitante_id AS CHAR) AS solicitanteId, ${publicName('u')} AS solicitante,
@@ -83,12 +90,13 @@ export async function listRequests(options: ListOptions, userId?: string): Promi
   if ((options.mios === '1' || options.participando === '1') && !userId) throw new AppError(401, 'AUTH_REQUIRED', 'Inicia sesión para ver tus pedidos y aportes.');
   await expireOpenRequests();
   const geo = geoClause(options);
+  const participating = options.participando === '1';
   const conditions = ["u.estado_cuenta = 'activo'", ...geo.where];
   const params = [...geo.whereParams];
   if (options.mios === '1') {
     conditions.push('s.solicitante_id = ?'); params.push(userId);
   } else if (options.participando === '1') {
-    conditions.push('EXISTS (SELECT 1 FROM ofertas_ayuda propias WHERE propias.solicitud_id = s.solicitud_id AND propias.voluntario_id = ?)'); params.push(userId);
+    conditions.push('mi_aporte.oferta_id IS NOT NULL');
   } else {
     conditions.push("s.estado IN ('abierta','en_curso')", '(s.vence_en IS NULL OR s.vence_en > UTC_TIMESTAMP())');
     if (userId) { conditions.push('s.solicitante_id <> ?'); params.push(userId); }
@@ -97,10 +105,11 @@ export async function listRequests(options: ListOptions, userId?: string): Promi
   if (options.sectorId) { conditions.push('l.sector_id = ?'); params.push(options.sectorId); }
   if (options.categoriaId) { conditions.push('s.categoria_ayuda_id = ?'); params.push(options.categoriaId); }
   if (options.urgencia) { conditions.push('s.urgencia = ?'); params.push(options.urgencia); }
-  const result = await query<PublicRequest>(`SELECT ${requestColumns}, ${geo.select}
-    ${requestFrom} WHERE ${conditions.join(' AND ')} ${geo.having}
+  const result = await query<PublicRequest>(`SELECT ${requestColumns}, ${geo.select}${participating ? ', mi_aporte.estado AS miAporteEstado' : ''}
+    ${requestFrom}${participating ? ' JOIN ofertas_ayuda mi_aporte ON mi_aporte.solicitud_id = s.solicitud_id AND mi_aporte.voluntario_id = ?' : ''}
+    WHERE ${conditions.join(' AND ')} ${geo.having}
     ORDER BY s.urgencia = 'urgente' DESC, s.creado_en DESC LIMIT 100`,
-  [...geo.selectParams, ...params, ...geo.havingParams]);
+  [...geo.selectParams, ...(participating ? [userId] : []), ...params, ...geo.havingParams]);
   return result.map((request) => privateRequestFields(request, userId));
 }
 export async function getRequest(id: string, userId?: string): Promise<PublicRequest> {
@@ -190,19 +199,29 @@ export async function closeRequest(userId: string, id: string, data: z.infer<typ
 interface OfferView {
   id: string; solicitudId: string; voluntarioId: string; voluntario: string;
   mensaje: string; estado: OfferState; entregadaEn: Date | null; confirmadaEn: Date | null;
-  motivoCancelacion: string | null; resenaId: string | null; calificacion: number | null; comentario: string | null;
+  motivoCancelacion: string | null;
+  resenaSolicitanteId: string | null; calificacionSolicitante: number | null; comentarioSolicitante: string | null;
+  resenaColaboradorId: string | null; calificacionColaborador: number | null; comentarioColaborador: string | null;
 }
 const offerColumns = `CAST(o.oferta_id AS CHAR) AS id, CAST(o.solicitud_id AS CHAR) AS solicitudId,
   CAST(o.voluntario_id AS CHAR) AS voluntarioId, ${publicName('u')} AS voluntario,
   o.mensaje, o.estado, o.entregada_en AS entregadaEn, o.confirmada_en AS confirmadaEn,
-  o.motivo_cancelacion AS motivoCancelacion, CAST(r.resena_colaboracion_id AS CHAR) AS resenaId,
-  r.calificacion, r.comentario`;
+  o.motivo_cancelacion AS motivoCancelacion,
+  CAST(rs.resena_colaboracion_id AS CHAR) AS resenaSolicitanteId, rs.calificacion AS calificacionSolicitante,
+  rs.comentario AS comentarioSolicitante,
+  CAST(rv.resena_colaboracion_id AS CHAR) AS resenaColaboradorId, rv.calificacion AS calificacionColaborador,
+  rv.comentario AS comentarioColaborador`;
 const offerFrom = `FROM ofertas_ayuda o JOIN usuarios u ON u.usuario_id = o.voluntario_id
-  LEFT JOIN resenas_colaboracion r ON r.oferta_id = o.oferta_id`;
+  JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id
+  LEFT JOIN resenas_colaboracion rs ON rs.oferta_id = o.oferta_id AND rs.autor_id = s.solicitante_id
+  LEFT JOIN resenas_colaboracion rv ON rv.oferta_id = o.oferta_id AND rv.autor_id = o.voluntario_id`;
 function offerView(data: OfferView) {
-  const { resenaId, calificacion, comentario, ...offer } = data;
+  const { resenaSolicitanteId, calificacionSolicitante, comentarioSolicitante,
+    resenaColaboradorId, calificacionColaborador, comentarioColaborador, ...offer } = data;
+  const resena = resenaSolicitanteId ? { id: resenaSolicitanteId, calificacion: Number(calificacionSolicitante), comentario: comentarioSolicitante } : null;
+  const resenaColaborador = resenaColaboradorId ? { id: resenaColaboradorId, calificacion: Number(calificacionColaborador), comentario: comentarioColaborador } : null;
   return { ...offer, entregaPendiente: offer.estado === 'aceptada' && offer.entregadaEn !== null,
-    resena: resenaId ? { id: resenaId, calificacion: Number(calificacion), comentario } : null };
+    resena, resenaColaborador };
 }
 async function getOffer(id: string) {
   const offer = await one<OfferView>(`SELECT ${offerColumns} ${offerFrom} WHERE o.oferta_id = ?`, [id]);
@@ -216,6 +235,7 @@ export async function listOffers(userId: string, requestId: string) {
     ${mineOnly ? 'AND o.voluntario_id = ?' : ''} ORDER BY o.creado_en ASC`, mineOnly ? [requestId, userId] : [requestId])).map(offerView);
 }
 export async function createOffer(userId: string, requestId: string, data: z.infer<typeof offerSchema>) {
+  assertAllowedCommunityText(data.mensaje);
   const result = await transaction(async (connection) => {
     const request = await lockRequest(connection, requestId);
     if (request.solicitante_id === userId) throw new AppError(400, 'SELF_OFFER', 'No puedes ofrecerte en tu propio pedido.');
@@ -228,7 +248,13 @@ export async function createOffer(userId: string, requestId: string, data: z.inf
     assertRequestActive(request.estado); assertNotExpired(request);
     const id = await insert(connection,
       'INSERT INTO ofertas_ayuda (solicitud_id, voluntario_id, mensaje) VALUES (?, ?, ?)', [requestId, userId, data.mensaje]);
-    await notifyInteraction(connection, request.solicitante_id, requestId, id, 'nueva_propuesta', 'Un vecino te envió una propuesta de ayuda. Entra a AYNI para revisarla.');
+    const details = await row<{ voluntario: string; titulo: string }>(connection,
+      `SELECT ${publicName('voluntario')} AS voluntario, s.titulo
+       FROM usuarios voluntario JOIN solicitudes_ayuda s ON s.solicitud_id = ?
+       WHERE voluntario.usuario_id = ?`, [requestId, userId]);
+    const offerText = notificationExcerpt(data.mensaje);
+    await notifyInteraction(connection, request.solicitante_id, requestId, id, 'nueva_propuesta',
+      `${details?.voluntario ?? 'Un vecino'} te ofrece: “${offerText}” para “${details?.titulo ?? 'tu pedido'}”. Toca para revisar y aceptar o rechazar.`);
     return { id, replayed: false };
   });
   const offer = await getOffer(result.id);
@@ -264,11 +290,19 @@ export async function updateOffer(userId: string, id: string, data: z.infer<type
       motivo_cancelacion = CASE WHEN ? IN ('rechazada','retirada') THEN ? ELSE motivo_cancelacion END
       WHERE oferta_id = ?`,
     [next.state, next.markDelivered, next.markConfirmed, next.state, data.motivo ?? null, id]);
-    const notification = data.accion === 'aceptar' ? { recipient: offer.voluntario_id, type: 'propuesta_aceptada', text: 'Aceptaron tu propuesta. Coordina tu aporte con el vecino en AYNI.' }
-      : data.accion === 'rechazar' ? { recipient: offer.voluntario_id, type: 'propuesta_respondida', text: 'El vecino respondió a tu propuesta. Revisa el estado de la colaboración en AYNI.' }
-        : data.accion === 'retirar' ? { recipient: request.solicitante_id, type: 'propuesta_retirada', text: 'Un vecino retiró su propuesta. Revisa los aportes de tu pedido en AYNI.' }
-          : data.accion === 'entregar' ? { recipient: request.solicitante_id, type: 'aporte_entregado', text: 'El colaborador indicó que entregó su aporte. Confirma si lo recibiste.' }
-            : { recipient: offer.voluntario_id, type: 'aporte_confirmado', text: 'El vecino confirmó que recibió tu ayuda. Ya puedes dejarle una reseña en AYNI.' };
+    const actors = await row<{ owner: string; volunteer: string; titulo: string; mensaje: string }>(connection,
+      `SELECT ${publicName('owner')} AS owner, ${publicName('volunteer')} AS volunteer, s.titulo, o.mensaje
+       FROM ofertas_ayuda o JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id
+       JOIN usuarios owner ON owner.usuario_id = s.solicitante_id
+       JOIN usuarios volunteer ON volunteer.usuario_id = o.voluntario_id
+       WHERE o.oferta_id = ?`, [id]);
+    const contribution = notificationExcerpt(actors?.mensaje ?? 'el aporte acordado');
+    const requestTitle = notificationExcerpt(actors?.titulo ?? 'tu pedido', 100);
+    const notification = data.accion === 'aceptar' ? { recipient: offer.voluntario_id, type: 'propuesta_aceptada', text: `${actors?.owner ?? 'El vecino'} aceptó tu propuesta “${contribution}” para “${requestTitle}”. Ya pueden coordinar en AYNI.` }
+      : data.accion === 'rechazar' ? { recipient: offer.voluntario_id, type: 'propuesta_respondida', text: `${actors?.owner ?? 'El vecino'} no aceptó tu propuesta “${contribution}” para “${requestTitle}”. Gracias por ofrecer tu ayuda.` }
+        : data.accion === 'retirar' ? { recipient: request.solicitante_id, type: 'propuesta_retirada', text: `${actors?.volunteer ?? 'Un vecino'} retiró su propuesta “${contribution}” para “${requestTitle}”.` }
+          : data.accion === 'entregar' ? { recipient: request.solicitante_id, type: 'aporte_entregado', text: `${actors?.volunteer ?? 'Tu colaborador'} indicó que ya entregó “${contribution}” para “${requestTitle}”. Confirma si lo recibiste.` }
+            : { recipient: offer.voluntario_id, type: 'aporte_confirmado', text: `${actors?.owner ?? 'El vecino'} confirmó que recibió “${contribution}” para “${requestTitle}”. Ya puedes dejarle una reseña en AYNI.` };
     await notifyInteraction(connection, notification.recipient, lookup.solicitudId, id, notification.type, notification.text);
     if (data.accion === 'aceptar') {
       await connection.execute("UPDATE solicitudes_ayuda SET estado = 'en_curso' WHERE solicitud_id = ?", [lookup.solicitudId]);
@@ -309,27 +343,53 @@ export async function updateOffer(userId: string, id: string, data: z.infer<type
   return updated;
 }
 export async function saveReview(userId: string, offerId: string, data: z.infer<typeof reviewSchema>) {
-  const lookup = await one<{ solicitudId: string }>(
-    'SELECT CAST(solicitud_id AS CHAR) AS solicitudId FROM ofertas_ayuda WHERE oferta_id = ?', [offerId]);
+  assertAllowedCommunityText(data.comentario || '');
+  const lookup = await one<{ solicitudId: string; requesterId: string; volunteerId: string }>(
+    `SELECT CAST(o.solicitud_id AS CHAR) AS solicitudId,
+      CAST(s.solicitante_id AS CHAR) AS requesterId, CAST(o.voluntario_id AS CHAR) AS volunteerId
+     FROM ofertas_ayuda o JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id WHERE o.oferta_id = ?`, [offerId]);
   if (!lookup) throw new AppError(404, 'OFFER_NOT_FOUND', 'No se encontró la colaboración.');
+  let evaluatedId = '';
   await transaction(async (connection) => {
     const request = await lockRequest(connection, lookup.solicitudId);
     const offer = await row<OfferLock>(connection, `SELECT CAST(oferta_id AS CHAR) AS oferta_id,
       CAST(voluntario_id AS CHAR) AS voluntario_id, estado, confirmada_en FROM ofertas_ayuda WHERE oferta_id = ? FOR UPDATE`, [offerId]);
     if (!offer) throw new AppError(404, 'OFFER_NOT_FOUND', 'No se encontró la colaboración.');
-    if (request.solicitante_id !== userId || offer.voluntario_id === userId) {
-      throw new AppError(403, 'FORBIDDEN', 'Solo quien recibió la ayuda puede valorar al colaborador.');
+    const isRequester = request.solicitante_id === userId;
+    const isVolunteer = offer.voluntario_id === userId;
+    if (!isRequester && !isVolunteer) {
+      throw new AppError(403, 'FORBIDDEN', 'Solo los participantes de la colaboración pueden valorarse.');
     }
     if (offer.estado !== 'completada' || !offer.confirmada_en) {
-      throw new AppError(409, 'UNCONFIRMED_COLLABORATION', 'Confirma que recibiste el aporte antes de recomendar al vecino.');
+      throw new AppError(409, 'UNCONFIRMED_COLLABORATION', 'Ambos participantes pueden valorarse después de confirmar el aporte.');
     }
-    await connection.execute(`INSERT INTO resenas_colaboracion (oferta_id, calificacion, comentario)
-      VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE calificacion = ?, comentario = ?`,
-    [offerId, data.calificacion, data.comentario || null, data.calificacion, data.comentario || null]);
+    evaluatedId = isRequester ? offer.voluntario_id : request.solicitante_id;
+    const existingReview = await row<{ id: string }>(connection,
+      'SELECT CAST(resena_colaboracion_id AS CHAR) AS id FROM resenas_colaboracion WHERE oferta_id = ? AND autor_id = ? FOR UPDATE',
+    [offerId, userId]);
+    await connection.execute(`INSERT INTO resenas_colaboracion (oferta_id, autor_id, evaluado_id, calificacion, comentario)
+      VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE calificacion = VALUES(calificacion), comentario = VALUES(comentario)`,
+    [offerId, userId, evaluatedId, data.calificacion, data.comentario || null]);
+    const people = await row<{ requester: string; volunteer: string; titulo: string }>(connection,
+      `SELECT ${publicName('owner')} AS requester, ${publicName('volunteer')} AS volunteer, s.titulo
+       FROM solicitudes_ayuda s JOIN usuarios owner ON owner.usuario_id = s.solicitante_id
+       JOIN ofertas_ayuda o ON o.solicitud_id = s.solicitud_id
+        JOIN usuarios volunteer ON volunteer.usuario_id = o.voluntario_id
+        WHERE s.solicitud_id = ? AND o.oferta_id = ?`, [lookup.solicitudId, offerId]);
+    const note = data.comentario ? ` Comentario: “${notificationExcerpt(data.comentario, 180)}”` : '';
+    const evaluatorName = isRequester ? people?.requester ?? 'El vecino' : people?.volunteer ?? 'El colaborador';
+    const reviewText = isRequester
+      ? `${evaluatorName} te calificó con ${data.calificacion}/5 por tu ayuda en “${notificationExcerpt(people?.titulo ?? 'un pedido', 100)}”.${note}`
+      : `${evaluatorName} valoró cómo cuidaste el aporte en “${notificationExcerpt(people?.titulo ?? 'un pedido', 100)}”: ${data.calificacion}/5.${note}`;
+    if (!existingReview) {
+      await notifyInteraction(connection, evaluatedId, lookup.solicitudId, offerId,
+        isRequester ? 'resena_recibida' : 'resena_del_colaborador', reviewText);
+    }
   });
-  return (await getOffer(offerId)).resena;
+  return await one(`SELECT CAST(resena_colaboracion_id AS CHAR) AS id, calificacion, comentario
+    FROM resenas_colaboracion WHERE oferta_id = ? AND autor_id = ?`, [offerId, userId]);
 }
-export async function getReputation(userId: string) {
+export async function getReputation(userId: string, viewerId?: string) {
   const user = await one('SELECT usuario_id FROM usuarios WHERE usuario_id = ? AND estado_cuenta = ?', [userId, 'activo']);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'No se encontró el vecino.');
   const total = await one<{ total: number }>(`SELECT COUNT(*) AS total FROM ofertas_ayuda
@@ -337,14 +397,17 @@ export async function getReputation(userId: string) {
   const reputation = await one<{ vistosBuenos: number | string | null; promedio: number | string | null }>(
     `SELECT SUM(r.calificacion >= 4) AS vistosBuenos, AVG(r.calificacion) AS promedio
      FROM resenas_colaboracion r JOIN ofertas_ayuda o ON o.oferta_id = r.oferta_id
-     WHERE o.voluntario_id = ? AND o.estado = 'completada' AND o.confirmada_en IS NOT NULL`, [userId]);
+     WHERE r.evaluado_id = ? AND o.estado = 'completada' AND o.confirmada_en IS NOT NULL`, [userId]);
   const reviews = await query(`SELECT CAST(r.resena_colaboracion_id AS CHAR) AS id,
+    CAST(s.solicitud_id AS CHAR) AS solicitudId, CAST(o.oferta_id AS CHAR) AS ofertaId,
+    CAST(mi_resena.calificacion AS UNSIGNED) AS miCalificacion,
     ${publicName('u')} AS autor, r.calificacion, r.comentario, r.creado_en AS creadoEn
     FROM resenas_colaboracion r JOIN ofertas_ayuda o ON o.oferta_id = r.oferta_id
     JOIN solicitudes_ayuda s ON s.solicitud_id = o.solicitud_id
-    JOIN usuarios u ON u.usuario_id = s.solicitante_id
-    WHERE o.voluntario_id = ? AND o.estado = 'completada' AND o.confirmada_en IS NOT NULL
-    ORDER BY r.creado_en DESC LIMIT 100`, [userId]);
+    JOIN usuarios u ON u.usuario_id = r.autor_id
+    LEFT JOIN resenas_colaboracion mi_resena ON mi_resena.oferta_id = o.oferta_id AND mi_resena.autor_id = ?
+    WHERE r.evaluado_id = ? AND o.estado = 'completada' AND o.confirmada_en IS NOT NULL
+    ORDER BY r.creado_en DESC LIMIT 100`, [viewerId === userId ? viewerId : null, userId]);
   return { colaboracionesConfirmadas: Number(total?.total ?? 0), vistosBuenos: Number(reputation?.vistosBuenos ?? 0),
     promedio: reputation?.promedio == null ? null : Math.round(Number(reputation.promedio) * 10) / 10, resenas: reviews };
 }
