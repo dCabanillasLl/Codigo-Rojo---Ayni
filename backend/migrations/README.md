@@ -24,6 +24,11 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 7. `006_fotos_publicaciones.sql` añade una foto opcional (`imagen` y `imagen_hash`)
    a cada producto o servicio. Las filas existentes permanecen sin foto. Se almacena
    el JPEG normalizado y su huella; las consultas de listados no descargan el BLOB.
+8. `007_vencimiento_solicitudes.sql` asigna fecha límite a solicitudes antiguas sin
+   vencimiento y marca como vencidas las que ya superaron el plazo. Aplicar para que
+   los pedidos existentes tampoco permanezcan publicados indefinidamente.
+9. `008_notificaciones_correo.sql` añade la preferencia privada de avisos por correo,
+   desactivada para todas las cuentas existentes hasta que cada persona la active.
 
 El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
 de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum

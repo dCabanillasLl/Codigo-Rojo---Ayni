@@ -52,16 +52,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [online, setUser]);
   useEffect(() => { if (!toast) return; const timeout = window.setTimeout(() => setToast(''), 5000); return () => window.clearTimeout(timeout); }, [toast]);
-  useEffect(() => { let active = true; void notificationList().then(value => { if (active) setNotifications(value); }).catch(() => undefined); return () => { active = false; }; }, []);
+  useEffect(() => {
+    let active = true;
+    const ownerId = user?.id;
+    setNotifications([]);
+    if (ownerId) void notificationList(ownerId).then(value => {
+      if (active && userRef.current?.id === ownerId) setNotifications(value);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [user?.id]);
   const notify = useCallback((text: string) => {
     setToast(text);
-    const notification: AppNotification = { id: crypto.randomUUID(), text, createdAt: new Date().toISOString(), read: false };
-    setNotifications(current => [notification, ...current].slice(0, 100));
-    void saveNotification(notification).catch(() => undefined);
+    const ownerId = userRef.current?.id;
+    if (!ownerId) return;
+    const notification: AppNotification = { id: crypto.randomUUID(), ownerId, text, createdAt: new Date().toISOString(), read: false };
+    setNotifications(current => userRef.current?.id === ownerId ? [notification, ...current].slice(0, 100) : current);
+    void saveNotification(notification).then(() => notificationList(ownerId)).then(value => {
+      if (userRef.current?.id === ownerId) setNotifications(value);
+    }).catch(() => undefined);
   }, []);
   const markRead = useCallback(() => {
-    setNotifications(current => current.map(item => ({ ...item, read: true })));
-    void persistNotificationsRead().catch(() => undefined);
+    const ownerId = userRef.current?.id;
+    if (!ownerId) return;
+    setNotifications(current => current.map(item => item.ownerId === ownerId ? { ...item, read: true } : item));
+    void persistNotificationsRead(ownerId).catch(() => undefined);
   }, []);
   const refreshPending = useCallback(async () => { const owner = userRef.current?.id; if (!owner) { setPending([]); return; } const list = await pendingList(owner).catch(() => []); if (owner === userRef.current?.id) setPending(list); }, []);
   useEffect(() => { void refreshPending(); }, [user?.id, refreshPending]);

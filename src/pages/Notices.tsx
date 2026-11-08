@@ -11,9 +11,9 @@ export default function Notices() {
   const [creating, setCreating] = useState(false);
   const params = areaQuery(area);
   const notices = useRemote<Notice[]>(`/avisos?${params}`, user?.id || 'public');
-  return <section data-tour="tour-notices">
+  return <section>
     <PageHeading eyebrow="LO QUE PASA CERCA" title="Avisos del barrio" text="Actividades, campañas y avisos compartidos por vecinos.">
-      <button className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>Crear aviso</button>
+      <button data-tour="tour-notices" className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>Crear aviso</button>
     </PageHeading>
     <p className="form-hint mt-3">Los avisos son información compartida por vecinos; no representan comunicados oficiales.</p>
     <RemoteState {...notices}/>

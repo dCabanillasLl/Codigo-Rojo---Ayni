@@ -59,14 +59,14 @@ export default function App() {
     <header className="app-header sticky top-0 z-30 border-b border-[#d9ded8] bg-[#fffef9]">
       <div className="header-inner mx-auto flex max-w-[1240px] items-center justify-between px-5 lg:px-10">
         <button type="button" className="flex items-center gap-3" onClick={() => navigate('cerca')} aria-label="Ir al inicio">
-          <span className="logo-mark"><span />A</span><span className="font-display text-[26px] font-extrabold tracking-[-0.04em] text-[#173f32]">AYNI</span>
+          <img className="logo-image" src="/ayni-logo.png" alt="" aria-hidden="true"/><span className="font-display text-[26px] font-extrabold tracking-[-0.04em] text-[#173f32]">AYNI</span>
         </button>
         <nav className="hidden items-center gap-1 md:flex" aria-label="Navegación principal">
           {navItems.map(item => <button type="button" key={item.id} onClick={() => navigate(item.id)} className={`top-nav ${route.page === item.id ? 'active' : ''}`} aria-current={route.page === item.id ? 'page' : undefined}><Icon name={item.icon} size={18}/>{t(item.id === 'cerca' ? 'near' : item.id === 'ayuda' ? 'help' : item.id === 'avisos' ? 'notices' : 'profile')}</button>)}
         </nav>
         <div className="flex items-center gap-2">
           <span className={`status-pill hidden sm:flex ${!online ? 'offline' : ''}`} role="status"><span className="status-dot"/>{online ? t('connected') : t('offline')}</span>
-          <button type="button" className="icon-button relative" aria-label={`Notificaciones${unreadNotifications ? ` sin leer: ${unreadNotifications}` : ''}`} onClick={() => { setNotificationsOpen(true); markNotificationsRead(); }}><Icon name="bell" size={21}/>{unreadNotifications > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#e76444] ring-2 ring-white"/>}</button>
+          <button type="button" className="icon-button relative" aria-label={`Notificaciones${unreadNotifications ? ` sin leer: ${unreadNotifications}` : ''}`} onClick={() => { if (!requireUser()) return; setNotificationsOpen(true); markNotificationsRead(); }}><Icon name="bell" size={21}/>{unreadNotifications > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#e76444] ring-2 ring-white"/>}</button>
           <button type="button" className="avatar" onClick={() => user ? navigate('perfil') : setAuthOpen(true)} aria-label={user ? `Perfil de ${user.nombres}` : 'Iniciar sesión'}>{user ? `${user.nombres[0]}${user.apellidos[0]}` : '?'}</button>
         </div>
       </div>
