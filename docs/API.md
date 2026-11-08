@@ -71,6 +71,7 @@ no se entrega correo. Consulta [GMAIL_SETUP.md](GMAIL_SETUP.md) para los pasos.
 | `/api/health` | `{data:{estado:"ok",baseDeDatos:"conectada"}}`; 503 si no están listos |
 | `/api/sectores` | `{data:[{id,nombre,distrito,ciudad}]}` |
 | `/api/catalogos` | `{data:{publicaciones:[{id,nombre}],ayuda:[{id,nombre}],avisos:[{id,nombre}]}}` |
+| `/api/notificaciones` | Notificaciones privadas del usuario: avisos vecinales y cambios de sus colaboraciones. Las de colaboración incluyen `solicitudId` y `ofertaId`; se consultan periódicamente y se pueden marcar como leídas. Requiere sesión. |
 
 ## Listados y cercanía
 

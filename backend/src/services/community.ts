@@ -1,4 +1,5 @@
 import type { PoolConnection } from 'mysql2/promise';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { one, query, transaction } from '../db/index.js';
 import { AppError } from '../lib/http.js';
@@ -33,6 +34,13 @@ export const reviewSchema = z.object({
   calificacion: z.number().int().min(1).max(5),
   comentario: z.string().trim().max(1200).optional(),
 }).strict();
+
+async function notifyInteraction(connection: PoolConnection, recipientId: string, requestId: string, offerId: string, type: string, text: string) {
+  await connection.execute(`INSERT INTO notificaciones_interacciones
+    (notificacion_id, usuario_id, solicitud_id, oferta_id, tipo, texto)
+    VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE texto = VALUES(texto)`,
+  [randomUUID(), recipientId, requestId, offerId, type, text]);
+}
 
 interface RequestLock {
   solicitud_id: string;
@@ -163,12 +171,18 @@ export async function closeRequest(userId: string, id: string, data: z.infer<typ
     const reservation = await row(connection,
       "SELECT reserva_id FROM reservas_recursos WHERE solicitud_id = ? AND estado = 'reservada' LIMIT 1", [id]);
     if (reservation) throw new AppError(409, 'PENDING_RESERVATIONS', 'Revisa las reservas de recursos pendientes de entrega antes de cerrar este pedido.');
+    const collaborators = await rows<{ offerId: string; userId: string }>(connection,
+      `SELECT CAST(oferta_id AS CHAR) AS offerId, CAST(voluntario_id AS CHAR) AS userId FROM ofertas_ayuda
+       WHERE solicitud_id = ? AND estado ${target === 'completada' ? '= \'completada\'' : 'NOT IN (\'rechazada\',\'retirada\')'} FOR UPDATE`, [id]);
     await connection.execute(`UPDATE solicitudes_ayuda SET estado = ?, motivo_cancelacion = ?,
       completada_en = CASE WHEN ? = 'completada' THEN UTC_TIMESTAMP() ELSE completada_en END WHERE solicitud_id = ?`,
     [target, data.accion === 'cancelar' ? data.motivo! : null, target, id]);
     await connection.execute("UPDATE ofertas_ayuda SET estado = 'rechazada', motivo_cancelacion = 'El solicitante cerró el pedido.' WHERE solicitud_id = ? AND estado = 'pendiente'", [id]);
     // Pending reservations do not consume inventory; accepted reservations are blocked above.
     await connection.execute("UPDATE reservas_recursos SET estado = 'cancelada', cancelada_en = UTC_TIMESTAMP() WHERE solicitud_id = ? AND estado = 'pendiente'", [id]);
+    for (const collaborator of collaborators) await notifyInteraction(connection, collaborator.userId, id, collaborator.offerId,
+      target === 'completada' ? 'pedido_completado' : 'pedido_cancelado',
+      target === 'completada' ? 'El pedido quedó resuelto. Gracias por aportar; tu reputación ya refleja esta ayuda confirmada.' : 'El pedido fue cancelado por quien lo publicó.');
   });
   return getRequest(id, userId);
 }
@@ -214,6 +228,7 @@ export async function createOffer(userId: string, requestId: string, data: z.inf
     assertRequestActive(request.estado); assertNotExpired(request);
     const id = await insert(connection,
       'INSERT INTO ofertas_ayuda (solicitud_id, voluntario_id, mensaje) VALUES (?, ?, ?)', [requestId, userId, data.mensaje]);
+    await notifyInteraction(connection, request.solicitante_id, requestId, id, 'nueva_propuesta', 'Un vecino te envió una propuesta de ayuda. Entra a AYNI para revisarla.');
     return { id, replayed: false };
   });
   const offer = await getOffer(result.id);
@@ -249,6 +264,12 @@ export async function updateOffer(userId: string, id: string, data: z.infer<type
       motivo_cancelacion = CASE WHEN ? IN ('rechazada','retirada') THEN ? ELSE motivo_cancelacion END
       WHERE oferta_id = ?`,
     [next.state, next.markDelivered, next.markConfirmed, next.state, data.motivo ?? null, id]);
+    const notification = data.accion === 'aceptar' ? { recipient: offer.voluntario_id, type: 'propuesta_aceptada', text: 'Aceptaron tu propuesta. Coordina tu aporte con el vecino en AYNI.' }
+      : data.accion === 'rechazar' ? { recipient: offer.voluntario_id, type: 'propuesta_respondida', text: 'El vecino respondió a tu propuesta. Revisa el estado de la colaboración en AYNI.' }
+        : data.accion === 'retirar' ? { recipient: request.solicitante_id, type: 'propuesta_retirada', text: 'Un vecino retiró su propuesta. Revisa los aportes de tu pedido en AYNI.' }
+          : data.accion === 'entregar' ? { recipient: request.solicitante_id, type: 'aporte_entregado', text: 'El colaborador indicó que entregó su aporte. Confirma si lo recibiste.' }
+            : { recipient: offer.voluntario_id, type: 'aporte_confirmado', text: 'El vecino confirmó que recibió tu ayuda. Ya puedes dejarle una reseña en AYNI.' };
+    await notifyInteraction(connection, notification.recipient, lookup.solicitudId, id, notification.type, notification.text);
     if (data.accion === 'aceptar') {
       await connection.execute("UPDATE solicitudes_ayuda SET estado = 'en_curso' WHERE solicitud_id = ?", [lookup.solicitudId]);
     } else if ((data.accion === 'rechazar' || data.accion === 'retirar') && request.estado === 'en_curso') {

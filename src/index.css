@@ -1761,12 +1761,43 @@ textarea:disabled {
 .auth-registration-form > .registration-location { margin-top: 0.15rem; }
 .profile-identity-fields input[readonly] { background: #f6f6f0; color: #506057; }
 .profile-identity-note { margin: -0.55rem 0 0; color: #718078; font-size: 0.78rem; line-height: 1.45; }
-.profile-email-section { display: grid; gap: 0.75rem; padding: 1rem; border: 1px solid #e0e7dd; border-radius: 1rem; background: #f8f8f2; }
+.profile-email-section { display: grid; gap: 0.8rem; padding: clamp(0.9rem, 3vw, 1.15rem); border: 1px solid #dfe7df; border-radius: 1.1rem; background: linear-gradient(145deg, #f8f9f4 0%, #f3f6f0 100%); box-shadow: 0 5px 18px rgba(35, 73, 54, 0.045); }
+.neighbor-reputation-card { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; padding: 1rem; border: 1px solid #dce6dc; border-radius: 1rem; background: #f4f8f2; }
+.neighbor-reputation-score { display: grid; justify-items: center; gap: 0.15rem; min-width: 4.5rem; color: #a97316; }
+.neighbor-reputation-score b { color: #263e32; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.neighbor-reputation-score b small { margin-left: 0.1rem; color: #758078; font-size: 0.72rem; font-weight: 500; }
+.neighbor-reputation-score span { color: #6c786f; font-size: 0.72rem; white-space: nowrap; }
+.neighbor-reputation-copy { min-width: 0; padding-left: 1rem; border-left: 1px solid #dce5db; }
+.neighbor-reputation-copy p { margin: 0.18rem 0 0; color: #69776f; font-size: 0.82rem; line-height: 1.4; }
+@media (max-width: 420px) { .neighbor-reputation-card { align-items: flex-start; gap: 0.7rem; padding: 0.8rem; } .neighbor-reputation-copy { padding-left: 0.7rem; } }
 .profile-email-section .check-field { margin: 0; }
 .profile-email-section .form-hint { margin: -0.45rem 0 0; }
-.email-verification-actions { display: grid; justify-items: start; gap: 10px; }
-.email-verification-actions > .action-row { width: 100%; flex-wrap: wrap; }
-.email-verification-actions input { min-width: 0; width: min(12rem, 100%); }
+.email-status { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.75rem 0.85rem; border-radius: 0.85rem; font-size: 0.88rem; line-height: 1.4; }
+.email-status > svg { flex: 0 0 auto; margin-top: 1px; }
+.email-status > span { display: grid; gap: 0.12rem; }
+.email-status small, .email-notifications-option small { display: block; color: #68776e; font-size: 0.78rem; line-height: 1.4; }
+.email-status.is-pending { color: #755323; border: 1px solid #f0d9a9; background: #fff7e7; }
+.email-status.is-verified { color: #2e694b; border: 1px solid #cfe3d1; background: #eaf4eb; }
+.email-notifications-option { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.25rem 0.1rem; line-height: 1.4; }
+.email-notifications-option input { flex: 0 0 auto; margin-top: 0.18rem; }
+.email-notifications-option span { display: grid; gap: 0.12rem; }
+.email-notifications-option:has(input:disabled) { color: #77837b; }
+.email-verification-actions { display: grid; gap: 0.65rem; padding-top: 0.75rem; border-top: 1px solid #e2e8df; }
+.email-send-code { justify-self: start; }
+.email-code-tip { display: flex; align-items: flex-start; gap: 0.55rem; color: #526c5d; font-size: 0.82rem; line-height: 1.45; }
+.email-code-tip svg { flex: 0 0 auto; margin-top: 1px; color: #397756; }
+.email-code-field { display: grid; gap: 0.4rem; color: #42574b; font-size: 0.82rem; font-weight: 650; }
+.email-code-controls { display: flex; align-items: stretch; gap: 0.55rem; }
+.email-code-controls input { flex: 1 1 10rem; min-width: 0; width: auto; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; }
+.email-code-controls input::placeholder { letter-spacing: normal; }
+.email-code-controls .small-primary { flex: 0 0 auto; min-height: 2.85rem; }
+.email-resend-code { justify-self: start; min-height: 2.4rem; padding: 0.35rem 0; color: #356e53; font-size: 0.82rem; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.email-resend-code:disabled { cursor: wait; opacity: 0.6; }
+@media (max-width: 420px) {
+  .email-code-controls { flex-direction: column; }
+  .email-code-controls .small-primary { width: 100%; justify-content: center; }
+  .email-send-code { width: 100%; justify-content: center; }
+}
 .dni-name-fields { align-items: start; }
 .dni-name-fields .form-field input[readonly] { background: #f7f7f1; color: #43544a; }
 .dni-name-fields .form-field input[readonly]::placeholder { color: #98a39b; font-size: 0.9rem; }

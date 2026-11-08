@@ -49,6 +49,8 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 15. `012_verificacion_correo.sql` habilita códigos de confirmación de un solo uso,
     almacenados como HMAC y con vencimiento de 10 minutos. Los correos existentes
     empiezan sin verificar.
+16. `013_notificaciones_interacciones.sql` crea notificaciones privadas persistentes
+    para propuestas y cambios de estado de colaboraciones vecinales.
 
 Las migraciones con el mismo prefijo numérico surgieron en ramas paralelas. El runner
 las identifica por el nombre completo: conservar los nombres y los archivos ya
