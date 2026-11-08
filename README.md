@@ -108,6 +108,30 @@ incluidos los datos guardados sin conexión. No necesita cron ni un servidor de 
 Los avisos antiguos sin ninguna fecha conservan su visibilidad hasta que su autor
 configure una fecha o los cancele; no se les asigna una fecha inventada.
 
+### Confirmación de asistencia y cambios de actividad
+
+Los vecinos con sesión pueden marcar **Asistiré** o retirar su confirmación. Las
+tarjetas muestran el total de confirmaciones, sin publicar nombres de los asistentes.
+**Mis asistencias** permite seguir las actividades confirmadas, incluidas las que
+posteriormente se cancelaron o vencieron. **Mis actividades** muestra al organizador
+sus avisos y el botón **Postergar o cancelar**. El organizador decide qué hacer según
+la participación; no hay un umbral que cancele actividades automáticamente.
+
+Para postergar se exige una fecha futura posterior a la original y un motivo. Se
+conservan las confirmaciones, que los vecinos pueden retirar, y el vencimiento anterior
+se sustituye por la nueva fecha. Para cancelar también se solicita el motivo y la
+actividad se retira del listado público. Ambos cambios notifican a quienes siguen
+confirmados, incluidos los cambios de fecha/estado realizados mediante PATCH.
+
+La migración `008_asistencia_avisos_notificaciones.sql` guarda confirmaciones y
+notificaciones por usuario. El cambio y sus notificaciones son transaccionales;
+reintentar la misma operación no duplica confirmaciones ni notificaciones.
+La campana consulta las novedades cada 20 segundos mientras la app está visible y
+al recuperar conexión o volver a la app. Las notificaciones pendientes se conservan
+en el servidor y la caché se separa por cuenta. Se entregan dentro de AYNI, sin push
+del sistema operativo, correo ni WhatsApp. No se necesita mantener la app abierta
+para conservar una notificación pendiente, pero sí abrirla con conexión para recibirla.
+
 ### Ubicación y mapa comunitario
 
 - Al crear una cuenta, **Dirección o referencia** es un campo compacto con un botón

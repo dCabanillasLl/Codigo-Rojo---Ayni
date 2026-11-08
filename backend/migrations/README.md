@@ -27,6 +27,13 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
 8. `007_fotos_avisos.sql` añade una imagen opcional normalizada y su huella a cada
    aviso. Conserva sus fechas y enlaces externos anteriores. No borra ni vence filas.
    La vigencia se aplica al consultar, según `fecha_evento` y `vence_en`, sin cron.
+9. `008_asistencia_avisos_notificaciones.sql` añade las confirmaciones por actividad y
+   usuario, la revisión del evento y las notificaciones persistentes de cambios.
+   Cada cambio y sus notificaciones se guardan en una misma transacción. La combinación
+   actividad/revisión/destinatario es única para evitar avisos duplicados.
+10. `009_estado_cambio_actividad.sql` conserva el tipo del último cambio de actividad
+    para distinguir la etiqueta de postergación de otras actualizaciones. No modifica
+    las fechas, estados ni publicaciones existentes.
 
 El runner normaliza únicamente saltos de línea LF/CRLF para no confundir la conversión
 de Git en Windows con un cambio de SQL. Acepta ambas variantes históricas de checksum
