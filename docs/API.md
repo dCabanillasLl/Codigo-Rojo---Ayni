@@ -52,9 +52,11 @@ Nombres y apellidos se fijan con la consulta verificada del DNI y no se pueden m
 desde el perfil ni desde PATCH `/auth/me`. El correo es opcional y único. La preferencia
 `notificacionesCorreo` se activa explícitamente y requiere un correo válido. AYNI envía
 avisos cuando alguien ofrece ayuda, una propuesta cambia de estado, se marca una entrega
-o se confirma su recepción. Se necesita `RESEND_API_KEY`, un remitente verificado en
-Resend (`EMAIL_FROM`) y aplicar `008_notificaciones_correo.sql`; sin configuración del
-proveedor se guarda el perfil, pero no se entrega correo.
+o se confirma su recepción. Configura `EMAIL_PROVIDER=gmail`, `GMAIL_USER`,
+`GMAIL_APP_PASSWORD` y `EMAIL_FROM` en `backend/.env`; Gmail SMTP no requiere comprar un
+dominio. Resend sigue disponible seleccionando `EMAIL_PROVIDER=resend`, con clave API y
+dominio remitente verificado. Sin configuración del proveedor se guarda el perfil, pero
+no se entrega correo. Consulta [GMAIL_SETUP.md](GMAIL_SETUP.md) para los pasos.
 
 ## Catálogos
 
@@ -347,3 +349,21 @@ o retirada del evento. Migración requerida: 008. No hay envío a servicios exte
 Las notificaciones usan `Cache-Control: no-store`, comprobación de `X-AYNI-User` y caché
 local por cuenta. El cliente consulta cada 20 segundos mientras está visible y al volver
 a la app; permite recuperar notificaciones guardadas durante una desconexión.
+
+### Guía Gemini
+
+El endpoint de la guía solo recibe el historial reciente del chat. No guarda prompts ni
+respuestas. El backend los envía a Gemini; la interfaz advierte no escribir DNI,
+contraseñas ni direcciones. La clave solo se configura en `backend/.env` mediante
+`GEMINI_API_KEY`; `GEMINI_MODEL` es opcional y por defecto `gemini-3.8-flash`.
+La guía no puede consultar datos de usuarios ni modificar pedidos.
+
+| Método y ruta | Entrada / operación | Éxito |
+|---|---|---|
+| POST `/api/assistant/chat` | `{messages:[{role:"user"|"model",text:string}]}`; máximo 8 turnos, 600 caracteres por turno; limitado a 12 solicitudes/minuto/cliente | 200 `{data:{answer:string}}` |
+
+Errores: 400 `VALIDATION_ERROR`/`USER_MESSAGE_REQUIRED`, 429 `AI_RATE_LIMITED` o
+`GEMINI_RATE_LIMITED`, 502 `GEMINI_REQUEST_FAILED`/`GEMINI_EMPTY_RESPONSE`, 503
+`GEMINI_NOT_CONFIGURED`/`GEMINI_AUTH_FAILED`/`GEMINI_UNAVAILABLE`. Sin clave o si
+Gemini no responde, la interfaz conserva sus acciones rápidas y muestra una respuesta
+de contingencia.

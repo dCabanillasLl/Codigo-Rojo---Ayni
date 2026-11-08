@@ -43,6 +43,17 @@ const port = Number(process.env.PORT ?? 3002);
 const dbPort = Number(process.env.DB_PORT ?? 3306);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT debe ser un puerto válido.");
 if (!Number.isInteger(dbPort) || dbPort < 1 || dbPort > 65535) throw new Error("DB_PORT debe ser un puerto válido.");
+const emailProvider = process.env.EMAIL_PROVIDER ?? "gmail";
+if (emailProvider !== "gmail" && emailProvider !== "resend") throw new Error("EMAIL_PROVIDER debe ser gmail o resend.");
+const gmailUser = process.env.GMAIL_USER ?? "";
+const gmailAppPassword = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
+const emailFrom = process.env.EMAIL_FROM ?? (gmailUser ? `AYNI <${gmailUser}>` : "");
+if (emailProvider === "gmail" && emailFrom && gmailUser) {
+  const fromAddress = emailFrom.match(/<([^<>]+)>/)?.[1] ?? emailFrom;
+  if (fromAddress.toLowerCase() !== gmailUser.toLowerCase()) {
+    throw new Error("Con Gmail SMTP, EMAIL_FROM debe usar la misma dirección indicada en GMAIL_USER.");
+  }
+}
 
 export const config = {
   production,
@@ -51,8 +62,16 @@ export const config = {
   jwtSecret,
   dniHashSecret,
   apiPeruKey: process.env.APIPERU_API_KEY ?? "",
+  emailProvider,
+  gmailUser,
+  gmailAppPassword,
   resendApiKey: process.env.RESEND_API_KEY ?? "",
-  emailFrom: process.env.EMAIL_FROM ?? "",
+  emailFrom,
+  emailConfigured: emailProvider === "gmail"
+    ? Boolean(gmailUser && gmailAppPassword && emailFrom)
+    : Boolean(process.env.RESEND_API_KEY && emailFrom),
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.8-flash",
   cookieSecure,
   trustProxy: bool(process.env.TRUST_PROXY),
   dbConfigured: Boolean(host && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME),

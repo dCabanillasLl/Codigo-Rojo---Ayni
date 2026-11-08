@@ -8,7 +8,17 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Revisa los datos ingresados.", details: error.issues.map((issue) => ({ campo: issue.path.join("."), mensaje: issue.message })) } }); return;
   }
   const code = typeof error?.code === "string" ? error.code : "INTERNAL_ERROR";
-  if (code === "ER_DUP_ENTRY") { res.status(409).json({ error: { code: "DUPLICATE", message: "Este registro ya existe. Revisa los datos e inténtalo nuevamente." } }); return; }
+  if (code === "ER_DUP_ENTRY") {
+    const duplicate = String(error?.sqlMessage || error?.message || "");
+    const field = duplicate.includes("uq_usuarios_correo") ? "EMAIL_ALREADY_REGISTERED"
+      : duplicate.includes("uq_usuarios_telefono") ? "PHONE_ALREADY_REGISTERED"
+      : duplicate.includes("uq_usuarios_dni_hash") ? "DNI_ALREADY_REGISTERED" : "DUPLICATE";
+    const message = field === "EMAIL_ALREADY_REGISTERED" ? "Ese correo ya está asociado a otra cuenta."
+      : field === "PHONE_ALREADY_REGISTERED" ? "Ese teléfono ya está asociado a otra cuenta."
+      : field === "DNI_ALREADY_REGISTERED" ? "Ese DNI ya está asociado a una cuenta de AYNI."
+      : "Este registro ya existe. Revisa los datos e inténtalo nuevamente.";
+    res.status(409).json({ error: { code: field, message } }); return;
+  }
   if (["ER_NO_REFERENCED_ROW_2", "ER_CHECK_CONSTRAINT_VIOLATED", "WARN_DATA_TRUNCATED"].includes(code)) {
     res.status(400).json({ error: { code: "INVALID_DATA", message: "Los datos no cumplen las reglas del registro." } }); return;
   }
