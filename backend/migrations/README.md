@@ -38,12 +38,12 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
     explícitamente para ser público. Los avisos anteriores quedan en `0`: no expone
     direcciones ni coordenadas privadas heredadas del perfil. La ubicación se guarda
     en una fila propia y no modifica el domicilio del organizador.
-12. `011_notificaciones_actividades_eliminadas.sql` permite borrar una actividad
-    cancelada sin perder las notificaciones pendientes: su referencia al aviso pasa
-    a NULL. La asistencia se elimina por cascada. Esta migración no elimina actividades.
-13. `010_vencimiento_solicitudes.sql` asigna fecha límite a solicitudes antiguas sin
+12. `010_vencimiento_solicitudes.sql` asigna fecha límite a solicitudes antiguas sin
     vencimiento y marca como vencidas las que ya superaron el plazo. Aplicar para que
     los pedidos existentes tampoco permanezcan publicados indefinidamente.
+13. `011_notificaciones_actividades_eliminadas.sql` permite borrar una actividad
+    cancelada sin perder las notificaciones pendientes: su referencia al aviso pasa
+    a NULL. La asistencia se elimina por cascada. Esta migración no elimina actividades.
 14. `011_notificaciones_correo.sql` añade la preferencia privada de avisos por correo,
     desactivada para todas las cuentas existentes hasta que cada persona la active.
 15. `012_verificacion_correo.sql` habilita códigos de confirmación de un solo uso,

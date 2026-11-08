@@ -1,0 +1,98 @@
+name: AYNI CI y despliegue
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Compilar y probar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ayni_test_hackathon
+          MYSQL_USER: ayni_test
+          MYSQL_PASSWORD: ayni-ci-only-password
+          MYSQL_ROOT_PASSWORD: ayni-ci-root-only-password
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -payni-ci-root-only-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3307
+      DB_NAME: ayni_test_hackathon
+      DB_USER: ayni_test
+      DB_PASSWORD: ayni-ci-only-password
+      DB_TLS: "false"
+      JWT_SECRET: ayni-github-actions-test-secret-only
+      FRONTEND_ORIGIN: http://localhost:8444
+      AYNI_TEST_DB: "true"
+      RUN_MYSQL_TESTS: "1"
+
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Instalar dependencias frontend
+        run: npm ci
+
+      - name: Instalar dependencias backend
+        run: npm ci --prefix backend
+
+      - name: Compilar frontend
+        run: npm run build
+
+      - name: Compilar backend
+        run: npm --prefix backend run build
+
+      - name: Ejecutar pruebas unitarias del backend
+        run: npm --prefix backend test
+
+      - name: Crear esquema desechable y aplicar migraciones
+        working-directory: backend
+        run: node scripts/migrate.mjs --baseline --apply
+
+      - name: Probar API y recorrido entre vecinos en MySQL
+        working-directory: backend
+        run: node --import tsx --test tests/api.integration.test.ts tests/community.integration.test.ts
+
+  deploy-render:
+    name: Desplegar API en Render
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Comprobar y disparar despliegues de Render
+        env:
+          RENDER_BACKEND_DEPLOY_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_BACKEND_DEPLOY_HOOK" ]; then
+            echo "Falta el secreto RENDER_BACKEND_DEPLOY_HOOK en GitHub."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$RENDER_BACKEND_DEPLOY_HOOK"
