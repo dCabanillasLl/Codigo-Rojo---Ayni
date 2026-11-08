@@ -97,6 +97,35 @@
 .notice-card-actions svg { flex-shrink: 0; }
 .notice-card-actions > .whatsapp-btn { background: #176b3b; border: 1px solid #176b3b; color: #fff; text-decoration: none; }
 .notice-card-actions > .whatsapp-btn:hover { background: #11512d; border-color: #11512d; }
+.publication-contact-link.whatsapp-btn { display: inline-flex; margin-top: 16px; }
+.publication-share-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+.publication-share-actions > a,
+.publication-share-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 11px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: center;
+}
+.publication-share-actions svg { flex-shrink: 0; }
+.publication-share-actions > .whatsapp-btn { background: #176b3b; color: #fff; border: 1px solid #176b3b; text-decoration: none; }
+.publication-share-actions > .whatsapp-btn:hover { background: #11512d; border-color: #11512d; }
+.publication-share-actions > .outline-btn { background: #fffef9; border-color: #cbd8cc; color: #3e5548; }
+.publication-share-actions > .outline-btn:hover { background: #edf2e9; }
 .notice-card-actions > .notice-delete-button { color: #9c302b; background: #fde9e7; border: 1px solid #e9b4ad; font-weight: 700; }
 .notice-card-actions > .notice-delete-button:hover { color: #fff; background: #9c302b; border-color: #9c302b; }
 .notice-card-labels { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }

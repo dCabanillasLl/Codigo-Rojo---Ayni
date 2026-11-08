@@ -6,6 +6,7 @@ import { LanguageProvider } from "./lib/language";
 import "./index.css";
 import "./maps.css";
 import "./photos.css";
+import "./nearby-filters.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
