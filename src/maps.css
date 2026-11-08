@@ -84,6 +84,15 @@
 .registration-location .address-autocomplete > .form-hint:last-of-type { margin-top: -2px; }
 .registration-location-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px 12px; }
 .registration-location-actions .outline-btn { min-height: 44px; padding: 9px 13px; font-size: 13px; font-weight: 750; }
+.registration-location-actions .registration-map-button {
+  flex: 0 0 100%; width: 100%; min-width: 0; min-height: 48px;
+  justify-content: center; padding: 12px 16px; font-size: 14px;
+  border-color: #315f49; background: #315f49; color: #fff;
+  box-shadow: 0 3px 8px #244c391a;
+}
+.registration-location-actions .registration-map-button:hover:not(:disabled) { border-color: #244c39; background: #244c39; }
+.registration-location-actions .registration-map-button:focus-visible { outline: 3px solid #87b69a; outline-offset: 3px; }
+.registration-location-actions .registration-map-button:disabled { box-shadow: none; }
 .registration-location-selected { display: inline-flex; align-items: center; gap: 5px; color: #397254; font-size: 12px; font-weight: 700; }
 .registration-location-privacy { margin: -2px 0 0; color: #718078; font-size: 11px; line-height: 1.5; }
 .registration-location-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }

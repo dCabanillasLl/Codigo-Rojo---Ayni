@@ -1791,6 +1791,14 @@ textarea:disabled {
 .auth-registration-form > .registration-location { margin-top: 0.15rem; }
 .profile-identity-fields input[readonly] { background: #f6f6f0; color: #506057; }
 .profile-identity-note { margin: -0.55rem 0 0; color: #718078; font-size: 0.78rem; line-height: 1.45; }
+.profile-card .profile-signout-button {
+  width: 100%; min-height: 48px; justify-content: center; padding: 12px 16px;
+  border-color: #a0443c; background: #a0443c; color: #fff;
+  font-size: 0.95rem; font-weight: 750; box-shadow: 0 3px 8px #85362f1a;
+}
+.profile-card .profile-signout-button:hover:not(:disabled) { border-color: #85362f; background: #85362f; }
+.profile-card .profile-signout-button:focus-visible { outline: 3px solid #dca59c; outline-offset: 3px; }
+.profile-card .profile-signout-button:disabled { box-shadow: none; }
 .profile-email-section { display: grid; gap: 0.8rem; padding: clamp(0.9rem, 3vw, 1.15rem); border: 1px solid #dfe7df; border-radius: 1.1rem; background: linear-gradient(145deg, #f8f9f4 0%, #f3f6f0 100%); box-shadow: 0 5px 18px rgba(35, 73, 54, 0.045); }
 .neighbor-reputation-card { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; padding: 1rem; border: 1px solid #dce6dc; border-radius: 1rem; background: #f4f8f2; }
 .profile-review-action { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.9rem; margin-top: 1.2rem; padding: 1rem; border: 1px solid #dce6dc; border-radius: 1rem; background: #f7f8f2; }
