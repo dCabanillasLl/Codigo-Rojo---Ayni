@@ -57,6 +57,11 @@ if (emailProvider === "gmail" && emailFrom && gmailUser) {
     throw new Error("Con Gmail SMTP, EMAIL_FROM debe usar la misma dirección indicada en GMAIL_USER.");
   }
 }
+const verificationReviewerUserIds = (process.env.AYNI_REVIEWER_USER_IDS ?? "")
+  .split(",").map(value => value.trim()).filter(Boolean);
+if (verificationReviewerUserIds.some(value => !/^[1-9]\d{0,19}$/.test(value))) {
+  throw new Error("AYNI_REVIEWER_USER_IDS debe contener IDs de usuario positivos separados por coma.");
+}
 
 export const config = {
   production,
@@ -64,6 +69,7 @@ export const config = {
   origins,
   jwtSecret,
   dniHashSecret,
+  verificationReviewerUserIds,
   apiPeruKey: process.env.APIPERU_API_KEY ?? "",
   emailProvider,
   gmailUser,

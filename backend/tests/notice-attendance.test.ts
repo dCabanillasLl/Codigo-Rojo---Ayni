@@ -19,6 +19,49 @@ function app() {
   value.use('/api', notices, notifications); value.use(errorHandler); return value;
 }
 
+test('las respuestas de avisos convierten el EXISTS numérico o textual en un booleano', async context => {
+  config.dbConfigured = true;
+  let attendance: unknown = '0';
+  context.mock.method(pool, 'execute', async () => [[{
+    id: '42', autorId: '1', miAsistencia: attendance, estado: 'publicado', fechaEvento: date, venceEn: null,
+  }]]);
+  const api = app();
+  for (const [value, expected] of [[0, false], ['0', false], [false, false], [null, false], [1, true], ['1', true], [true, true]] as const) {
+    attendance = value;
+    const list = await request(api).get('/api/avisos').set('X-Test-User', '2').expect(200);
+    assert.equal(list.body.data[0].miAsistencia, expected);
+    const detail = await request(api).get('/api/avisos/42').set('X-Test-User', '2').expect(200);
+    assert.equal(detail.body.data.miAsistencia, expected);
+  }
+});
+
+test('un cero textual no concede acceso a actividades canceladas o vencidas ni a sus flyers', async context => {
+  config.dbConfigured = true;
+  let state = 'cancelado';
+  let attendance = '0';
+  context.mock.method(pool, 'execute', async (_sql: string, values: unknown[]) => [[{
+    id: '42', autorId: '1', miAsistencia: values[0] === '2' ? attendance : '0', estado: state, fechaEvento: date, venceEn: null,
+    imagen: Buffer.from([0xff, 0xd8, 0xff, 0xd9]), imagen_hash: 'a'.repeat(64),
+  }]]);
+  const api = app();
+  for (const status of ['cancelado', 'vencido']) {
+    state = status;
+    attendance = '0';
+    await request(api).get('/api/avisos/42').expect(404);
+    await request(api).get('/api/avisos/42').set('X-Test-User', '2').expect(404);
+    await request(api).get('/api/avisos/42/imagen').expect(404);
+    await request(api).get('/api/avisos/42/imagen').set('X-Test-User', '2').expect(404);
+    const owned = await request(api).get('/api/avisos/42').set('X-Test-User', '1').expect(200);
+    assert.equal(owned.body.data.miAsistencia, false);
+    attendance = '1';
+    const attended = await request(api).get('/api/avisos/42').set('X-Test-User', '2').expect(200);
+    assert.equal(attended.body.data.miAsistencia, true);
+    await request(api).get('/api/avisos/42/imagen').set('X-Test-User', '2').expect(200);
+    await request(api).get('/api/avisos/42').set('X-Test-User', '3').expect(404);
+    await request(api).get('/api/avisos/42/imagen').set('X-Test-User', '3').expect(404);
+  }
+});
+
 test('confirmar y retirar asistencia es idempotente; solo se aceptan confirmaciones en actividades vigentes', async context => {
   config.dbConfigured = true;
   const event = base(); const attendees = new Set<string>(); let locks = 0;

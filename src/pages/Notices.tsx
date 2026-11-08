@@ -7,20 +7,24 @@ import Icon from '../components/Icon';
 import type { LocationDraft, Notice } from '../types';
 import PhotoPicker from '../components/PhotoPicker';
 import { apiAssetUrl } from '../lib/api';
-import { localDateTimeInput, noticeCategory, noticeEditPayload, noticeStatus, noticeVenueChanged, noticeVisible } from '../lib/notices';
+import { localDateTimeInput, noticeAttendanceConfirmed, noticeCategory, noticeEditPayload, noticeStatus, noticeVenueChanged, noticeVisible } from '../lib/notices';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import ActivityLocationDialog from '../components/ActivityLocationDialog';
 import CommunityMap from '../components/CommunityMap';
 import { googleMapsUrl, locationInput, mapPoint } from '../lib/location';
 import { forgetNoticeCache } from '../lib/storage';
+import NoticeShareDialog from '../components/NoticeShareDialog';
 
 export default function Notices({ view }: { view?: string }) {
-  const { user, area, requireUser, online } = useApp();
+  const { user, area, requireUser, online, sessionLoading } = useApp();
   const [creating, setCreating] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  const detailId = view && /^[1-9]\d{0,19}$/.test(view) ? view : null;
   const tab = view === 'mios' || view === 'asistencias' ? view : 'cerca';
   const params = tab === 'mios' ? new URLSearchParams({ mios: '1' }) : tab === 'asistencias' ? new URLSearchParams({ asistire: '1' }) : areaQuery(area);
-  const notices = useRemote<Notice[]>(`/avisos?${params}`, user?.id || 'public');
+  const listing = useRemote<Notice[]>(detailId ? null : `/avisos?${params}`, user?.id || 'public');
+  const detail = useRemote<Notice>(detailId && !sessionLoading ? `/avisos/${detailId}` : null, user?.id || 'public');
+  const notices = detailId ? { ...detail, data: detail.data ? [detail.data] : null } : listing;
   useEffect(() => {
     if (!online) return;
     const refresh = () => { if (document.visibilityState === 'visible') notices.reload(); };
@@ -37,24 +41,28 @@ export default function Notices({ view }: { view?: string }) {
     document.addEventListener('visibilitychange', update);
     return () => { window.clearTimeout(timer); window.removeEventListener('focus', update); document.removeEventListener('visibilitychange', update); };
   }, [notices.data, now]);
-  const visible = notices.data?.filter(item => !deletedIds.has(item.id) && (tab !== 'cerca' || noticeVisible(item, Math.max(now, Date.now()))));
+  const visible = notices.data?.filter(item => !deletedIds.has(item.id) && (detailId || tab !== 'cerca' || noticeVisible(item, Math.max(now, Date.now()))));
   return <section data-tour="tour-notices">
+    {detailId && <button type="button" className="text-action notice-back-link" onClick={() => { window.location.hash = 'avisos'; }}>← Ver todos los avisos</button>}
     <PageHeading eyebrow="LO QUE PASA CERCA" title="Avisos del barrio" text="Actividades, campañas y avisos compartidos por vecinos.">
       <button data-tour="tour-notices" className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>Crear aviso</button>
     </PageHeading>
     <p className="form-hint mt-3">Los avisos son información compartida por vecinos; no representan comunicados oficiales.</p>
     <div className="notice-view-switch" role="group" aria-label="Ver avisos"><button type="button" className="notice-view-button notice-view-nearby" aria-pressed={tab === 'cerca'} onClick={() => { window.location.hash = 'avisos'; }}><Icon name="pin" size={18}/><span>Actividades cercanas</span></button><button type="button" className="notice-view-button notice-view-attending" aria-pressed={tab === 'asistencias'} onClick={() => { if (requireUser()) window.location.hash = 'avisos/asistencias'; }}><Icon name="check" size={18}/><span>Mis asistencias</span></button><button type="button" className="notice-view-button notice-view-owned" aria-pressed={tab === 'mios'} onClick={() => { if (requireUser()) window.location.hash = 'avisos/mios'; }}><Icon name="calendar" size={18}/><span>Mis actividades</span></button></div>
     <RemoteState {...notices}/>
-    {!notices.loading && !notices.error && visible?.length === 0 && <Empty title={tab === 'asistencias' ? 'Aún no confirmaste asistencia' : tab === 'mios' ? 'Aún no publicaste actividades' : 'Aún no hay avisos en tu zona'} text={tab === 'asistencias' ? 'Marca Asistiré en una actividad para seguir sus cambios.' : 'Comparte una actividad o campaña de tu barrio.'}/>}
-    <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{visible?.map(item => <article key={item.id} className="request-card">
-      <div className="notice-card-labels"><NoticeCategoryBadge name={item.categoria}/><NoticeStatusBadge item={item}/></div><h2 className="mt-3 text-xl font-bold">{item.titulo}</h2>
-      <p className="card-description whitespace-pre-wrap">{item.contenido}</p>
-      {item.imagenUrl && <a href={apiAssetUrl(item.imagenUrl)} target="_blank" rel="noopener noreferrer" aria-label={`Ver flyer completo: ${item.titulo}`}><img className="mt-4 max-h-96 w-full rounded-2xl object-contain" src={apiAssetUrl(item.imagenUrl)} alt={`Flyer: ${item.titulo}`} loading="lazy" referrerPolicy="no-referrer"/><span className="text-action text-sm">Ver flyer completo</span></a>}
-      <p className="mt-4 text-sm text-[#68766f]">{distance(item.distanciaMetros, 'Distancia no disponible')} · {item.autor}</p>
-      {item.fechaEvento && <p className="mt-1 text-sm text-[#68766f]">{formatDate(item.fechaEvento)}</p>}
-      <ActivityVenue item={item}/>
-      {item.motivoCambio && <p className="form-hint mt-2"><b>Último cambio:</b> {item.motivoCambio}</p>}
-      <p className="mt-1 text-xs text-[#87918b]">Publicado {formatDate(item.creadoEn)}</p>
+    {!notices.loading && !notices.error && visible?.length === 0 && <Empty title={tab === 'asistencias' ? 'Aún no confirmaste asistencia' : tab === 'mios' ? 'Aún no publicaste actividades' : 'Aún no hay avisos en tu zona'} text={tab === 'asistencias' ? 'Pulsa Confirmar asistencia en una actividad para seguir sus cambios.' : 'Comparte una actividad o campaña de tu barrio.'}/>}
+    <div className="notice-grid">{visible?.map(item => <article key={item.id} className="notice-card" aria-labelledby={`notice-title-${item.id}`}>
+      <div className="notice-card-labels"><NoticeCategoryBadge name={item.categoria}/><NoticeStatusBadge item={item}/></div>
+      <h2 id={`notice-title-${item.id}`} className="notice-title font-display">{item.titulo}</h2>
+      <p className="notice-description">{item.contenido}</p>
+      {item.imagenUrl && <a className="notice-flyer" href={apiAssetUrl(item.imagenUrl)} target="_blank" rel="noopener noreferrer" aria-label={`Ver flyer completo: ${item.titulo}`}><div className="notice-flyer-frame"><img src={apiAssetUrl(item.imagenUrl)} alt={`Flyer: ${item.titulo}`} loading="lazy" referrerPolicy="no-referrer"/></div><span className="notice-flyer-link">Ver flyer completo<Icon name="chevron" size={16}/></span></a>}
+      <div className="notice-details">
+        {item.fechaEvento && <div className="notice-detail-row"><Icon name="calendar" size={18}/><p>{formatDate(item.fechaEvento)}</p></div>}
+        <ActivityVenue item={item}/>
+        <div className="notice-detail-row"><Icon name="user" size={18}/><p>Autor: {item.autor}<span className="notice-distance">{distance(item.distanciaMetros, 'Distancia no disponible')}</span></p></div>
+        <div className="notice-detail-row notice-published"><Icon name="clock" size={18}/><p>Publicado {formatDate(item.creadoEn)}</p></div>
+      </div>
+      {item.motivoCambio && <p className="notice-change-note"><b>Último cambio:</b> {item.motivoCambio}</p>}
       <AttendanceActions item={item} onDeleted={id => setDeletedIds(current => new Set(current).add(id))}/>
     </article>)}</div>
     {creating && <NoticeForm close={() => setCreating(false)}/>}
@@ -90,8 +98,9 @@ function AttendanceActions({ item, onDeleted }: { item: Notice; onDeleted: (id: 
   const [managing, setManaging] = useState(false);
   const [editing, setEditing] = useState<Notice | null>(null);
   const [deleting, setDeleting] = useState<Notice | null>(null);
+  const [sharing, setSharing] = useState(false);
   const owner = item.autorId === user?.id;
-  const confirmed = Boolean(item.miAsistencia);
+  const confirmed = Boolean(user) && noticeAttendanceConfirmed(item.miAsistencia);
   async function confirm() {
     if (!requireUser() || !user || busy) return;
     setBusy(true); setError('');
@@ -100,19 +109,20 @@ function AttendanceActions({ item, onDeleted }: { item: Notice; onDeleted: (id: 
       refreshData(); notify(confirmed ? 'Retiraste tu confirmación de asistencia.' : 'Asistencia confirmada. Recibirás los cambios de esta actividad en tu campana.');
     } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   }
-  return <div className="mt-4">
-    <p className="text-sm font-bold text-[#28593f]">{Number(item.totalAsistentes || 0)} {Number(item.totalAsistentes) === 1 ? 'persona confirmó asistencia' : 'personas confirmaron asistencia'}</p>
+  return <div className="notice-attendance">
+    <p className="notice-attendance-count" aria-live="polite" aria-atomic="true">{Number(item.totalAsistentes || 0)} {Number(item.totalAsistentes) === 1 ? 'persona confirmó asistencia' : 'personas confirmaron asistencia'}</p>
     {owner && <p className="form-hint">{item.estado === 'cancelado' ? 'Esta actividad está cancelada. Puedes eliminarla permanentemente.' : 'Revisa las confirmaciones para decidir si mantienes, postergas o cancelas la actividad.'}</p>}
     {owner && item.estado !== 'cancelado' && <button type="button" className="text-action notice-edit-action" disabled={!online} onClick={() => setEditing(item)}><Icon name="calendar" size={16}/>Editar actividad o ubicación</button>}
     <div className="notice-card-actions">
-      {owner ? ['publicado', 'vencido'].includes(item.estado) && <button type="button" className="outline-btn" disabled={!online} onClick={() => setManaging(true)}><span>Postergar o cancelar</span></button> : (confirmed || noticeVisible(item)) && <button type="button" className={confirmed ? 'outline-btn attendance-toggle' : 'record-button attendance-toggle'} aria-pressed={confirmed} disabled={busy || !online} onClick={() => void confirm()}><Icon name="check" size={17}/><span>{busy ? 'Guardando…' : confirmed ? 'Asistiré · Quitar confirmación' : 'Asistiré'}</span></button>}
-      {item.estado !== 'cancelado' && <a className="whatsapp-btn" href={`https://wa.me/?text=${encodeURIComponent(`${item.titulo}\n${window.location.origin}/#avisos`)}`} target="_blank" rel="noopener noreferrer"><Icon name="whatsapp" size={20}/><span>Compartir por WhatsApp</span></a>}
+      {owner ? ['publicado', 'vencido'].includes(item.estado) && <button type="button" className="outline-btn" disabled={!online} onClick={() => setManaging(true)}><span>Postergar o cancelar</span></button> : (confirmed || noticeVisible(item)) && <button type="button" className="attendance-toggle" aria-pressed={confirmed} disabled={busy || !online} onClick={() => void confirm()}><span className="attendance-check"><Icon name="check" size={19}/></span><span>{busy ? 'Guardando…' : confirmed ? 'Quitar confirmación' : 'Confirmar asistencia'}</span></button>}
+      {item.estado !== 'cancelado' && <button type="button" className="whatsapp-btn" onClick={() => setSharing(true)}><Icon name="whatsapp" size={20}/><span>Compartir por WhatsApp</span></button>}
       {owner && item.estado === 'cancelado' && <button type="button" className="notice-delete-button" disabled={!online} onClick={() => setDeleting(item)}><Icon name="close" size={17}/><span>Eliminar permanentemente</span></button>}
     </div>
     <ErrorBox message={error}/>
     {managing && <EventChangeDialog item={item} onClose={() => setManaging(false)}/>}
     {editing && item.estado !== 'cancelado' && <NoticeForm initial={editing} close={() => setEditing(null)}/>}
     {deleting && <DeleteActivityDialog item={deleting} onClose={() => setDeleting(null)} onDeleted={() => onDeleted(deleting.id)}/>}
+    {sharing && item.estado !== 'cancelado' && <NoticeShareDialog item={item} onClose={() => setSharing(false)}/>}
   </div>;
 }
 

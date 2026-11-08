@@ -1,0 +1,65 @@
+.profile-card.neighbor-reputation-panel {
+  align-self: start;
+  min-width: 0;
+  padding: clamp(1.1rem, 2.5vw, 1.8rem);
+  border-color: #dce4d9;
+  border-radius: 1.5rem;
+  background: #fffef9;
+  box-shadow: 0 8px 28px #2744380a;
+}
+.neighbor-reputation-heading .eyebrow { font-size: 0.69rem; letter-spacing: 0.14em; }
+.neighbor-reputation-heading h2 {
+  margin: 0.65rem 0 0;
+  color: #244c39;
+  font-size: clamp(1.45rem, 2.3vw, 1.85rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.neighbor-rank-summary { margin-top: 1.5rem; padding-bottom: 1.45rem; border-bottom: 1px solid #e1e6dc; }
+.neighbor-rank-heading { display: flex; align-items: center; gap: 0.85rem; }
+.neighbor-rank-illustration { display: block; width: 4.1rem; height: 4.1rem; flex: 0 0 auto; }
+.neighbor-rank-heading h3 { margin: 0; color: #60723c; font-size: clamp(1.15rem, 1.8vw, 1.4rem); font-weight: 800; line-height: 1.3; letter-spacing: -0.025em; }
+.neighbor-rank-summary > p { margin: 0.75rem 0 0; color: #506155; font-size: 0.9rem; line-height: 1.7; }
+.neighbor-reputation-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem; margin: 1.2rem 0 0; }
+.neighbor-reputation-stat {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.85rem 0.75rem;
+  border: 1px solid #dfe5da;
+  border-radius: 1rem;
+  background: #fff;
+}
+.neighbor-reputation-stat dt { grid-row: 2; color: #5c6b60; font-size: 0.8rem; line-height: 1.45; }
+.neighbor-reputation-stat dd { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; grid-row: 1; min-width: 0; margin: 0; }
+.neighbor-reputation-stat dd > span:first-child { min-width: 0; color: #244c39; font-size: clamp(1.4rem, 2.4vw, 1.85rem); font-weight: 800; line-height: 1.2; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.neighbor-stat-icon { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; flex: 0 0 auto; border-radius: 50%; background: #eef2e5; color: #75874b; }
+.neighbor-stat-icon svg { max-width: 70%; max-height: 70%; }
+.neighbor-review-action { display: grid; gap: 1.1rem; margin-top: 1.4rem; padding: 1.15rem; border: 1px solid #c4d5bb; border-radius: 1.2rem; background: #eaf1e5; }
+.neighbor-review-action b { display: block; color: #244c39; font-size: 1rem; font-weight: 800; line-height: 1.45; }
+.neighbor-review-action p { margin: 0.4rem 0 0; color: #53684f; font-size: 0.88rem; line-height: 1.65; }
+.neighbor-review-button {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  width: 100%; min-width: 0; min-height: 50px; padding: 0.85rem;
+  border: 1px solid #315f49; border-radius: 0.85rem; background: #315f49; color: #fff;
+  font-size: 0.85rem; font-weight: 750; line-height: 1.4; text-align: center;
+  box-shadow: 0 3px 8px #244c3912; cursor: pointer;
+}
+.neighbor-review-button svg { flex: 0 0 auto; color: #cad8ae; fill: #cad8ae; }
+.neighbor-review-button:hover { border-color: #244c39; background: #244c39; }
+.neighbor-review-button:focus-visible { outline: 3px solid #87b69a; outline-offset: 3px; }
+.neighbor-review-button span { min-width: 0; }
+.neighbor-reputation-panel .profile-reviews-empty { padding: 0.95rem 1rem; border-color: #dce4d6; background: #f8f9f2; font-size: 0.8rem; line-height: 1.65; }
+.neighbor-reputation-note { display: flex; align-items: flex-start; gap: 0.5rem; margin: 1.2rem 0 0; padding-top: 1rem; border-top: 1px solid #e5e9df; color: #73806f; font-size: 0.73rem; line-height: 1.65; }
+.neighbor-reputation-note svg { flex: 0 0 auto; margin-top: 0.15rem; color: #8a986e; }
+@media (max-width: 380px) {
+  .neighbor-reputation-stats { gap: 0.45rem; }
+  .neighbor-reputation-stat { padding: 0.75rem 0.5rem; }
+  .neighbor-reputation-stat dt { font-size: 0.72rem; }
+  .neighbor-stat-icon { width: 1.35rem; height: 1.35rem; }
+  .neighbor-review-action { padding: 0.9rem; }
+  .neighbor-review-button { gap: 0.4rem; padding: 0.75rem 0.5rem; font-size: 0.8rem; }
+}

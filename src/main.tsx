@@ -7,6 +7,8 @@ import "./index.css";
 import "./maps.css";
 import "./photos.css";
 import "./nearby-filters.css";
+import "./reputation.css";
+import "./notices.css";
 
 if (import.meta.env.PROD && window.isSecureContext && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

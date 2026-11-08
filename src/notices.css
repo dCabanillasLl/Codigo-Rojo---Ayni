@@ -1,0 +1,72 @@
+.notice-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 1.25rem; margin-top: 1.25rem; }
+.notice-back-link { display: inline-flex; min-height: 44px; align-items: center; margin-bottom: 0.5rem; }
+.notice-card {
+  display: flex; flex-direction: column; min-width: 0;
+  padding: clamp(1.1rem, 2.5vw, 1.6rem);
+  border: 1px solid #dde4d9; border-radius: 1.5rem; background: #fffef9;
+  box-shadow: 0 6px 20px #2744380b;
+}
+.notice-card .notice-card-labels { align-items: flex-start; flex-wrap: nowrap; gap: 0.6rem; }
+.notice-card .notice-category { min-width: 0; padding: 0.45rem 0.7rem; font-size: 0.75rem; line-height: 1.35; overflow-wrap: anywhere; }
+.notice-card .notice-status { padding: 0.5rem 0.65rem; font-size: 0.66rem; }
+.notice-title { margin: 1.1rem 0 0; color: #263e32; font-size: clamp(1.2rem, 2vw, 1.4rem); font-weight: 800; line-height: 1.35; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.notice-description { margin: 0.45rem 0 0; color: #59675d; font-size: 0.95rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notice-flyer { display: block; margin-top: 1.15rem; color: #315f49; text-decoration: none; }
+.notice-flyer-frame { overflow: hidden; border: 1px solid #e4e8dc; border-radius: 1rem; background: #f1f3e9; }
+.notice-flyer img { display: block; width: 100%; max-height: 24rem; object-fit: contain; }
+.notice-flyer-link { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 36px; margin-top: 0.2rem; font-size: 0.85rem; font-weight: 600; }
+.notice-flyer-link svg { transform: rotate(90deg); }
+.notice-flyer:hover .notice-flyer-link { text-decoration: underline; text-underline-offset: 3px; }
+.notice-flyer:focus-visible { outline: 3px solid #87b69a; outline-offset: 4px; border-radius: 1rem; }
+.notice-details { display: grid; gap: 0.8rem; margin-top: 1.2rem; color: #526056; }
+.notice-detail-row { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.85rem; line-height: 1.5; }
+.notice-detail-row > svg { flex: 0 0 auto; margin-top: 0.1rem; color: #71816e; }
+.notice-detail-row p { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.notice-distance { display: block; margin-top: 0.1rem; color: #7c877b; font-size: 0.76rem; }
+.notice-published { color: #7c877b; font-size: 0.77rem; }
+.notice-card .activity-venue { min-width: 0; margin: 0; gap: 0.2rem; }
+.notice-card .activity-venue > p { gap: 0.6rem; color: #526056; font-size: 0.85rem; }
+.notice-card .activity-venue > p > svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 0.1rem; color: #71816e; }
+.notice-card .activity-venue > p > span { min-width: 0; overflow-wrap: anywhere; }
+.notice-card .activity-venue > .text-action { min-height: 32px; margin-left: 1.72rem; font-size: 0.83rem; }
+.notice-change-note { margin: 1rem 0 0; padding: 0.7rem 0.8rem; border-left: 3px solid #d9a443; border-radius: 0 0.6rem 0.6rem 0; background: #f8f3e8; color: #756342; font-size: 0.8rem; line-height: 1.6; overflow-wrap: anywhere; }
+.notice-attendance { margin-top: auto; padding-top: 1.25rem; }
+.notice-attendance-count { margin: 0; color: #2d4b38; font-size: 0.88rem; font-weight: 750; line-height: 1.5; }
+.notice-attendance > .form-hint { margin-top: 0.4rem; line-height: 1.55; }
+.notice-card .notice-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; margin-top: 0.85rem; }
+.notice-card .notice-card-actions > button,
+.notice-card .notice-card-actions > a { width: 100%; min-height: 54px; padding: 0.75rem 0.6rem; border-radius: 0.9rem; font-size: 0.82rem; font-weight: 750; line-height: 1.35; }
+.notice-card-actions > :only-child { grid-column: 1 / -1; }
+.notice-card .attendance-toggle { border: 1px solid #315f49; background: #315f49; color: #fff; box-shadow: 0 3px 8px #244c3912; }
+.notice-card .attendance-toggle:hover:not(:disabled) { border-color: #244c39; background: #244c39; }
+.notice-card .attendance-toggle[aria-pressed="true"] { border-color: #b5cbb1; background: #e6efe1; color: #315f49; box-shadow: none; }
+.notice-card .attendance-toggle[aria-pressed="true"]:hover:not(:disabled) { border-color: #8eae8d; background: #d8e7d3; }
+.attendance-check { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; flex: 0 0 auto; border-radius: 50%; background: #ffffff24; }
+.attendance-toggle[aria-pressed="true"] .attendance-check { background: #315f49; color: #fff; }
+.notice-card .notice-card-actions > .whatsapp-btn { gap: 0.45rem; border-color: #168342; background: #168342; }
+.notice-card .notice-card-actions > .whatsapp-btn:hover { border-color: #106b35; background: #106b35; }
+.notice-card .notice-card-actions > :focus-visible { outline: 3px solid #87b69a; outline-offset: 3px; }
+.notice-card .notice-card-actions > .outline-btn { border-color: #cbd8cc; background: #f8faf3; color: #315f49; }
+.notice-share-reset { justify-self: start; margin-top: -0.4rem; font-size: 0.8rem; }
+.notice-share-flyer { display: grid; gap: 0.85rem; padding: 1rem; border: 1px solid #dce5d7; border-radius: 1rem; background: #f4f7ee; }
+.notice-share-flyer-preview { display: flex; align-items: center; gap: 0.85rem; min-width: 0; }
+.notice-share-flyer-preview img { width: 4.5rem; height: 5.5rem; flex: 0 0 auto; object-fit: contain; border: 1px solid #dce5d7; border-radius: 0.55rem; background: #fffef9; }
+.notice-share-flyer-preview > div { min-width: 0; }
+.notice-share-flyer-preview b { color: #315f49; font-size: 0.9rem; }
+.notice-share-flyer-preview p { margin: 0.25rem 0; color: #657361; font-size: 0.8rem; line-height: 1.5; }
+.notice-share-flyer-preview .text-action { min-height: 32px; font-size: 0.8rem; }
+.notice-share-image-button { justify-content: center; width: 100%; min-height: 44px; border-color: #c1d0b9; background: #fffef9; color: #315f49; font-size: 0.82rem; }
+.notice-share-include { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0; color: #315f49; font-size: 0.85rem; line-height: 1.5; }
+.notice-share-include input { flex: 0 0 auto; margin-top: 0.2rem; }
+.notice-share-ready { display: flex; align-items: center; gap: 0.4rem; color: #397254; font-size: 0.8rem; }
+.notice-share-form .event-change-actions { grid-template-columns: auto minmax(0, 1fr); }
+@media (min-width: 768px) { .notice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 380px) {
+  .notice-card { padding: 1rem; }
+  .notice-card .notice-category { padding: 0.4rem 0.55rem; font-size: 0.68rem; }
+  .notice-card .notice-status { padding: 0.45rem 0.5rem; font-size: 0.6rem; }
+  .notice-card .notice-card-actions { gap: 0.5rem; }
+  .notice-card .notice-card-actions > button,
+  .notice-card .notice-card-actions > a { gap: 0.35rem; padding: 0.65rem 0.4rem; font-size: 0.74rem; }
+  .attendance-check { width: 1.35rem; height: 1.35rem; }
+}

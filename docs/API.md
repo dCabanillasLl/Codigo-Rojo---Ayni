@@ -162,7 +162,7 @@ Errores específicos: 400 `INVALID_PHOTO`, `PHOTO_DIMENSIONS_TOO_LARGE`,
 | POST `/api/publicaciones` | `{categoriaId,tipo,titulo,descripcion?,modalidadPrecio,precio?,sectorId,estado?}` → `{data: Publicacion}` | 201 |
 | GET `/api/publicaciones/:id` | Sin cuerpo → `{data: Publicacion}` pública publicada o propia | 200 |
 | PATCH `/api/publicaciones/:id` | Campos editables de creación, al menos uno → `{data: Publicacion}` actualizada; solo propietario | 200 |
-| GET `/api/publicaciones/:id/resenas` | Sin cuerpo → `{data: Resena[]}`; `verificada:false` | 200 |
+| GET `/api/publicaciones/:id/resenas` | Filtro, página, tamaño y orden → recomendaciones con estado de verificación | 200 |
 
 Publicación: `{id,propietarioId,propietario,telefonoContacto,categoriaId,categoria,tipo,titulo,descripcion,
 modalidadPrecio,precio,moneda,estado,sectorId,sectorNombre,distanciaMetros,
@@ -343,6 +343,8 @@ no envía WhatsApp ni mensajes en nombre de usuarios.
 ### Asistencia y cambios de actividades
 
 Los avisos incluyen `totalAsistentes`, `miAsistencia`, `revisionEvento` y `motivoCambio`.
+`miAsistencia` siempre se devuelve como booleano (`true` o `false`), aunque MySQL
+devuelva el resultado de `EXISTS` como texto `"0"` o `"1"`.
 `ultimoCambioEvento` distingue `postergado`, `reprogramado`, `cancelado` y `retirado`
 (nullable para registros anteriores; migración 009). Permite mostrar etiquetas de
 estado sin confundir una actualización de vencimiento con una postergación. El estado
@@ -394,3 +396,101 @@ Errores: 400 `VALIDATION_ERROR`/`USER_MESSAGE_REQUIRED`, 429 `AI_RATE_LIMITED` o
 `GEMINI_NOT_CONFIGURED`/`GEMINI_AUTH_FAILED`/`GEMINI_UNAVAILABLE`. Sin clave o si
 Gemini no responde, la interfaz conserva sus acciones rápidas y muestra una respuesta
 de contingencia.
+
+### Identidad y pertenencia a zona
+
+`POST /api/identity/dni/lookup` consulta API Perú para prellenar nombres y emite una
+prueba firmada de corta duración para el registro. Esa consulta **no acredita la
+titularidad del DNI**; la cuenta nueva queda `PENDIENTE` hasta revisión manual. GPS y la
+zona declarada tampoco acreditan residencia. El backend no devuelve el hash del DNI,
+domicilio ni coordenadas en estas rutas.
+
+| Método y ruta | Entrada / operación | Éxito |
+|---|---|---|
+| GET `/api/identity/me` | Estado de identidad de la cuenta autenticada: estado, método y fechas | 200 |
+| POST `/api/identity/verification-request` | `{}`; solicita revisión manual o reabre un rechazo/revocación | 200 |
+| GET `/api/identity/zones` | Membresías propias, zona aproximada, estado, fechas y vigencia | 200 |
+| POST `/api/identity/zones` | `{sectorId:string}`; crea/reabre una solicitud sin adjuntar domicilio ni GPS | 202 |
+| GET `/api/admin/verifications?tipo=identidad\|zona` | Cola pendiente limitada a 100 entradas; solo revisor configurado | 200 |
+| PATCH `/api/admin/verifications/identity/:userId` | `{accion:"aprobar"\|"rechazar"\|"revocar",metodo,motivo?}` | 200 |
+| PATCH `/api/admin/verifications/zones/:id` | Mismo cuerpo; aprobar puede incluir `venceEn` ISO-8601 | 200 |
+
+Los métodos admitidos son `REVISION_PRESENCIAL`, `REFERENCIA_VECINAL`,
+`VALIDACION_INSTITUCIONAL` y `OTRO`. Rechazar o revocar requiere un motivo; el motivo
+no puede contener una cadena de ocho dígitos. Aprobar/rechazar solo acepta solicitudes
+pendientes; revocar solo verificaciones vigentes. Nadie puede revisar su propia cuenta.
+Las acciones y actor se guardan en `auditoria_verificaciones` dentro de la misma
+transacción.
+
+No existe un rol administrativo persistido en el esquema: las cuentas autorizadas se
+configuran exclusivamente en el servidor con `AYNI_REVIEWER_USER_IDS=12,34` (IDs internos
+de usuarios). Vacío significa que nadie puede revisar. Nunca se acepta un rol enviado
+por el navegador. El equipo debe contrastar la identidad/residencia fuera de AYNI; no se
+suben ni almacenan documentos de prueba.
+
+### Interacciones verificables con productos y servicios
+
+Las interacciones pertenecen a publicaciones de producto o servicio y se mantienen
+separadas de solicitudes de ayuda, colaboraciones y reservas de recursos. Solo los dos
+participantes pueden consultar el detalle. La respuesta no incluye correo, teléfono,
+DNI, dirección ni coordenadas.
+
+| Método y ruta | Entrada / operación | Éxito |
+|---|---|---|
+| POST `/api/publicaciones/:id/interacciones` | `{tipo:"CONSULTA"|"COMPRA"|"CONTRATACION"|"OTRO"}`; el dueño se obtiene de la publicación | 201; 200 devuelve la interacción activa previa |
+| GET `/api/interacciones` | Interacciones propias; opcional `?publicacionId=:id`; cada una incluye `resenaCreada` | 200 |
+| GET `/api/interacciones/:id` | Detalle visible solo a los participantes | 200 |
+| PATCH `/api/interacciones/:id` | `{accion:"aceptar"|"rechazar"|"iniciar"|"cumplir"|"confirmar"|"cancelar"}` | 200 |
+
+El proveedor acepta o rechaza una propuesta pendiente, inicia una interacción aceptada
+y marca el cumplimiento cuando está en curso. Quien inició la interacción confirma la
+recepción después del cumplimiento. Solo esa segunda confirmación deja el estado
+`CONFIRMADA`; repetir una acción ya registrada es idempotente. Cualquiera de los
+participantes puede cancelar antes de la confirmación final. Un tercero recibe 404 para
+no revelar si existe la interacción; una acción de participante con transición inválida
+recibe 409. Otros errores posibles: 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`,
+404 `PUBLICATION_NOT_AVAILABLE`/`INTERACTION_NOT_FOUND`, 409 `SELF_INTERACTION`,
+`INVALID_TRANSITION`/`FULFILLMENT_REQUIRED`, 503 `DATABASE_SCHEMA_REQUIRED`.
+
+Para la Fase 5, `getConfirmedPublicationInteraction` en
+`backend/src/services/publication-interactions.ts` proporciona una consulta reutilizable
+que exige coincidencia de interacción, publicación y solicitante, y ambas confirmaciones.
+La siguiente sección describe la API de recomendaciones implementada en Fase 5.
+
+### Recomendaciones de productos y servicios
+
+Las reseñas del muro de ayuda (`resenas_colaboracion`) permanecen independientes. Esta
+API trabaja con `resenas` vinculadas a publicaciones. `NO_VERIFICADA` significa que no se
+aportó una interacción; `PENDIENTE` significa que se vinculó una interacción válida pero
+aún falta confirmarla o acreditar identidad/zona; `VERIFICADA` se calcula al consultar y
+solo aparece mientras coinciden todas las evidencias vigentes. Las reseñas históricas sin
+interacción siguen como `NO_VERIFICADA`.
+
+| Método y ruta | Entrada / operación | Éxito |
+|---|---|---|
+| POST `/api/publicaciones/:id/resenas` | `{calificacion:1..5, comentario?:string, interaccionId?:string}`; autor desde sesión | 201 |
+| GET `/api/publicaciones/:id/resenas` | `?filtro=todas\|verificadas\|no_verificadas\|pendientes&pagina=1&porPagina=20&orden=recientes\|antiguas` | 200 `{data:[],paginacion:{pagina,porPagina,total,totalPaginas}}` |
+| GET `/api/publicaciones/:id/resenas/resumen` | Conteos, promedios separados y `miOpinion` para la sesión actual | 200 |
+
+El POST no acepta autor, proveedor, identidad, zona ni estado de verificación desde el
+cliente. Una opinión sin `interaccionId` queda `NO_VERIFICADA`; una experiencia activa o
+confirmada que todavía no satisface identidad/zona queda `PENDIENTE`. La interacción debe
+pertenecer al autor, a esta publicación y al proveedor que consta en ella; una interacción
+rechazada o cancelada no puede respaldar una opinión. El autor no puede reseñar su propia
+publicación y solo se admite una opinión por autor y publicación.
+
+Errores principales: 400 `VALIDATION_ERROR`/`COMMUNITY_CONTENT_RESTRICTED`, 401
+`UNAUTHENTICATED`, 404 `PUBLICATION_NOT_FOUND`, 409 `SELF_REVIEW_FORBIDDEN`,
+`REVIEW_ALREADY_EXISTS`, `INTERACTION_MISMATCH`/`INTERACTION_INVALID`, 503
+`DATABASE_SCHEMA_REQUIRED`. La lista expone solo el nombre público abreviado, calificación,
+comentario y fechas; nunca DNI, teléfono, correo, domicilio, coordenadas ni documentos.
+
+El resumen separa `verificadas`, `noVerificadas` y `pendientes`; el promedio principal
+`promedioVerificado` usa solo opiniones verificadas. `promedioGeneral` se devuelve aparte.
+La revocación de identidad, revocación/vencimiento de la zona o cancelación de evidencia
+retira el sello en las siguientes consultas, sin borrar la opinión ni confiar en el valor
+persistido de `estado_verificacion`.
+
+La API exige identidad vigente y pertenencia de zona verificada y no vencida del autor,
+en el sector de la publicación. La experiencia vinculada demuestra que el proveedor es
+el propietario y que el autor confirmó la recepción; el sello se recalcula en cada lectura.

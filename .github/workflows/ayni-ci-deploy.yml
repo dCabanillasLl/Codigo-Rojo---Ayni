@@ -1,4 +1,4 @@
-name: AYNI CI y despliegue
+name: AYNI CI
 
 on:
   pull_request:
@@ -72,6 +72,15 @@ jobs:
       - name: Ejecutar pruebas unitarias del backend
         run: npm --prefix backend test
 
+      - name: Habilitar triggers en MySQL desechable
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_PWD: ayni-ci-root-only-password
+        # Las migraciones 015+ crean triggers; el ajuste solo afecta a este contenedor temporal.
+        run: >-
+          docker exec --env MYSQL_PWD="$MYSQL_PWD" "$MYSQL_CONTAINER"
+          mysql --user=root --execute="SET GLOBAL log_bin_trust_function_creators = 1;"
+
       - name: Crear esquema desechable y aplicar migraciones
         working-directory: backend
         run: node scripts/migrate.mjs --baseline --apply
@@ -79,20 +88,3 @@ jobs:
       - name: Probar API y recorrido entre vecinos en MySQL
         working-directory: backend
         run: node --import tsx --test tests/api.integration.test.ts tests/community.integration.test.ts
-
-  deploy-render:
-    name: Desplegar API en Render
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Comprobar y disparar despliegues de Render
-        env:
-          RENDER_BACKEND_DEPLOY_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$RENDER_BACKEND_DEPLOY_HOOK" ]; then
-            echo "Falta el secreto RENDER_BACKEND_DEPLOY_HOOK en GitHub."
-            exit 1
-          fi
-          curl --fail --silent --show-error -X POST "$RENDER_BACKEND_DEPLOY_HOOK"

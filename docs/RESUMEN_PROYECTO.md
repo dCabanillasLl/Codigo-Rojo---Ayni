@@ -33,8 +33,14 @@ servicios del barrio, publicar necesidades, ofrecer ayuda y compartir recursos.
   Esta opción pide confirmación antes de borrar. Al confirmar se eliminan la actividad,
   su flyer y las confirmaciones. Las notificaciones de cancelación pendientes se
   conservan para quienes todavía no se hayan conectado.
-- **Confirmar asistencia:** marcar **Asistiré** y consultar las actividades en
+- **Confirmar asistencia:** pulsar **Confirmar asistencia** y usar **Quitar confirmación**
+  si se cambia de opinión. Consultar las actividades en
   **Mis asistencias**. Cada anuncio muestra cuántos vecinos confirmaron.
+- **Compartir avisos:** personalizar un mensaje con título, fecha y dirección y
+  abrirlo directamente en WhatsApp. En la app Android se puede adjuntar el flyer
+  al mensaje y abrir ambos juntos en WhatsApp. En la web, el flyer se comparte por
+  separado desde el menú del dispositivo o se abre para guardarlo. El envío siempre
+  lo realiza el usuario.
 - **Gestionar actividades:** desde **Mis actividades**, el creador puede postergar
   para una fecha posterior o cancelar, indicando el motivo. Quienes siguen confirmados
   reciben el cambio en la campana de AYNI, aunque se conecten más tarde. La decisión
