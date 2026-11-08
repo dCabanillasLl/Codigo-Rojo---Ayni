@@ -13,14 +13,18 @@ import ActivityLocationDialog from '../components/ActivityLocationDialog';
 import CommunityMap from '../components/CommunityMap';
 import { googleMapsUrl, locationInput, mapPoint } from '../lib/location';
 import { forgetNoticeCache } from '../lib/storage';
+import NoticeShareDialog from '../components/NoticeShareDialog';
 
 export default function Notices({ view }: { view?: string }) {
-  const { user, area, requireUser, online } = useApp();
+  const { user, area, requireUser, online, sessionLoading } = useApp();
   const [creating, setCreating] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  const detailId = view && /^[1-9]\d{0,19}$/.test(view) ? view : null;
   const tab = view === 'mios' || view === 'asistencias' ? view : 'cerca';
   const params = tab === 'mios' ? new URLSearchParams({ mios: '1' }) : tab === 'asistencias' ? new URLSearchParams({ asistire: '1' }) : areaQuery(area);
-  const notices = useRemote<Notice[]>(`/avisos?${params}`, user?.id || 'public');
+  const listing = useRemote<Notice[]>(detailId ? null : `/avisos?${params}`, user?.id || 'public');
+  const detail = useRemote<Notice>(detailId && !sessionLoading ? `/avisos/${detailId}` : null, user?.id || 'public');
+  const notices = detailId ? { ...detail, data: detail.data ? [detail.data] : null } : listing;
   useEffect(() => {
     if (!online) return;
     const refresh = () => { if (document.visibilityState === 'visible') notices.reload(); };
@@ -37,8 +41,9 @@ export default function Notices({ view }: { view?: string }) {
     document.addEventListener('visibilitychange', update);
     return () => { window.clearTimeout(timer); window.removeEventListener('focus', update); document.removeEventListener('visibilitychange', update); };
   }, [notices.data, now]);
-  const visible = notices.data?.filter(item => !deletedIds.has(item.id) && (tab !== 'cerca' || noticeVisible(item, Math.max(now, Date.now()))));
+  const visible = notices.data?.filter(item => !deletedIds.has(item.id) && (detailId || tab !== 'cerca' || noticeVisible(item, Math.max(now, Date.now()))));
   return <section data-tour="tour-notices">
+    {detailId && <button type="button" className="text-action notice-back-link" onClick={() => { window.location.hash = 'avisos'; }}>← Ver todos los avisos</button>}
     <PageHeading eyebrow="LO QUE PASA CERCA" title="Avisos del barrio" text="Actividades, campañas y avisos compartidos por vecinos.">
       <button data-tour="tour-notices" className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>Crear aviso</button>
     </PageHeading>
@@ -93,6 +98,7 @@ function AttendanceActions({ item, onDeleted }: { item: Notice; onDeleted: (id: 
   const [managing, setManaging] = useState(false);
   const [editing, setEditing] = useState<Notice | null>(null);
   const [deleting, setDeleting] = useState<Notice | null>(null);
+  const [sharing, setSharing] = useState(false);
   const owner = item.autorId === user?.id;
   const confirmed = Boolean(user) && noticeAttendanceConfirmed(item.miAsistencia);
   async function confirm() {
@@ -109,13 +115,14 @@ function AttendanceActions({ item, onDeleted }: { item: Notice; onDeleted: (id: 
     {owner && item.estado !== 'cancelado' && <button type="button" className="text-action notice-edit-action" disabled={!online} onClick={() => setEditing(item)}><Icon name="calendar" size={16}/>Editar actividad o ubicación</button>}
     <div className="notice-card-actions">
       {owner ? ['publicado', 'vencido'].includes(item.estado) && <button type="button" className="outline-btn" disabled={!online} onClick={() => setManaging(true)}><span>Postergar o cancelar</span></button> : (confirmed || noticeVisible(item)) && <button type="button" className="attendance-toggle" aria-pressed={confirmed} disabled={busy || !online} onClick={() => void confirm()}><span className="attendance-check"><Icon name="check" size={19}/></span><span>{busy ? 'Guardando…' : confirmed ? 'Quitar confirmación' : 'Confirmar asistencia'}</span></button>}
-      {item.estado !== 'cancelado' && <a className="whatsapp-btn" href={`https://wa.me/?text=${encodeURIComponent(`${item.titulo}\n${window.location.origin}/#avisos`)}`} target="_blank" rel="noopener noreferrer"><Icon name="whatsapp" size={20}/><span>Compartir por WhatsApp</span></a>}
+      {item.estado !== 'cancelado' && <button type="button" className="whatsapp-btn" onClick={() => setSharing(true)}><Icon name="whatsapp" size={20}/><span>Compartir por WhatsApp</span></button>}
       {owner && item.estado === 'cancelado' && <button type="button" className="notice-delete-button" disabled={!online} onClick={() => setDeleting(item)}><Icon name="close" size={17}/><span>Eliminar permanentemente</span></button>}
     </div>
     <ErrorBox message={error}/>
     {managing && <EventChangeDialog item={item} onClose={() => setManaging(false)}/>}
     {editing && item.estado !== 'cancelado' && <NoticeForm initial={editing} close={() => setEditing(null)}/>}
     {deleting && <DeleteActivityDialog item={deleting} onClose={() => setDeleting(null)} onDeleted={() => onDeleted(deleting.id)}/>}
+    {sharing && item.estado !== 'cancelado' && <NoticeShareDialog item={item} onClose={() => setSharing(false)}/>}
   </div>;
 }
 
