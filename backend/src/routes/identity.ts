@@ -5,10 +5,17 @@ import { createHmac } from "node:crypto";
 import { z } from "zod";
 import { config } from "../config.js";
 import { AppError, asyncHandler } from "../lib/http.js";
+import { idSchema } from "../lib/validation.js";
+import { requireAuth } from "../middlewares/auth.js";
+import { getIdentityStatus, listMyZoneMemberships, requestIdentityReview, requestZoneMembership } from "../services/verification.js";
 
 const router = Router();
 const lookupLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: "draft-7", legacyHeaders: false,
   message: { error: { code: "RATE_LIMITED", message: "Has consultado demasiados DNI. Espera unos minutos." } } });
+const identityActionLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8,
+  keyGenerator: (req) => `account:${req.userId}`,
+  standardHeaders: "draft-7", legacyHeaders: false,
+  message: { error: { code: "RATE_LIMITED", message: "Has enviado muchas solicitudes de verificación. Espera unos minutos." } } });
 
 router.post("/identity/dni/lookup", lookupLimiter, asyncHandler(async (req, res) => {
   const { dni, consentimiento } = z.object({ dni: z.string().regex(/^\d{8}$/), consentimiento: z.literal(true) }).strict().parse(req.body);
@@ -41,6 +48,24 @@ router.post("/identity/dni/lookup", lookupLimiter, asyncHandler(async (req, res)
   const dniHash = createHmac("sha256", config.dniHashSecret).update(dni).digest("hex");
   const proof = jwt.sign({ dniHash, nombres, apellidos }, config.jwtSecret, { algorithm: "HS256", issuer: "ayni-api", audience: "ayni-dni-prefill", expiresIn: "10m" });
   res.json({ data: { nombres, apellidos, proof, venceEnSegundos: 600 } });
+}));
+
+router.get("/identity/me", requireAuth, asyncHandler(async (req, res) => {
+  res.json({ data: await getIdentityStatus(req.userId) });
+}));
+
+router.post("/identity/verification-request", requireAuth, identityActionLimiter, asyncHandler(async (req, res) => {
+  z.object({}).strict().parse(req.body);
+  res.json({ data: await requestIdentityReview(req.userId) });
+}));
+
+router.get("/identity/zones", requireAuth, asyncHandler(async (req, res) => {
+  res.json({ data: await listMyZoneMemberships(req.userId) });
+}));
+
+router.post("/identity/zones", requireAuth, identityActionLimiter, asyncHandler(async (req, res) => {
+  const { sectorId } = z.object({ sectorId: idSchema }).strict().parse(req.body);
+  res.status(202).json({ data: await requestZoneMembership(req.userId, sectorId) });
 }));
 
 export default router;

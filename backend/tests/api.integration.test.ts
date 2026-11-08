@@ -20,7 +20,7 @@ test('API real: cuentas, privacidad, publicaciones, avisos y permisos', { skip: 
   const tag = randomUUID().slice(0, 8);
   const password = `Ayni-${randomUUID()}!`;
   function identity(nombres: string, apellidos: string) {
-    const dni = String(randomInt(100000)).padStart(8, '0');
+    const dni = String(randomInt(100_000_000)).padStart(8, '0');
     const dniHash = createHmac('sha256', config.dniHashSecret).update(dni).digest('hex');
     const dniProof = jwt.sign({ dniHash, nombres, apellidos }, config.jwtSecret,
       { algorithm: 'HS256', issuer: 'ayni-api', audience: 'ayni-dni-prefill', expiresIn: '5m' });
@@ -33,7 +33,7 @@ test('API real: cuentas, privacidad, publicaciones, avisos y permisos', { skip: 
     const sectorId = sectors.body.data[0].id;
     await t.test('Registro, cookie HttpOnly y contraseña protegida', async () => {
       const ownerBody = { ...identity('Prueba', `Propietaria ${tag}`), correo: `owner-${tag}@example.test`, contrasena: password,
-        sectorId, direccion: 'Dirección privada de integración', latitud: -12.073, longitud: -77.063 };
+        sectorId, direccion: 'Referencia sintética de prueba', latitud: -12.073, longitud: -77.063 };
       const invalidPhone = await owner.post('/api/auth/register').set(headers).send({ ...ownerBody, telefono: '887654321' }).expect(400);
       assert.equal(invalidPhone.body.error.code, 'VALIDATION_ERROR');
       const registered = await owner.post('/api/auth/register').set(headers).send({ ...ownerBody, telefono: '987654321' }).expect(201);
@@ -43,12 +43,13 @@ test('API real: cuentas, privacidad, publicaciones, avisos y permisos', { skip: 
       assert.ok(cookies.some(cookie => /HttpOnly/i.test(cookie)));
       assert.equal(registered.body.data.hash_contrasena, undefined);
       assert.equal(Number(registered.body.data.latitud), -12.073);
+      assert.equal(Number(registered.body.data.longitud), -77.063);
       assert.equal(registered.body.data.telefono, '+51987654321');
       const stored = await query<{ hash_contrasena: string }>('SELECT hash_contrasena FROM usuarios WHERE usuario_id = ?', [userId]);
       assert.notEqual(stored[0].hash_contrasena, password);
       assert.match(stored[0].hash_contrasena, /^\$2[aby]\$/);
       await other.post('/api/auth/register').set(headers).send({ ...identity('Prueba', `Vecino ${tag}`), correo: `other-${tag}@example.test`, contrasena: password,
-        sectorId, direccion: 'Referencia privada del otro vecino' }).expect(201);
+        sectorId, direccion: 'Otra referencia sintética de prueba' }).expect(201);
     });
     await t.test('Sesión, origen, identidad esperada y autorización', async () => {
       const me = await owner.get('/api/auth/me').expect(200);

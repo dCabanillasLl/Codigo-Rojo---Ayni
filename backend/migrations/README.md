@@ -53,6 +53,21 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
     para propuestas y cambios de estado de colaboraciones vecinales.
 17. `014_resenas_reciprocas.sql` conserva las reseñas existentes y permite una reseña
     independiente por cada participante de una colaboración confirmada.
+18. `015_visto_bueno_verificado.sql` agrega el estado de verificación de identidad y de
+    pertenencia a sector, registra interacciones bilaterales con publicaciones y enlaza
+    reseñas de productos/servicios a una interacción confirmada. Las identidades y zonas
+    históricas se importan como `PENDIENTE`; las reseñas existentes quedan
+    `NO_VERIFICADA`. No copia DNI, documentos, domicilios ni coordenadas a estas tablas.
+19. `016_revision_identidad_zona.sql` registra quién revisó el estado actual y crea una
+    bitácora de cambios de identidad y zona. Guarda IDs internos, estados, método y motivo;
+    no almacena DNI, direcciones, coordenadas ni evidencias adjuntas.
+20. `017_ciclo_interacciones_publicacion.sql` amplía los estados de `interacciones_publicacion`
+    para representar aceptación e inicio antes de las confirmaciones bilaterales. No altera
+    filas existentes; `CONFIRMADA` sigue requiriendo ambas confirmaciones.
+21. `018_estado_recomendaciones.sql` agrega `PENDIENTE` a las reseñas enlazadas a una
+    experiencia que aún no cumple identidad, zona y confirmación. `NO_VERIFICADA` queda para
+    opiniones sin evidencia vinculada. Las reseñas históricas mantienen `NO_VERIFICADA`; la
+    API calcula el sello vigente para reflejar revocaciones y vencimientos.
 
 Las migraciones con el mismo prefijo numérico surgieron en ramas paralelas. El runner
 las identifica por el nombre completo: conservar los nombres y los archivos ya
@@ -90,3 +105,22 @@ confirmaciones NULL; sus reseñas no se convierten en verificadas.
 - Los flyers nuevos pueden cargarse como JPG, PNG o WebP de hasta 5 MB. Se guarda el
   JPEG normalizado (hasta 1600 px y 2 MB) sin metadatos. Los enlaces HTTPS anteriores
   se conservan por compatibilidad. El archivo no se devuelve en los listados JSON.
+- `verificaciones_identidad` guarda solo usuario, estado, método y fechas; `dni_hash`
+  continúa en `usuarios` y no se duplica. `pertenencias_zona` referencia el sector, no
+  la dirección ni el punto GPS. Los sectores del perfil previos se consideran pendientes,
+  nunca verificados automáticamente.
+- `interacciones_publicacion` vincula publicación, solicitante y propietario mediante
+  claves foráneas; el propietario debe ser el dueño registrado de esa publicación y no
+  puede ser el solicitante. Una interacción confirmada requiere confirmación de ambas
+  partes y fecha de cierre.
+- `resenas.interaccion_id` es opcional. Sin interacción la opinión es `NO_VERIFICADA`;
+  con evidencia todavía incompleta es `PENDIENTE`. La API calcula el sello vigente con
+  identidad acreditada, zona vigente y experiencia confirmada del mismo autor y
+  publicación. Una interacción respalda como máximo una opinión. Las opiniones históricas
+  conservan publicación, autor, texto, calificación y fechas sin recibir sello automático.
+- Los cambios administrativos de identidad y zona requieren un ID incluido en la
+  variable privada `AYNI_REVIEWER_USER_IDS`. La consulta de API Perú solo prellena los
+  nombres del registro y queda `PENDIENTE`; no es una prueba de titularidad.
+- La revisión de residencia es manual. GPS, sector del perfil y DNI no acreditan
+  residencia. El revisor contrasta información fuera del sistema y registra solo el
+  método y un motivo breve sin datos sensibles.

@@ -55,6 +55,16 @@ router.post("/auth/register", loginLimiter, asyncHandler(async (req, res) => {
       "INSERT INTO usuarios (ubicacion_id, nombres, apellidos, correo, telefono, hash_contrasena, dni_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [location.insertId, data.nombres, data.apellidos, data.correo ?? null, data.telefono ?? null, hash, dniHash],
     );
+    const newUserId = String(user.insertId);
+    await connection.execute(`INSERT INTO verificaciones_identidad (usuario_id, estado, metodo)
+      VALUES (?, 'PENDIENTE', 'APIPERU_PREFILL_NO_ACREDITA_TITULARIDAD')`, [newUserId]);
+    await connection.execute(`INSERT INTO pertenencias_zona (usuario_id, sector_id, metodo, estado)
+      VALUES (?, ?, 'DECLARADA_EN_PERFIL', 'PENDIENTE')`, [newUserId, sectorId]);
+    await connection.execute(`INSERT INTO auditoria_verificaciones
+      (tipo, usuario_afectado_id, sector_id, actor_id, estado_anterior, estado_nuevo, metodo)
+      VALUES ('IDENTIDAD', ?, NULL, ?, NULL, 'PENDIENTE', 'APIPERU_PREFILL_NO_ACREDITA_TITULARIDAD'),
+             ('ZONA', ?, ?, ?, NULL, 'PENDIENTE', 'DECLARADA_EN_PERFIL')`,
+      [newUserId, newUserId, newUserId, sectorId, newUserId]);
     return String(user.insertId);
   });
   const user = await one(`${userSelect} WHERE u.usuario_id = ?`, [userId]);

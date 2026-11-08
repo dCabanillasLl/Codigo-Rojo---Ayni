@@ -55,14 +55,6 @@ router.get("/publicaciones", asyncHandler(async (req, res) => {
   res.json({ data: await query(`${baseSelect}, ${geo.select}${joins} WHERE ${conditions.join(" AND ")} ORDER BY distanciaMetros IS NULL, distanciaMetros, p.creado_en DESC LIMIT 100`, [...geo.selectParams, ...params]) });
 }));
 
-router.get("/publicaciones/:id/resenas", asyncHandler(async (req, res) => {
-  const id = idSchema.parse(req.params.id);
-  const publication = await one<{ propietarioId: string; estado: string }>("SELECT CAST(propietario_id AS CHAR) AS propietarioId, estado FROM publicaciones WHERE publicacion_id = ?", [id]);
-  if (!publication || (publication.estado !== "publicada" && publication.propietarioId !== req.userId)) throw new AppError(404, "NOT_FOUND", "No encontramos esta publicación.");
-  res.json({ data: await query(`SELECT CAST(r.resena_id AS CHAR) AS id, u.nombres AS autor, r.calificacion, r.comentario, r.creado_en AS creadoEn, FALSE AS verificada
-    FROM resenas r JOIN usuarios u ON u.usuario_id = r.usuario_id WHERE r.publicacion_id = ? ORDER BY r.creado_en DESC LIMIT 100`, [id]) });
-}));
-
 router.get("/publicaciones/:id", asyncHandler(async (req, res) => {
   const item = await one<{ propietarioId: string; estado: string }>(`${baseSelect}, NULL AS distanciaMetros${joins} WHERE p.publicacion_id = ? AND u.estado_cuenta = 'activo'`, [idSchema.parse(req.params.id)]);
   if (!item || (item.estado !== "publicada" && item.propietarioId !== req.userId)) throw new AppError(404, "NOT_FOUND", "No encontramos esta publicación.");
