@@ -57,7 +57,29 @@ export default function Profile({ onLocation, onSignOut, signOutBusy, signOutErr
       <form className="form-stack mt-6" onSubmit={updateProfile}>
         <div className="form-columns profile-identity-fields"><Field label="Nombres"><input value={user.nombres} readOnly aria-readonly="true"/></Field><Field label="Apellidos"><input value={user.apellidos} readOnly aria-readonly="true"/></Field></div>
         <p className="profile-identity-note">Nombres y apellidos provienen del DNI verificado y no se pueden editar.</p>
-        <div className="profile-email-section"><Field label="Correo electrónico (opcional)" hint="Confírmalo para demostrar que puedes recibir mensajes en esa dirección."><input name="correo" type="email" autoComplete="email" maxLength={254} defaultValue={user.correo || ''} placeholder="tu@correo.com"/></Field>{user.correo && <p className={user.correoVerificado ? 'success-message' : 'form-hint'} role="status">{user.correoVerificado ? 'Correo confirmado' : 'Correo pendiente de confirmar'}</p>}<label className="check-field"><input name="notificacionesCorreo" type="checkbox" defaultChecked={Boolean(user.notificacionesCorreo)} disabled={!user.correoVerificado}/>Recibir avisos por correo sobre mis pedidos y colaboraciones</label>{user.correo && !user.correoVerificado && <div className="email-verification-actions"><button type="button" className="outline-btn" disabled={!online || busy} onClick={() => void sendEmailCode()}>{emailCodeSent ? 'Reenviar código' : 'Enviar código de confirmación'}</button>{emailCodeSent && <div className="action-row"><input aria-label="Código de confirmación" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={emailCode} onChange={event => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" required/><button type="button" className="small-primary" disabled={busy || emailCode.length !== 6} onClick={() => void confirmEmail()}>Confirmar correo</button></div>}</div>}</div>
+        <div className="profile-email-section">
+          <Field label="Correo electrónico (opcional)" hint="Confírmalo para demostrar que puedes recibir mensajes en esa dirección.">
+            <input name="correo" type="email" autoComplete="email" maxLength={254} defaultValue={user.correo || ''} placeholder="tu@correo.com"/>
+          </Field>
+          {user.correo && <div className={`email-status ${user.correoVerificado ? 'is-verified' : 'is-pending'}`} role="status">
+            <Icon name={user.correoVerificado ? 'check' : 'clock'} size={16}/>
+            <span><b>{user.correoVerificado ? 'Correo confirmado' : 'Falta confirmar tu correo'}</b>{!user.correoVerificado && <small>Te enviaremos un código para comprobar que puedes recibir mensajes.</small>}</span>
+          </div>}
+          <label className="check-field email-notifications-option">
+            <input name="notificacionesCorreo" type="checkbox" defaultChecked={Boolean(user.notificacionesCorreo)} disabled={!user.correoVerificado}/>
+            <span><b>Recibir avisos por correo</b><small>Te avisaremos sobre tus pedidos y colaboraciones.</small></span>
+          </label>
+          {user.correo && !user.correoVerificado && <div className="email-verification-actions">
+            {!emailCodeSent ? <button type="button" className="outline-btn email-send-code" disabled={!online || busy} onClick={() => void sendEmailCode()}>{busy ? 'Enviando…' : 'Enviar código de confirmación'}</button> : <>
+              <div className="email-code-tip"><Icon name="shield" size={16}/><span>Revisa tu bandeja de entrada y spam. El código vence en 10 minutos.</span></div>
+              <label className="email-code-field"><span>Código de confirmación</span><div className="email-code-controls">
+                <input aria-label="Código de confirmación" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={emailCode} onChange={event => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" required/>
+                <button type="button" className="small-primary" disabled={busy || emailCode.length !== 6} onClick={() => void confirmEmail()}>{busy ? 'Verificando…' : 'Confirmar'}</button>
+              </div></label>
+              <button type="button" className="email-resend-code" disabled={!online || busy} onClick={() => void sendEmailCode()}>{busy ? 'Enviando…' : 'No llegó el código · Reenviar'}</button>
+            </>}
+          </div>}
+        </div>
         <Field label="Teléfono para contacto (opcional)" hint="Para el enlace de WhatsApp, usa prefijo internacional; ejemplo: +51987654321."><input name="telefono" type="tel" maxLength={25} defaultValue={user.telefono || ''} placeholder="+51987654321"/></Field>
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>Permitir que contacten mi teléfono por WhatsApp desde mis publicaciones</label>
         <p className="form-hint">El teléfono se oculta por defecto. Si lo haces público, cualquier persona que vea una publicación tuya podrá abrir un chat de WhatsApp.</p>

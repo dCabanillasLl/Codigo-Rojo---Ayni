@@ -24,6 +24,7 @@ const files = [
   '011_notificaciones_actividades_eliminadas.sql',
   '011_notificaciones_correo.sql',
   '012_verificacion_correo.sql',
+  '013_notificaciones_interacciones.sql',
 ];
 const sources = await Promise.all(files.map(async (name) => {
   let sql = await readFile(fileURLToPath(new URL(`../migrations/${name}`, import.meta.url)), 'utf8');
