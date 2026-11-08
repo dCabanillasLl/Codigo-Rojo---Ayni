@@ -1801,12 +1801,6 @@ textarea:disabled {
 .profile-card .profile-signout-button:disabled { box-shadow: none; }
 .profile-email-section { display: grid; gap: 0.8rem; padding: clamp(0.9rem, 3vw, 1.15rem); border: 1px solid #dfe7df; border-radius: 1.1rem; background: linear-gradient(145deg, #f8f9f4 0%, #f3f6f0 100%); box-shadow: 0 5px 18px rgba(35, 73, 54, 0.045); }
 .neighbor-reputation-card { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; padding: 1rem; border: 1px solid #dce6dc; border-radius: 1rem; background: #f4f8f2; }
-.profile-review-action { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.9rem; margin-top: 1.2rem; padding: 1rem; border: 1px solid #dce6dc; border-radius: 1rem; background: #f7f8f2; }
-.profile-review-action > div { display: grid; gap: 0.25rem; }
-.profile-review-action b { color: #244c39; font-size: 0.92rem; }
-.profile-review-action p { margin: 0; color: #6b786e; font-size: 0.82rem; line-height: 1.45; }
-.profile-review-action .outline-btn { min-height: 2.8rem; border: 1.5px solid #b8cbbc; background: #fffefa; color: #315f49; box-shadow: 0 2px 8px #203b2b0a; }
-.profile-review-action .outline-btn:hover { border-color: #6e997d; background: #edf4ec; transform: translateY(-1px); }
 .profile-review-list { display: grid; gap: 0.9rem; margin-top: 1rem; }
 .profile-review-card { display: grid; gap: 0.8rem; padding: 1.05rem; border: 1px solid #e0e7df; border-radius: 1rem; background: linear-gradient(145deg, #fffefb, #fafaf5); }
 .profile-review-meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.35rem 0.8rem; color: #30473a; }
@@ -1825,7 +1819,7 @@ textarea:disabled {
 .neighbor-reputation-copy { min-width: 0; padding-left: 1rem; border-left: 1px solid #dce5db; }
 .neighbor-reputation-copy p { margin: 0.18rem 0 0; color: #69776f; font-size: 0.82rem; line-height: 1.4; }
 @media (max-width: 420px) { .neighbor-reputation-card { align-items: flex-start; gap: 0.7rem; padding: 0.8rem; } .neighbor-reputation-copy { padding-left: 0.7rem; } }
-@media (max-width: 640px) { .profile-review-action { align-items: stretch; padding: 0.9rem; } .profile-review-action .outline-btn { width: 100%; justify-content: center; } .profile-review-card { gap: 0.7rem; padding: 0.9rem; } .profile-review-rate { width: 100%; justify-content: center; } }
+@media (max-width: 640px) { .profile-review-card { gap: 0.7rem; padding: 0.9rem; } .profile-review-rate { width: 100%; justify-content: center; } }
 .profile-email-section .check-field { margin: 0; }
 .profile-email-section .form-hint { margin: -0.45rem 0 0; }
 .email-status { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.75rem 0.85rem; border-radius: 0.85rem; font-size: 0.88rem; line-height: 1.4; }
