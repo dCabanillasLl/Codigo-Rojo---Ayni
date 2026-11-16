@@ -13,7 +13,7 @@ import { notifyEventChange, type EventSnapshot } from '../services/notice-attend
 
 const router = Router();
 const select = `SELECT CAST(a.aviso_id AS CHAR) AS id, CAST(a.autor_id AS CHAR) AS autorId,
-  u.nombres AS autor, CAST(a.categoria_aviso_id AS CHAR) AS categoriaId, c.nombre AS categoria,
+  CONCAT(SUBSTRING_INDEX(TRIM(u.nombres), ' ', 1), ' ', SUBSTRING_INDEX(TRIM(u.apellidos), ' ', 1)) AS autor, CAST(a.categoria_aviso_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   a.titulo, a.contenido, CASE WHEN a.estado = 'publicado' AND NOT (${noticeDateSql}) THEN 'vencido' ELSE a.estado END AS estado,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
   CASE WHEN a.ubicacion_publica = 1 THEN l.direccion ELSE NULL END AS direccionActividad,

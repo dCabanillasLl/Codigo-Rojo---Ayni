@@ -21,8 +21,8 @@ const viewSelect = `SELECT CAST(i.interaccion_id AS CHAR) AS interaccionId,
   i.solicitante_confirmo_en AS solicitanteConfirmoEn, i.propietario_confirmo_en AS propietarioConfirmoEn,
   i.confirmada_en AS confirmadaEn, i.creado_en AS creadoEn, i.actualizado_en AS actualizadoEn,
   p.titulo AS publicacionTitulo, p.tipo AS publicacionTipo,
-  CONCAT(us.nombres, ' ', LEFT(us.apellidos, 1), '.') AS solicitante,
-  CONCAT(up.nombres, ' ', LEFT(up.apellidos, 1), '.') AS propietario
+  CONCAT(SUBSTRING_INDEX(TRIM(us.nombres), ' ', 1), ' ', SUBSTRING_INDEX(TRIM(us.apellidos), ' ', 1)) AS solicitante,
+  CONCAT(SUBSTRING_INDEX(TRIM(up.nombres), ' ', 1), ' ', SUBSTRING_INDEX(TRIM(up.apellidos), ' ', 1)) AS propietario
   FROM interacciones_publicacion i JOIN publicaciones p ON p.publicacion_id=i.publicacion_id
   JOIN usuarios us ON us.usuario_id=i.solicitante_id JOIN usuarios up ON up.usuario_id=i.propietario_id`;
 

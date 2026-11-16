@@ -11,7 +11,7 @@ import { photoSchema, preparePhoto } from "../lib/photos.js";
 
 const router = Router();
 const baseSelect = `SELECT CAST(p.publicacion_id AS CHAR) AS id, CAST(p.propietario_id AS CHAR) AS propietarioId,
-  u.nombres AS propietario, CASE WHEN u.telefono_publico = 1 THEN u.telefono ELSE NULL END AS telefonoContacto,
+  CONCAT(SUBSTRING_INDEX(TRIM(u.nombres), ' ', 1), ' ', SUBSTRING_INDEX(TRIM(u.apellidos), ' ', 1)) AS propietario, CASE WHEN u.telefono_publico = 1 THEN u.telefono ELSE NULL END AS telefonoContacto,
   CAST(p.categoria_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   p.tipo, p.titulo, p.descripcion, p.modalidad_precio AS modalidadPrecio, p.precio, p.moneda, p.estado,
   CASE WHEN p.imagen_hash IS NULL THEN NULL ELSE CONCAT('/api/publicaciones/', CAST(p.publicacion_id AS CHAR), '/imagen?v=', p.imagen_hash) END AS imagenUrl,

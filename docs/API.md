@@ -482,7 +482,7 @@ publicación y solo se admite una opinión por autor y publicación.
 Errores principales: 400 `VALIDATION_ERROR`/`COMMUNITY_CONTENT_RESTRICTED`, 401
 `UNAUTHENTICATED`, 404 `PUBLICATION_NOT_FOUND`, 409 `SELF_REVIEW_FORBIDDEN`,
 `REVIEW_ALREADY_EXISTS`, `INTERACTION_MISMATCH`/`INTERACTION_INVALID`, 503
-`DATABASE_SCHEMA_REQUIRED`. La lista expone solo el nombre público abreviado, calificación,
+`DATABASE_SCHEMA_REQUIRED`. La lista expone solo el primer nombre y primer apellido, calificación,
 comentario y fechas; nunca DNI, teléfono, correo, domicilio, coordenadas ni documentos.
 
 El resumen separa `verificadas`, `noVerificadas` y `pendientes`; el promedio principal
