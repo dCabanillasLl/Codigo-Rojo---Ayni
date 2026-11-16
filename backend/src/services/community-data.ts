@@ -43,7 +43,7 @@ export async function createLocation(connection: PoolConnection, userId: string,
 
 export function publicName(alias: string): string {
   // alias is internal, never supplied by the client.
-  return `CONCAT(${alias}.nombres, ' ', LEFT(${alias}.apellidos, 1), '.')`;
+  return `CONCAT(SUBSTRING_INDEX(TRIM(${alias}.nombres), ' ', 1), ' ', SUBSTRING_INDEX(TRIM(${alias}.apellidos), ' ', 1))`;
 }
 
 export function geoClause(options: ListOptions, locationAlias = 'l'): {
