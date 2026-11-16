@@ -68,3 +68,47 @@ test("error de base de datos no expone SQL ni datos privados", async () => {
   assert.equal(result.status, 409);
   assert.ok(!JSON.stringify(result.body).includes("private"));
 });
+
+
+test("cambio de contraseña sin correo valida la actual e invalida sesiones anteriores", async t => {
+  const { config } = await import("../src/config.js");
+  const { pool } = await import("../src/db/index.js");
+  const { default: bcrypt } = await import("bcryptjs");
+  const { default: cookieParser } = await import("cookie-parser");
+  const { default: router } = await import("../src/routes/auth.js");
+  const { optionalAuth, requireAuth, setSession } = await import("../src/middlewares/auth.js");
+  const original = { secret: config.jwtSecret, configured: config.dbConfigured };
+  config.jwtSecret = "synthetic-test-secret-at-least-32-characters";
+  config.dbConfigured = true;
+  t.after(() => { config.jwtSecret = original.secret; config.dbConfigured = original.configured; });
+  let hash = await bcrypt.hash("Original-123", 4);
+  const connection = {
+    beginTransaction: async () => {}, commit: async () => {}, rollback: async () => {}, release: () => {},
+    execute: async (sql: string, args: unknown[]) => {
+      if (sql.startsWith("SELECT")) return [[{ hash }], []];
+      hash = String(args[0]); return [{ affectedRows: 1 }, []];
+    },
+  };
+  t.mock.method(pool, "getConnection", async () => connection);
+  t.mock.method(pool, "execute", async () => [[{ id: "1", hash }], []]);
+  const app = express();
+  app.use(express.json(), cookieParser(), optionalAuth);
+  app.get("/session", (_req, res) => { setSession(res, "1", hash); res.json({ ok: true }); });
+  app.get("/private", requireAuth, (_req, res) => { res.json({ ok: true }); });
+  app.use(router, errorHandler);
+  const login = await request(app).get("/session");
+  const cookie = login.headers["set-cookie"][0].split(";")[0];
+  await request(app).get("/private").set("Cookie", cookie).expect(200);
+  const payload = { actual: "Original-123", nueva: "Nueva-clave-456", confirmacion: "Nueva-clave-456" };
+  await request(app).post("/auth/password").send(payload).expect(401);
+  await request(app).post("/auth/password").set("Cookie", cookie).send({ ...payload, confirmacion: "No-coincide" }).expect(400);
+  await request(app).post("/auth/password").set("Cookie", cookie).send({ ...payload, actual: "Incorrecta" }).expect(400);
+  assert.ok(await bcrypt.compare(payload.actual, hash));
+  const changed = await request(app).post("/auth/password").set("Cookie", cookie).send(payload).expect(200);
+  assert.ok(changed.headers["set-cookie"][0].includes("Expires="));
+  assert.ok(await bcrypt.compare(payload.nueva, hash));
+  assert.equal(await bcrypt.compare(payload.actual, hash), false);
+  await request(app).get("/private").set("Cookie", cookie).expect(401);
+  const renewed = await request(app).get("/session");
+  await request(app).get("/private").set("Cookie", renewed.headers["set-cookie"][0].split(";")[0]).expect(200);
+});

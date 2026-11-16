@@ -8,6 +8,12 @@ export const locationSchema = z.object({
 }).strict();
 export const passwordSchema = z.string().min(8, "Usa al menos 8 caracteres").max(72)
   .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "La contraseña excede los 72 bytes permitidos");
+export const changePasswordSchema = z.object({
+  actual: z.string().min(1).max(200),
+  nueva: passwordSchema,
+  confirmacion: z.string().min(1).max(72),
+}).strict().refine(value => value.nueva === value.confirmacion, "Las contraseñas nuevas no coinciden")
+  .refine(value => value.actual !== value.nueva, "Elige una contraseña diferente de la actual");
 export const phoneSchema = z.string().trim()
   .regex(/^(?:\+?51)?9[0-9]{8}$/, "Ingresa un celular peruano de 9 dígitos que empiece con 9; el prefijo es +51.")
   .transform(value => `+51${value.slice(-9)}`);

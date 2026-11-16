@@ -1,23 +1,39 @@
 import { config } from '../config.js';
-import nodemailer, { type Transporter } from 'nodemailer';
-import { setServers } from 'node:dns';
+import nodemailer from 'nodemailer';
+import { lookup, Resolver } from 'node:dns/promises';
 
 export type EmailSendResult = { sent: true } | { sent: false; status: number | null; providerCode: string };
 
-let gmailTransporter: Transporter | undefined;
-function getGmailTransporter() {
-  if (!gmailTransporter) {
-    gmailTransporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: config.gmailUser, pass: config.gmailAppPassword },
-      connectionTimeout: 8_000,
-      greetingTimeout: 8_000,
-      socketTimeout: 12_000,
-    });
-  }
-  return gmailTransporter;
+async function getGmailTransporter() {
+  const hostname = 'smtp.gmail.com';
+  let address: string;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      lookup(hostname, { family: 4 }),
+      new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('SMTP DNS lookup timeout'), { code: 'EDNS' })), 5000); }),
+    ]);
+    address = result.address;
+  } catch (error) {
+    if (!config.gmailDnsServers.length) throw error;
+    const resolver = new Resolver({ timeout: 2000, tries: 1 });
+    resolver.setServers(config.gmailDnsServers);
+    const addresses = await resolver.resolve4(hostname);
+    if (!addresses.length) throw Object.assign(new Error('SMTP DNS returned no address'), { code: 'EDNS' });
+    address = addresses[0];
+  } finally { if (timer) clearTimeout(timer); }
+  // Nodemailer creates its own DNS Resolver, so global dns.setServers did not
+  // affect it. Resolve through the OS first; retain Gmail's name for TLS/SNI.
+  return nodemailer.createTransport({
+    host: address,
+    port: 465,
+    secure: true,
+    tls: { servername: hostname, rejectUnauthorized: true },
+    auth: { user: config.gmailUser, pass: config.gmailAppPassword },
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
+  });
 }
 
 /** Sends a plain-text transactional notice. Delivery is best-effort and never changes the API result. */
@@ -25,8 +41,11 @@ export async function sendCommunityEmail(to: string | null, subject: string, tex
   if (!to || !config.emailConfigured) return { sent: false, status: null, providerCode: 'missing_configuration' };
   if (config.emailProvider === 'gmail') {
     try {
-      if (config.gmailDnsServers.length) setServers(config.gmailDnsServers);
-      await getGmailTransporter().sendMail({ from: config.emailFrom, to, subject, text });
+      const transporter = await getGmailTransporter();
+      try {
+        const delivery = await transporter.sendMail({ from: config.emailFrom, to, subject, text });
+        if (!delivery.accepted?.length) return { sent: false, status: null, providerCode: 'recipient_rejected' };
+      } finally { transporter.close(); }
       return { sent: true };
     } catch (error) {
       const providerCode = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'

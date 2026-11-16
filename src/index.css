@@ -3075,3 +3075,10 @@ select:focus-visible {
   .recommendation-pagination button { flex: 1 1 6rem; }
 }
 @media (prefers-reduced-motion: reduce) { .recommendation-filter { transition: none; } }
+
+.account-security-card { display: grid; gap: 16px; align-self: start; }
+.account-security-heading { display: flex; gap: 14px; align-items: center; }
+.account-security-heading h2 { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+.account-security-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: #edf3e8; color: #315f4a; flex-shrink: 0; }
+.account-security-card > p, .account-security-card > small { color: #65726b; line-height: 1.6; }
+.account-security-card > .outline-btn { width: 100%; justify-content: center; }
