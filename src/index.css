@@ -3082,3 +3082,17 @@ select:focus-visible {
 .account-security-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: #edf3e8; color: #315f4a; flex-shrink: 0; }
 .account-security-card > p, .account-security-card > small { color: #65726b; line-height: 1.6; }
 .account-security-card > .outline-btn { width: 100%; justify-content: center; }
+
+.emergency-mode-toggle { border-color: #efc9b3 !important; background: #fff7ef !important; }
+.emergency-mode-toggle > span { display: grid; gap: .2rem; }
+.emergency-mode-toggle b { color: #873a24; }
+.emergency-mode-toggle small { color: #765d51; font-size: .78rem; }
+.emergency-request-fields { display: grid; gap: .8rem; padding: .9rem; border: 1px solid #efcfb8; border-radius: 1rem; background: #fffaf5; }
+.emergency-request-fields fieldset { display: grid; gap: .6rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.emergency-request-fields legend { margin-bottom: .55rem; color: #4e5f55; font-size: .86rem; font-weight: 750; }
+.emergency-complement-hint { margin: 0; padding: .65rem .75rem; border-left: 3px solid #c8794d; border-radius: .25rem .65rem .65rem .25rem; background: #fff0e7; color: #70452f; font-size: .78rem; line-height: 1.45; }
+.emergency-needs-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+.emergency-needs-grid .check-field { min-height: 2.85rem; align-items: center; margin: 0; padding: .55rem .65rem; background: #fff; font-size: .82rem; }
+.pending-emergency-label { display: inline-flex; width: fit-content; padding: .3rem .55rem; border-radius: 999px; background: #fff0e7; color: #9b321f; font-size: .67rem; letter-spacing: .035em; }
+@media (max-width: 560px) { .emergency-request-fields { padding: .7rem; } .emergency-needs-grid { grid-template-columns: 1fr; } }
+
