@@ -8,7 +8,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { config } from "../config.js";
 import { one, query, transaction } from "../db/index.js";
 import { AppError, asyncHandler } from "../lib/http.js";
-import { idSchema, phoneSchema, registerSchema } from "../lib/validation.js";
+import { changePasswordSchema, idSchema, phoneSchema, registerSchema } from "../lib/validation.js";
 import { clearSession, requireAuth, setSession } from "../middlewares/auth.js";
 import { sendCommunityEmail } from "../services/email.js";
 
@@ -68,7 +68,7 @@ router.post("/auth/register", loginLimiter, asyncHandler(async (req, res) => {
     return String(user.insertId);
   });
   const user = await one(`${userSelect} WHERE u.usuario_id = ?`, [userId]);
-  setSession(res, userId);
+  setSession(res, userId, hash);
   res.status(201).json({ data: user });
 }));
 
@@ -85,8 +85,23 @@ router.post("/auth/login", loginLimiter, asyncHandler(async (req, res) => {
   );
   const valid = await bcrypt.compare(body.contrasena, account?.hash ?? dummyHash);
   if (!valid || !account || account.estado !== "activo") throw new AppError(401, "INVALID_CREDENTIALS", "DNI o correo y contraseña incorrectos.");
-  setSession(res, account.id);
+  setSession(res, account.id, account.hash);
   res.json({ data: await one(`${userSelect} WHERE u.usuario_id = ?`, [account.id]) });
+}));
+
+router.post("/auth/password", requireAuth, loginLimiter, asyncHandler(async (req, res) => {
+  const body = changePasswordSchema.parse(req.body);
+  await transaction(async connection => {
+    const [accounts] = await connection.execute<RowDataPacket[]>(
+      "SELECT hash_contrasena AS hash FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo' FOR UPDATE", [req.userId]);
+    const account = accounts[0];
+    if (!account) throw new AppError(401, "UNAUTHENTICATED", "Inicia sesión para continuar.");
+    if (!await bcrypt.compare(body.actual, account.hash)) throw new AppError(400, "INVALID_PASSWORD", "La contraseña actual es incorrecta.");
+    const hash = await bcrypt.hash(body.nueva, 12);
+    await connection.execute("UPDATE usuarios SET hash_contrasena = ? WHERE usuario_id = ?", [hash, req.userId]);
+  });
+  clearSession(res);
+  res.json({ data: { cambiado: true } });
 }));
 
 router.post("/auth/logout", (_req, res) => { clearSession(res); res.json({ data: { cerrado: true } }); });

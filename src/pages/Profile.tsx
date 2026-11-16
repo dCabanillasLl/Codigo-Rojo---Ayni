@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useApp } from '../AppContext';
 import { api, errorMessage, refreshData } from '../lib/api';
-import { ErrorBox, Field, RemoteState, formatDate } from '../components/UI';
+import { ErrorBox, Field, Modal, RemoteState, formatDate } from '../components/UI';
 import Icon from '../components/Icon';
 import { useRemote } from '../lib/hooks';
 import type { Reputation, User } from '../types';
@@ -11,9 +11,13 @@ import PhoneField from '../components/PhoneField';
 import NeighborRankIcon from '../components/NeighborRankIcon';
 
 export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBusy, signOutError }: { onLocation: () => void; onReviewHelp: () => void; onSignOut: () => void; signOutBusy: boolean; signOutError?: string }) {
-  const { user, setUser, online } = useApp();
+  const { user, setUser, online, notify, setAuthOpen } = useApp();
   const { language, setLanguage, t } = useLanguage();
   const reputation = useRemote<Reputation>(user ? `/usuarios/${user.id}/reputacion` : null, user?.id || 'public');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [emailTipDismissed, setEmailTipDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -48,6 +52,28 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
     finally { setBusy(false); }
   }
 
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const element = event.currentTarget;
+    const form = new FormData(element);
+    const actual = String(form.get('actual') || '');
+    const nueva = String(form.get('nueva') || '');
+    const confirmacion = String(form.get('confirmacion') || '');
+    setPasswordError('');
+    if (nueva !== confirmacion) { setPasswordError('Las contraseñas nuevas no coinciden.'); return; }
+    if (actual === nueva) { setPasswordError('Elige una contraseña diferente de la actual.'); return; }
+    if (new TextEncoder().encode(nueva).length > 72) { setPasswordError('La contraseña es demasiado larga. Usa como máximo 72 bytes.'); return; }
+    setPasswordBusy(true);
+    try {
+      await api('/auth/password', { method: 'POST', expectedUserId: user!.id, body: { actual, nueva, confirmacion } });
+      element.reset();
+      setUser(null);
+      notify('Contraseña actualizada. Inicia sesión con tu nueva contraseña.');
+      setAuthOpen(true);
+    } catch (cause) { setPasswordError(errorMessage(cause)); }
+    finally { setPasswordBusy(false); }
+  }
+
   async function sendEmailCode() {
     setBusy(true); setError('');
     try { await api('/auth/email/verification', { method: 'POST', body: {} }); setEmailCodeSent(true); setSuccess('Te enviamos un código de 6 dígitos. Revisa tu bandeja de entrada y spam.'); }
@@ -68,6 +94,9 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         <div className="form-columns profile-identity-fields"><Field label="Nombres"><input value={user.nombres} readOnly aria-readonly="true"/></Field><Field label="Apellidos"><input value={user.apellidos} readOnly aria-readonly="true"/></Field></div>
         <p className="profile-identity-note">Nombres y apellidos provienen del DNI verificado y no se pueden editar.</p>
         <div className="profile-email-section">
+          {!user.correoVerificado && !emailTipDismissed && <aside className="email-code-tip">
+            <div><b>Un correo confirmado te ayuda a cuidar tu cuenta</b><p>Te recomendamos añadir y confirmar tu correo para recuperar tu cuenta si olvidas la contraseña. Es opcional: puedes seguir usando AYNI con tu DNI.</p><button type="button" className="email-resend-code" onClick={() => setEmailTipDismissed(true)}>Ahora no</button></div>
+          </aside>}
           <Field label="Correo electrónico (opcional)" hint="Confírmalo para demostrar que puedes recibir mensajes en esa dirección.">
             <input name="correo" type="email" autoComplete="email" maxLength={254} defaultValue={user.correo || ''} placeholder="tu@correo.com"/>
           </Field>
@@ -99,6 +128,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
       <ErrorBox message={signOutError}/><button type="button" className="outline-btn profile-signout-button mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </article>
 
+    <div className="grid content-start gap-5">
     <article className="profile-card neighbor-reputation-panel" aria-labelledby="neighbor-reputation-title">
       <header className="neighbor-reputation-heading">
         <p className="eyebrow">VISTO BUENO VECINAL</p>
@@ -125,5 +155,22 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         </article>)}</div>}</>}
       <p className="neighbor-reputation-note"><Icon name="shield" size={16}/><span>Las recomendaciones corresponden a colaboraciones confirmadas. No verifican identidad ni certifican oficios.</span></p>
     </article>
+      <article className="profile-card account-security-card" aria-labelledby="account-security-title">
+        <div className="account-security-heading"><span className="account-security-icon"><Icon name="shield" size={24}/></span><div><p className="eyebrow">CUIDA TU CUENTA</p><h2 id="account-security-title" className="font-display">Seguridad</h2></div></div>
+        <p>Gestiona tu contraseña y mantén protegido tu acceso a AYNI.</p>
+        <button type="button" className="outline-btn" onClick={() => { setPasswordError(''); setPasswordOpen(true); }}>Cambiar contraseña</button>
+        <small>{user.correoVerificado ? 'Tu correo está confirmado para recuperar el acceso si olvidas tu contraseña.' : 'Añade y confirma un correo para recuperar el acceso si olvidas tu contraseña. Es opcional.'}</small>
+      </article>
+    </div>
+    {passwordOpen && <Modal title="Cambiar contraseña" onClose={() => { if (!passwordBusy) setPasswordOpen(false); }}>
+        <form className="form-stack mt-5" onSubmit={changePassword}>
+          <p className="form-hint">Al cambiarla se cerrarán tus sesiones. Vuelve a entrar con tu nueva contraseña. No necesitas un correo para hacer este cambio.</p>
+          <Field label="Contraseña actual"><input name="actual" type="password" autoComplete="current-password" required maxLength={200}/></Field>
+          <Field label="Nueva contraseña" hint="Usa al menos 8 caracteres."><input name="nueva" type="password" autoComplete="new-password" required minLength={8} maxLength={72}/></Field>
+          <Field label="Confirmar nueva contraseña"><input name="confirmacion" type="password" autoComplete="new-password" required minLength={8} maxLength={72}/></Field>
+          <ErrorBox message={passwordError}/>
+          <button type="submit" className="record-button justify-center" disabled={passwordBusy || busy || signOutBusy || !online}>{passwordBusy ? 'Cambiando contraseña…' : 'Guardar nueva contraseña'}</button>
+        </form>
+    </Modal>}
   </section>;
 }

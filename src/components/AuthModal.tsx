@@ -8,9 +8,12 @@ import Icon from './Icon';
 import AddressAutocomplete from './AddressAutocomplete';
 import PasswordField from './PasswordField';
 import PhoneField from './PhoneField';
+import PasswordRecovery from './PasswordRecovery';
 
 export default function AuthModal() {
   const { setAuthOpen, setUser, online, notify } = useApp();
+  const [recovery, setRecovery] = useState(false);
+  const [recoverySuccess, setRecoverySuccess] = useState('');
   const [register, setRegister] = useState(false);
   const [legacyLogin, setLegacyLogin] = useState(false);
   const [password, setPassword] = useState('');
@@ -64,8 +67,10 @@ export default function AuthModal() {
       setUser(user); refreshData(); setAuthOpen(false); notify(`Bienvenido${register ? ' a AYNI' : ' de vuelta'}, ${user.nombres}`);
     } catch (error) { setError(explainError(error)); } finally { setBusy(false); }
   }
+  if (recovery) return <Modal title="Recupera tu acceso" onClose={() => setAuthOpen(false)}><PasswordRecovery online={online} onBack={() => setRecovery(false)} onComplete={() => { setRecovery(false); setPassword(''); setPasswordConfirmation(''); setError(''); setUser(null); setRecoverySuccess('Contraseña actualizada. Inicia sesión con tu nueva contraseña.'); }}/></Modal>;
   return <><Modal title={register ? 'Únete a tu barrio' : 'Qué bueno verte'} onClose={() => setAuthOpen(false)}>
     <p className="form-intro">{register ? 'Crea tu cuenta para pedir ayuda y colaborar con tus vecinos.' : 'Entra para encontrar ayuda y conectar con tus vecinos.'}</p>
+    {recoverySuccess && <p className="success-message" role="status">{recoverySuccess}</p>}
     <form onSubmit={submit} className={`form-stack auth-form ${register ? 'auth-registration-form' : ''}`}>
       {register && <>
         <Field label="DNI" hint="Lo usaremos para consultar tus nombres y crear tu acceso."><div className="input-with-action"><input name="dni" inputMode="numeric" autoComplete="off" value={dni} onChange={event => { setDni(event.target.value.replace(/\D/g, '').slice(0, 8)); setDniProof(''); setDniMessage(''); setDniLookupError(''); setDniNames(''); setDniSurnames(''); }} placeholder="Escribe los 8 dígitos" maxLength={8} required/><button type="button" className="secondary-button" disabled={dniBusy || dni.length !== 8 || !dniConsent || !online} onClick={lookupDni}>{dniBusy ? 'Consultando…' : 'Consultar'}</button></div></Field>
@@ -77,6 +82,7 @@ export default function AuthModal() {
       </>}
       {!register && <Field label={legacyLogin ? 'Correo de tu cuenta anterior' : 'DNI'}><input name={legacyLogin ? 'correo' : 'identificador'} type={legacyLogin ? 'email' : 'text'} inputMode={legacyLogin ? 'email' : 'numeric'} autoComplete="username" required minLength={legacyLogin ? undefined : 8} maxLength={legacyLogin ? 254 : 8} pattern={legacyLogin ? undefined : '[0-9]{8}'} placeholder={legacyLogin ? 'tu@correo.com' : 'Escribe los 8 dígitos'}/></Field>}
       <PasswordField key={register ? 'register-password' : 'login-password'} label="Contraseña" name="contrasena" value={password} onChange={setPassword} autoComplete={register ? 'new-password' : 'current-password'} minLength={register ? 10 : 1} hint={register ? 'Usa al menos 10 caracteres.' : undefined}/>
+      {!register && <button type="button" className="text-action" disabled={busy} onClick={() => { setRecovery(true); setRecoverySuccess(''); setError(''); }}>Olvidé mi contraseña</button>}
       {register && <PasswordField label="Confirmar contraseña" name="confirmarContrasena" value={passwordConfirmation} onChange={setPasswordConfirmation} autoComplete="new-password" minLength={10} confirmAgainst={password} hint="Vuelve a escribir tu contraseña."/>}
       {register && <>
         <div className="registration-location">

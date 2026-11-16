@@ -11,6 +11,7 @@ import { protectMutations, verifyExpectedUser } from "./middlewares/security.js"
 import { errorHandler } from "./middlewares/errors.js";
 import { defaultJson } from "./middlewares/json.js";
 import auth from "./routes/auth.js";
+import passwordRecovery from "./routes/password-recovery.js";
 import catalog from "./routes/catalog.js";
 import publications from "./routes/publications.js";
 import notices from "./routes/notices.js";
@@ -64,7 +65,7 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
 }));
 app.use("/api", (req, res, next) => req.path === "/auth/logout" ? next() : optionalAuth(req, res, next));
 app.use('/api', verifyExpectedUser);
-app.use("/api", identity, auth, catalog, recommendations, publications, notices, community, locations, notifications, assistant, publicationInteractions, verificationAdmin);
+app.use("/api", identity, auth, passwordRecovery, catalog, recommendations, publications, notices, community, locations, notifications, assistant, publicationInteractions, verificationAdmin);
 app.use((_req, _res, next) => next(new AppError(404, "NOT_FOUND", "La ruta solicitada no existe.")));
 app.use(errorHandler);
 export default app;
