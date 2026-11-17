@@ -1,4 +1,6 @@
 export type IconName =
+  | "message"
+  | "link"
   | "home"
   | "hands"
   | "megaphone"
@@ -33,6 +35,9 @@ export type IconName =
   | "send";
 
 const paths: Record<IconName, React.ReactNode> = {
+  message: <><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-3 2V11.5A8.5 8.5 0 0 1 9.5 3h3a8.5 8.5 0 0 1 8.5 8.5Z"/><path d="M6 9h10M6 13h7"/></>,
+  link: <><path d="m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M13 17a4 4 0 0 0 6 0l4-4a4 4 0 0 0-6-6l-1 1" transform="translate(0 -1)"/></>,
+
   hand: <><path d="M8 13V5a1.5 1.5 0 0 1 3 0v7M11 11V3.5a1.5 1.5 0 0 1 3 0V12M14 11V5a1.5 1.5 0 0 1 3 0v8M17 11V8a1.5 1.5 0 0 1 3 0v7a7 7 0 0 1-14 1l-3-4a1.5 1.5 0 0 1 2.3-1.9L8 13Z"/></>,
   thumbsUp: <><path d="M7 10h3l3-7q4 0 3 5l-.5 2H20a2 2 0 0 1 2 2l-1.2 7a2 2 0 0 1-2 2H10l-3-2Z"/><rect x="2" y="10" width="5" height="11" rx="1"/></>,
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,

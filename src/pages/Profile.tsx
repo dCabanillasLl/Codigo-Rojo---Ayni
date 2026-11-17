@@ -90,9 +90,9 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
     catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   }
 
-  return <section className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
+  return <section className="profile-page">
     <article className="profile-card">
-      <p className="eyebrow">{t('account')}</p><h1 className="font-display mt-2 text-3xl font-bold">{user.nombres} {user.apellidos}</h1><p className="mt-2">{user.correo || t('accessDni')}</p>
+      <p className="eyebrow">{t('account')}</p><h1 className="profile-title font-display mt-2 font-bold">{user.nombres} {user.apellidos}</h1><p className="profile-account-email mt-2">{user.correo || t('accessDni')}</p>
       <div className="profile-photo-section"><PhotoPicker value={profilePhoto} currentUrl={user.fotoPerfilUrl} onChange={setProfilePhoto} onBusyChange={setProfilePhotoBusy} disabled={busy || !online} label={t('profilePhoto')} variant="avatar"/></div>
       <div className="profile-location-card mt-5"><div className="profile-location-copy"><span className="eyebrow">{t('privateLocation')}</span><p>{user.direccion || t('addLocation')}</p><small>{t('exactLocationPrivate')}</small></div><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={16}/>{user.direccion ? t('editLocation') : t('setLocation')}</button></div>
       <div className="mt-5"><Field label={t('language')}><select value={language} onChange={event => setLanguage(event.target.value as Language)}><option value="es">{t('spanish')}</option><option value="en">English</option><option value="qu">{t('southernQuechua')}</option></select></Field><p className="form-hint">{t('languageNote')}</p></div>
@@ -129,7 +129,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>{t('publicPhoneConsent')}</label>
         <p className="form-hint">{t('phonePrivacy')}</p>
         <ErrorBox message={error}/>{success && <p className="success-message" role="status">{success}</p>}
-        <button type="submit" className="record-button justify-center" disabled={busy || profilePhotoBusy || !online}>{busy ? t('saving') : profilePhotoBusy ? t('preparingPhoto') : t('save')}</button>
+        <button type="submit" className="record-button profile-save-button justify-center" disabled={busy || profilePhotoBusy || !online}>{busy ? t('saving') : profilePhotoBusy ? t('preparingPhoto') : t('save')}</button>
       </form>
       <ErrorBox message={signOutError}/><button type="button" className="outline-btn profile-signout-button mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? t('signingOut') : t('signOut')}</button>
     </article>

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useApp } from '../AppContext';
 import { api, errorMessage, refreshData } from '../lib/api';
 import { areaQuery, useDebounced, useRemote } from '../lib/hooks';
-import { Empty, ErrorBox, Field, Modal, RemoteState, distance, shareItem, statusLabel } from '../components/UI';
+import { Empty, ErrorBox, Field, Modal, RemoteState, distance, statusLabel } from '../components/UI';
 import Icon from '../components/Icon';
 import ServicesMap from '../ServicesMap';
 import LocationPicker from '../components/LocationPicker';
@@ -15,6 +15,7 @@ import PhotoPicker from '../components/PhotoPicker';
 import PublicationImage from '../components/PublicationImage';
 import NearbyFilters from '../components/NearbyFilters';
 import PublicationReviews from '../components/PublicationReviews';
+import PublicationActions from '../components/PublicationActions';
 import { localize, localizePublicationCategory, useLanguage, type Language } from '../lib/language';
 
 function price(item: Publication, language: Language = 'es') { return item.modalidadPrecio === 'gratis' ? localize(language,'Gratis','Free','Mana qullqiyuq') : item.modalidadPrecio === 'cotizar' ? localize(language,'Consultar precio','Ask for price','Chaninta tapuy') : `${item.modalidadPrecio === 'desde' ? localize(language,'Desde ','From ','Qallariq chanin ') : ''}${new Intl.NumberFormat(language === 'en' ? 'en-PE' : 'es-PE',{style:'currency',currency:item.moneda || 'PEN'}).format(Number(item.precio))}`; }
@@ -99,9 +100,8 @@ function PublicationForm({ initial, draft, onClose }: { initial: Publication | n
 }
 function PublicationDetail({id,onClose,onEdit}:{id:string;onClose:()=>void;onEdit:(item:Publication)=>void}) {
   const { language } = useLanguage();
-  const {user,notify,online} = useApp();const publication=useRemote<Publication>(`/publicaciones/${id}`,user?.id||'public');const reputation=useRemote<Reputation>(publication.data?`/usuarios/${publication.data.propietarioId}/reputacion`:null);const [error,setError]=useState('');const item=publication.data; const point=item ? mapPoint(item) : null;
+  const {user,online} = useApp();const publication=useRemote<Publication>(`/publicaciones/${id}`,user?.id||'public');const reputation=useRemote<Reputation>(publication.data?`/usuarios/${publication.data.propietarioId}/reputacion`:null);const item=publication.data; const point=item ? mapPoint(item) : null;
   const contactPhone = item?.propietarioId !== user?.id ? item?.telefonoContacto?.replace(/\D/g, '') : null;
-  const shareText = item ? `${item.titulo}\n${item.descripcion || ''}\n${price(item, language)}\n${window.location.origin}${window.location.pathname}#cerca/${id}` : '';
   return <Modal title={item?.titulo || localize(language, 'Publicación', 'Listing', 'Willay')} onClose={onClose} wide>
     <RemoteState {...publication} />
     {item && <>
@@ -111,13 +111,8 @@ function PublicationDetail({id,onClose,onEdit}:{id:string;onClose:()=>void;onEdi
       <p className="text-xl font-bold">{price(item, language)}</p>
       <p className="mt-3 text-sm">{localize(language, 'Ofrece:', 'Offered by:', 'Qoq:')} {item.propietario}</p>
       {item.propietarioId === user?.id && <button type="button" className="outline-btn mt-3" onClick={() => onEdit(item)}>{localize(language, 'Editar mi publicación', 'Edit my listing', 'Willayniyta tikray')}</button>}
-      <div className="publication-share-actions" role="group" aria-label={localize(language, 'Acciones de la publicación', 'Listing actions', 'Willaypaq ruwaykuna')}>
-        {contactPhone && <a className="whatsapp-btn" href={`https://wa.me/${contactPhone}?text=${encodeURIComponent(`Hola, vi tu publicación en AYNI: ${item.titulo}`)}`} target="_blank" rel="noopener noreferrer"><Icon name="whatsapp" size={20} /><span>{localize(language, 'Contactar por WhatsApp', 'Contact on WhatsApp', 'WhatsApp nisqapi rimay')}</span></a>}
-        <a className="outline-btn" href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer"><Icon name="share" size={18} /><span>{localize(language, 'Compartir por WhatsApp', 'Share on WhatsApp', 'WhatsApp nisqapi rakiy')}</span></a>
-        <button type="button" className="outline-btn" onClick={() => void shareItem(item.titulo, `${item.descripcion || ''}\n${price(item, language)}`, `#cerca/${id}`).then(message => { if (message) notify(message); }).catch(error => { if (error?.name !== 'AbortError') setError(errorMessage(error)); })}><Icon name="share" size={18} /><span>{localize(language, 'Más opciones', 'More options', 'Aswan akllaykuna')}</span></button>
-      </div>
+      <PublicationActions key={id} id={id} title={item.titulo} description={`${item.descripcion || ''}\n${price(item, language)}`} phone={contactPhone}/>
       {!contactPhone && <p className="form-hint">{localize(language, 'Este vecino no habilitó un teléfono público. Puedes compartir la publicación, pero no contactar su WhatsApp desde AYNI.', 'This neighbor has not made a phone number public. You can share the listing, but cannot contact them on WhatsApp through AYNI.', 'Kay llaqtamasiqa celularninta manam llapanpaq rikuchirqanchu. Willayta rakiyta atinki, ichaqa AYNI ukhupi WhatsApp nisqapi manam rimayta atinkichu.')}</p>}
-      <ErrorBox message={error} />
       {point && <div className="detail-map">
         <h3 className="section-subtitle font-display">{localize(language, 'Ubicación aproximada', 'Approximate location', 'Qaylla kay')}</h3>
         <CommunityMap center={point} pins={[{ id, point, title: item.titulo, label: '1', kind: item.tipo === 'producto' ? 'product' : 'service', symbol: listingSymbol(item, item.tipo === 'producto' ? 'product' : 'service'), category: item.categoria }]} selectedId={id} online={online} compact label={localize(language, 'Zona del producto o servicio', 'Product or service area', 'Rantikuypa utaq yanapakuypa qaylla kaynin')} />
