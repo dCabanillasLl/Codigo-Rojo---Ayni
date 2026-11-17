@@ -14,6 +14,9 @@ import { useLanguage } from './lib/language';
 import GuideBot from './components/GuideBot';
 
 type Destination = 'cerca' | 'ayuda' | 'avisos' | 'perfil';
+type AssistantRequestDraft = { description: string; helpType: string; urgent: boolean; earthquake: boolean; emergencyNeeds: string[]; peopleCount?: number; locationQuery?: string };
+type AssistantServiceDraft = { title: string; description: string; categoryHint?: string };
+type AssistantNoticeDraft = { title: string; content: string; categoryHint?: string; dateTime?: string; locationQuery?: string };
 const navItems: { id: Destination; label: string; icon: 'home' | 'hands' | 'megaphone' | 'user' }[] = [
   { id: 'cerca', label: 'Cerca de mí', icon: 'home' },
   { id: 'ayuda', label: 'Ayuda vecinal', icon: 'hands' },
@@ -38,6 +41,10 @@ export default function App() {
   const { user, setUser, online, sessionLoading, sessionError, authOpen, setAuthOpen, requireUser, notify, notifications, notificationsError, unreadNotifications, markNotificationsRead } = useApp();
   const [route, setRoute] = useState(readRoute);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [assistantRequestDraft, setAssistantRequestDraft] = useState<AssistantRequestDraft | undefined>();
+  const [assistantServiceDraft, setAssistantServiceDraft] = useState<AssistantServiceDraft | undefined>();
+  const [assistantServiceSearch, setAssistantServiceSearch] = useState('');
+  const [assistantNoticeDraft, setAssistantNoticeDraft] = useState<AssistantNoticeDraft | undefined>();
   const [locationOpen, setLocationOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [signOutBusy, setSignOutBusy] = useState(false);
@@ -76,9 +83,9 @@ export default function App() {
     <main className="app-main mx-auto max-w-[1240px] px-5 pt-7 lg:px-10 lg:pt-10">
       {!online && <p className="offline-banner" role="status"><Icon name="wifiOff" size={18}/>Estás sin conexión. Puedes consultar información guardada y guardar pedidos para enviarlos cuando vuelvas a conectarte.</p>}
       {sessionError && <p className="offline-banner" role="status">{sessionError} · {sessionLoading ? 'Verificando sesión…' : 'Los datos del servidor pueden no estar disponibles.'}</p>}
-      {route.page === 'cerca' && <Nearby detailId={route.detailId} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
+      {route.page === 'cerca' && <Nearby detailId={route.detailId} serviceDraft={assistantServiceDraft} initialServiceSearch={assistantServiceSearch} onServiceSearchApplied={() => setAssistantServiceSearch('')} onServiceDraftClose={() => setAssistantServiceDraft(undefined)} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>} 
       {route.page === 'ayuda' && <Help detailId={route.detailId} initialTab={route.helpTab} onLocation={() => setLocationOpen(true)} onAsk={() => { if (requireUser()) setHelpOpen(true); }}/>}
-      {route.page === 'avisos' && <Notices view={route.detailId}/>}
+      {route.page === 'avisos' && <Notices view={route.detailId} noticeDraft={assistantNoticeDraft} onNoticeDraftClose={() => setAssistantNoticeDraft(undefined)}/>}
       {route.page === 'perfil' && <Profile onLocation={() => setLocationOpen(true)} onReviewHelp={() => navigate('ayuda', 'mis-pedidos')} onSignOut={() => void signOut()} signOutBusy={signOutBusy} signOutError={profileError}/>}
     </main>
 
@@ -87,10 +94,10 @@ export default function App() {
       <button type="button" className="mobile-help-action" onClick={() => { if (requireUser()) setHelpOpen(true); }} aria-label="Pedir ayuda"><span className="mobile-help-icon"><Icon name="mic" size={23}/></span><span>Pedir ayuda</span></button>
       {navItems.slice(2).map(item => <button type="button" key={item.id} onClick={() => navigate(item.id)} className={route.page === item.id ? 'active' : ''} aria-current={route.page === item.id ? 'page' : undefined}><Icon name={item.icon} size={21}/><span>{t(item.id === 'avisos' ? 'notices' : 'profile')}</span></button>)}
     </nav>
-    {helpOpen && <RequestForm onClose={() => setHelpOpen(false)}/>}
+    {helpOpen && <RequestForm initialRequest={assistantRequestDraft} onClose={() => { setHelpOpen(false); setAssistantRequestDraft(undefined); }}/>} 
     {locationOpen && <LocationDialog onClose={() => setLocationOpen(false)} saveToProfile={route.page === 'perfil'}/>}
     {notificationsOpen && <NotificationCenter notifications={notifications} error={notificationsError} onClose={() => setNotificationsOpen(false)}/>}
     {authOpen && <AuthModal/>}
-    <GuideBot onNavigate={navigate} onAsk={() => { if (requireUser()) setHelpOpen(true); }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }} onLocation={() => { if (requireUser()) setLocationOpen(true); }}/>
+    <GuideBot onNavigate={navigate} onAsk={draft => { if (requireUser()) { setAssistantRequestDraft(draft); setHelpOpen(true); } }} onOffer={() => { navigate('ayuda'); if (!user) requireUser(); }} onOfferService={draft => { if (requireUser()) { setAssistantServiceDraft(draft); navigate('cerca'); } }} onFindService={query => { if (requireUser()) { setAssistantServiceSearch(query); navigate('cerca'); } }} onCreateNotice={draft => { if (requireUser()) { setAssistantNoticeDraft(draft); navigate('avisos'); } }} onLocation={() => { if (requireUser()) setLocationOpen(true); }}/>
   </div>;
 }

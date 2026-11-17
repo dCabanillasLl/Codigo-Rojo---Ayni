@@ -28,15 +28,20 @@ export function LocationDialog({ onClose, saveToProfile = false }: { onClose: ()
     finally { setBusy(false); }
   }
   return <Modal title="Elige tu ubicación" onClose={onClose} wide>
-    <p className="form-intro">Busca servicios y pedidos cerca de un punto. También puedes guardar tu ubicación en el perfil para usarla en tus próximas publicaciones.</p>
+    <p className="location-dialog-intro">Busca una dirección o coloca el pin en el mapa para definir tu zona.</p>
     <form className="form-stack location-form" onSubmit={save}>
       <LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/>
-      {location.coordinates && <button type="button" className="text-action" onClick={() => { setLocation({ coordinates: null, address: '' }); setSaveProfile(false); }}>Ver todas las publicaciones, sin filtrar por distancia</button>}
-      <Field label="Distancia de búsqueda"><select value={radius} onChange={event => setRadius(Number(event.target.value))}>{[1000, 1500, 2000].map(value => <option key={value} value={value}>{value / 1000} km a la redonda</option>)}</select></Field>
-      {user && <label className="check-field"><input type="checkbox" checked={saveProfile} onChange={event => setSaveProfile(event.target.checked)}/>Guardar también como mi ubicación en el perfil</label>}
-      <p className="form-hint">Otros vecinos verán una zona aproximada. Sin un punto elegido, puedes consultar las publicaciones sin filtrar por distancia.</p>
+      {location.coordinates && <button type="button" className="text-action location-clear-action" onClick={() => { setLocation({ coordinates: null, address: '' }); setSaveProfile(false); }}>Quitar el filtro de ubicación</button>}
+      <details className="location-options">
+        <summary>Opciones de búsqueda y perfil</summary>
+        <div className="location-options-content">
+          <Field label="Distancia de búsqueda"><select value={radius} onChange={event => setRadius(Number(event.target.value))}>{[1000, 1500, 2000].map(value => <option key={value} value={value}>{value / 1000} km a la redonda</option>)}</select></Field>
+          {user && <label className="check-field"><input type="checkbox" checked={saveProfile} onChange={event => setSaveProfile(event.target.checked)}/>Guardar también en mi perfil para próximas publicaciones</label>}
+          <p className="form-hint">Tu perfil muestra solo una zona aproximada. También puedes continuar sin ubicación para ver todas las publicaciones.</p>
+        </div>
+      </details>
       <ErrorBox message={error}/>
-      <button type="submit" className="record-button justify-center" disabled={busy || (saveProfile && (!postingSectorId || !online || !location.coordinates))}>{busy ? 'Guardando…' : 'Usar esta ubicación'}</button>
+      <div className="location-submit-bar"><button type="submit" className="record-button justify-center" disabled={busy || (saveProfile && (!postingSectorId || !online || !location.coordinates))}>{busy ? 'Guardando…' : 'Aplicar ubicación'}</button></div>
     </form>
   </Modal>;
 }

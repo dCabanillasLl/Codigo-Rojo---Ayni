@@ -15,9 +15,12 @@ import { googleMapsUrl, locationInput, mapPoint } from '../lib/location';
 import { forgetNoticeCache } from '../lib/storage';
 import NoticeShareDialog from '../components/NoticeShareDialog';
 
-export default function Notices({ view }: { view?: string }) {
+type NoticeDraft = { title: string; content: string; categoryHint?: string; dateTime?: string; locationQuery?: string };
+
+export default function Notices({ view, noticeDraft, onNoticeDraftClose }: { view?: string; noticeDraft?: NoticeDraft; onNoticeDraftClose?: () => void }) {
   const { user, area, requireUser, online, sessionLoading } = useApp();
   const [creating, setCreating] = useState(false);
+  useEffect(() => { if (noticeDraft) setCreating(true); }, [noticeDraft]);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
   const detailId = view && /^[1-9]\d{0,19}$/.test(view) ? view : null;
   const tab = view === 'mios' || view === 'asistencias' ? view : 'cerca';
@@ -65,7 +68,7 @@ export default function Notices({ view }: { view?: string }) {
       {item.motivoCambio && <p className="notice-change-note"><b>Último cambio:</b> {item.motivoCambio}</p>}
       <AttendanceActions item={item} onDeleted={id => setDeletedIds(current => new Set(current).add(id))}/>
     </article>)}</div>
-    {creating && <NoticeForm close={() => setCreating(false)}/>}
+    {creating && <NoticeForm draft={noticeDraft} close={() => { setCreating(false); onNoticeDraftClose?.(); }}/>} 
   </section>;
 }
 
@@ -174,16 +177,22 @@ function EventChangeDialog({ item, onClose }: { item: Notice; onClose: () => voi
   </form></Modal>;
 }
 
-function NoticeForm({close, initial}:{close:()=>void; initial?: Notice}) {
+function NoticeForm({close, initial, draft}:{close:()=>void; initial?: Notice; draft?: NoticeDraft}) {
   const { user, postingSectorId, catalogs, area, online, notify } = useApp();
   const [error,setError]=useState(''); const [busy,setBusy]=useState(false);
   const [photo, setPhoto] = useState<string | null | undefined>(undefined);
   const [readingPhoto, setReadingPhoto] = useState(false);
   const [categoryId, setCategoryId] = useState(initial?.categoriaId || '');
-  const [location, setLocation] = useState<LocationDraft>(() => ({ coordinates: initial ? mapPoint({ mapaLatitud: initial.latitudActividad, mapaLongitud: initial.longitudActividad }) : null, address: initial?.direccionActividad || '' }));
+  const [location, setLocation] = useState<LocationDraft>(() => ({ coordinates: initial ? mapPoint({ mapaLatitud: initial.latitudActividad, mapaLongitud: initial.longitudActividad }) : null, address: initial?.direccionActividad || draft?.locationQuery || '' }));
   const [locationOpen, setLocationOpen] = useState(false);
   const [conflict, setConflict] = useState(false);
   const selectedCategory = catalogs.data?.avisos.find(category => category.id === categoryId);
+  useEffect(() => {
+    if (initial?.categoriaId || categoryId || !draft?.categoryHint) return;
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    const match = catalogs.data?.avisos.find(category => normalize(category.nombre) === normalize(draft.categoryHint!));
+    if (match) setCategoryId(match.id);
+  }, [initial?.categoriaId, categoryId, draft?.categoryHint, catalogs.data?.avisos]);
   const initialDate = initial?.fechaEvento ? localDateTimeInput(new Date(initial.fechaEvento)) : '';
   const needsPoint = !initial || noticeVenueChanged(initial, location);
   async function submit(event:FormEvent<HTMLFormElement>) {
@@ -204,13 +213,13 @@ function NoticeForm({close, initial}:{close:()=>void; initial?: Notice}) {
   }
   return <><Modal title={initial ? 'Editar actividad' : 'Comparte un aviso'} onClose={() => { if (!busy) close(); }}><form className="form-stack" onSubmit={submit}>
     {initial && <p className="form-intro">Corrige los datos, cambia el flyer o elige otro lugar. Los cambios de fecha o ubicación se notificarán a los asistentes confirmados.</p>}
-    <Field label="Título"><input name="titulo" required minLength={3} maxLength={180} defaultValue={initial?.titulo} disabled={busy} placeholder="Ej. Jornada de limpieza vecinal"/></Field>
-    <Field label="¿Qué deben saber tus vecinos?"><textarea name="contenido" required minLength={3} maxLength={8000} rows={5} defaultValue={initial?.contenido} disabled={busy}/></Field>
+    <Field label="Título"><input name="titulo" required minLength={3} maxLength={180} defaultValue={initial?.titulo ?? draft?.title} disabled={busy} placeholder="Ej. Jornada de limpieza vecinal"/></Field>
+    <Field label="¿Qué deben saber tus vecinos?"><textarea name="contenido" required minLength={3} maxLength={8000} rows={5} defaultValue={initial?.contenido ?? draft?.content} disabled={busy}/></Field>
     <PhotoPicker label="Imagen del flyer" value={photo} currentUrl={initial?.imagenUrl} onChange={setPhoto} onBusyChange={setReadingPhoto} disabled={busy}/>
     <Field label="Categoría"><select name="categoriaId" required value={categoryId} onChange={event => setCategoryId(event.target.value)} disabled={busy}><option value="" disabled>Elige una opción</option>{catalogs.data?.avisos.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Field>
     <div className="notice-category-preview" aria-live="polite">{selectedCategory && <><span className="form-hint">Tu aviso tendrá esta etiqueta:</span><NoticeCategoryBadge name={selectedCategory.nombre}/></>}</div>
-    <Field label="Fecha y hora de la actividad" hint={initial ? 'Puedes conservar la fecha actual. Si la cambias, debe ser futura y se avisará a los asistentes. Una actividad vencida sigue vencida si no cambias su fecha.' : 'Hora local de tu dispositivo. Al llegar este momento, el aviso dejará de aparecer automáticamente.'}><input name="fechaEvento" type="datetime-local" required={!initial || Boolean(initialDate)} defaultValue={initialDate} min={initial ? undefined : localDateTimeInput()} disabled={busy}/></Field>
-    <div className="registration-location"><AddressAutocomplete label="Lugar de la actividad" name="direccionActividad" value={location.address} onChange={address => setLocation({ address, coordinates: null })} onSelect={place => setLocation({ address: place.nombre, coordinates: { latitude: place.latitud, longitude: place.longitud } })} bias={location.coordinates || area.coordinates} online={online} disabled={busy} showSearchButton={false}/><div className="registration-location-actions"><button type="button" className="outline-btn" disabled={busy || !online} onClick={() => setLocationOpen(true)}><Icon name="pin" size={17}/>{location.coordinates ? 'Cambiar lugar en el mapa' : 'Elegir lugar en el mapa'}</button>{location.coordinates && <span className="registration-location-selected" role="status"><Icon name="check" size={15}/>Lugar seleccionado</span>}</div><p className="form-hint">Selecciona una sugerencia o un punto en el mapa. La dirección y el punto elegidos serán visibles como lugar de la actividad; tu perfil no cambia.</p></div>
+    <Field label="Fecha y hora de la actividad" hint={initial ? 'Puedes conservar la fecha actual. Si la cambias, debe ser futura y se avisará a los asistentes. Una actividad vencida sigue vencida si no cambias su fecha.' : 'Hora local de tu dispositivo. Al llegar este momento, el aviso dejará de aparecer automáticamente.'}><input name="fechaEvento" type="datetime-local" required={!initial || Boolean(initialDate)} defaultValue={initialDate || draft?.dateTime || ''} min={initial ? undefined : localDateTimeInput()} disabled={busy}/></Field>
+    <div className="registration-location"><AddressAutocomplete label="Lugar de la actividad" name="direccionActividad" value={location.address} onChange={address => setLocation({ address, coordinates: null })} onSelect={place => setLocation({ address: place.nombre, coordinates: { latitude: place.latitud, longitude: place.longitud } })} bias={location.coordinates || area.coordinates} online={online} disabled={busy} showSearchButton={false} autoSearch={Boolean(draft?.locationQuery)}/><div className="registration-location-actions"><button type="button" className="outline-btn" disabled={busy || !online} onClick={() => setLocationOpen(true)}><Icon name="pin" size={17}/>{location.coordinates ? 'Cambiar lugar en el mapa' : 'Elegir lugar en el mapa'}</button>{location.coordinates && <span className="registration-location-selected" role="status"><Icon name="check" size={15}/>Lugar seleccionado</span>}</div><p className="form-hint">Selecciona una sugerencia o un punto en el mapa. La dirección y el punto elegidos serán visibles como lugar de la actividad; tu perfil no cambia.</p></div>
     <RemoteState {...catalogs}/><ErrorBox message={error}/><div className="event-change-actions"><button type="button" className="outline-btn" disabled={busy} onClick={close}>Volver</button><button className="record-button event-change-submit" disabled={busy||readingPhoto||locationOpen||conflict||(needsPoint&&!location.coordinates)||!online||!categoryId||!postingSectorId}>{busy?'Guardando…':readingPhoto?'Preparando flyer…':initial?'Guardar cambios':'Publicar aviso'}</button></div>
   </form></Modal>{locationOpen && <ActivityLocationDialog value={location} initialCenter={area.coordinates} online={online} onClose={() => setLocationOpen(false)} onConfirm={value => { setLocation(value); setLocationOpen(false); setError(''); }}/>}</>;
 }
