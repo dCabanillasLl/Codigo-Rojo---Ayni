@@ -71,6 +71,7 @@ export function localizePublicationCategory(language: Language, category: string
     'Préstamo de objetos': ['Borrowing items', 'Imakunata mañakuy'], 'Ayuda urgente': ['Urgent help', 'Utqay yanapay'],
     'Reparaciones y herramientas': ['Repairs and tools', 'Allichaykuna, llamk’ana imakuna'],
     'Clases y aprendizaje': ['Classes and learning', 'Yachachiykuna, yachay'], 'Tecnología': ['Technology', 'Tecnología'], Mascotas: ['Pets', 'Uywakuna'], Bicicletas: ['Bicycles', 'Bicicletakuna'],
+    'Apoyo urgente': ['Urgent support', 'Utqay yanapay'], 'Primeros auxilios': ['First aid', 'Ñawpaq yanapakuy'],
   };
   const translated = labels[category];
   return language === 'qu' ? translated?.[1] || category : language === 'en' ? translated?.[0] || category : category;
