@@ -149,6 +149,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   const [tourIndex, setTourIndex] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<TourSpotlight | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognition = useRef<Recognition | null>(null);
   const Voice = (window as VoiceWindow).SpeechRecognition || (window as VoiceWindow).webkitSpeechRecognition;
 
@@ -158,6 +159,13 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
     const list = listRef.current;
     if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
   }, [messages, open]);
+
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${Math.min(field.scrollHeight, 120)}px`;
+  }, [input]);
 
   useEffect(() => {
     if (tourIndex === null) { setSpotlight(null); return; }
@@ -457,7 +465,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
           <span className="sr-only">{message.from === 'bot' ? 'Guía AYNI: ' : 'Tú: '}</span>
           <p className="guide-message-text">{message.text}</p>
           {message.action && <button type="button" className="guide-card-action" onClick={() => runAction(message.action!)}><Icon name={message.action.icon} size={17}/>{message.action.label}<Icon name="arrow" size={16}/></button>}
-          {message.from === 'bot' && message.text.length > 0 && <button type="button" className="guide-speech-action" aria-label="Escuchar respuesta" onClick={() => { if (!speak(message.text)) setVoiceError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones" size={15}/>Escuchar</button>}
+          {message.from === 'bot' && message.text.length > 0 && <button type="button" className="guide-speech-action" aria-label="Escuchar mensaje de AYNI" onClick={() => { if (!speak(message.text)) setVoiceError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones" size={16}/>Escuchar mensaje</button>}
         </div>)}
         {thinking && <div className="guide-message bot" role="status"><p className="guide-message-text">Estoy pensando cómo ayudarte…</p></div>}
         {messages.length === 1 && <div className="guide-home-actions" aria-label="Elige qué quieres hacer">
@@ -468,7 +476,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
         {homeActions.filter(action => ['nearby', 'ask', 'tutorial'].includes(action.key)).map(action => <button type="button" key={action.key} className="guide-chip" onClick={() => selectAction(action)}>{action.label}</button>)}
       </div>
       {voiceError && <p className="guide-voice-error" role="status">{voiceError}</p>}
-      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><input id="guide-question" value={input} onChange={event => setInput(event.target.value)} placeholder="Ej. Necesito una escalera por una hora" maxLength={600} disabled={thinking}/>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={!input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
+      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><textarea ref={inputRef} id="guide-question" rows={1} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Escribe lo que necesitas…" maxLength={600} disabled={thinking}/><button type="button" className="guide-voice-btn guide-read-input" aria-label="Escuchar texto escrito" title="Escuchar texto escrito" onClick={() => { if (!speak(input.trim())) setVoiceError(input.trim() ? 'La lectura en voz alta no está disponible en este navegador.' : 'Escribe un mensaje para poder escucharlo.'); }} disabled={!input.trim() || thinking}><Icon name="headphones" size={18}/></button>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={!input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
       <p className="guide-privacy-note">Las preguntas abiertas se procesan con Gemini de Google. No escribas tu DNI, dirección ni contraseñas.</p>
     </section>}
     <button type="button" className={`guide-launcher ${open ? 'is-open' : ''}`} aria-label={open ? 'Cerrar guía AYNI' : 'Abrir guía AYNI'} aria-expanded={open} onClick={() => setOpen(value => !value)}>

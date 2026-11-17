@@ -480,6 +480,76 @@
   width: 42px;
   height: 42px;
   border: 3px solid #e7ece7;
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.profile-photo-section {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid #e2e8df;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fbfcf8, #f2f6ef);
+  box-shadow: 0 5px 18px #2346320a;
+}
+.photo-picker-avatar-layout { display: flex; align-items: center; gap: 17px; }
+.photo-picker-avatar input[type='file'] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.photo-picker-avatar-control { position: relative; display: block; flex: 0 0 auto; }
+.photo-picker-avatar-button { display: block; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.photo-picker-avatar-button:disabled { cursor: not-allowed; opacity: .62; }
+.photo-picker-avatar-image { display: grid; width: 82px; height: 82px; place-items: center; overflow: hidden; border: 3px solid #fff; border-radius: 50%; color: #52765e; background: #e6eee3; box-shadow: 0 0 0 1px #d9e3d6, 0 5px 12px #23463218; transition: transform .18s ease, box-shadow .18s ease; }
+.photo-picker-avatar-button:not(:disabled):hover .photo-picker-avatar-image { transform: translateY(-2px); box-shadow: 0 0 0 1px #c5d6c3, 0 8px 16px #23463220; }
+.photo-picker-avatar-button:focus-visible { outline: 3px solid #97b99b; outline-offset: 4px; }
+.photo-picker-avatar input:focus-visible ~ .photo-picker-avatar-control .photo-picker-avatar-button { outline: 3px solid #97b99b; outline-offset: 4px; }
+.photo-picker-avatar-image img { width: 100%; height: 100%; object-fit: cover; }
+.photo-picker-avatar-badge { position: absolute; right: 0; bottom: 0; display: grid; width: 27px; height: 27px; place-items: center; border: 2px solid #fbfcf8; border-radius: 50%; color: white; background: #315f49; cursor: pointer; }
+.photo-picker-avatar-copy { min-width: 0; }
+.photo-picker-avatar-copy > b { display: block; color: #29483a; font-size: 14px; }
+.photo-picker-optional { display: block; margin-top: 3px; color: #64746a; font-size: 12px; line-height: 1.45; }
+.photo-picker-avatar-copy .form-hint { margin-top: 5px; }
+.photo-picker-avatar-actions { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
+.photo-picker-select { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 13px; border-radius: 9px; color: #fff; background: #315f49; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .16s ease, transform .16s ease; }
+.photo-picker-select:hover { background: #254c3a; transform: translateY(-1px); }
+.photo-picker-select.is-disabled { opacity: .55; cursor: not-allowed; }
+.photo-picker-remove { display: inline-flex; align-items: center; gap: 4px; border: 0; color: #68776d; background: transparent; font-size: 12px; cursor: pointer; }
+.photo-picker-remove:hover { color: #a44438; }
+.photo-picker-reading { margin: 10px 0 0 99px; }
+.photo-crop-instructions { margin: 0 0 14px; color: #617168; font-size: .88rem; line-height: 1.5; }
+.photo-crop-stage { position: relative; width: min(300px, 100%); aspect-ratio: 1; margin: 0 auto; overflow: hidden; border: 3px solid white; border-radius: 50%; background: #26352d; box-shadow: 0 0 0 1px #d9e3d6, 0 8px 24px #1c332522; cursor: grab; touch-action: none; }
+.photo-crop-stage:active { cursor: grabbing; }
+.photo-crop-stage::after { position: absolute; inset: 0; border: 1px solid #ffffff77; border-radius: inherit; content: ''; pointer-events: none; }
+.photo-crop-stage img { position: absolute; top: 50%; left: 50%; max-width: none; max-height: none; user-select: none; pointer-events: none; }
+.photo-crop-zoom { display: flex; align-items: center; gap: 12px; max-width: 360px; margin: 20px auto; color: #5a6d62; font-size: 12px; }
+.photo-crop-zoom input { flex: 1; accent-color: #315f49; }
+.photo-crop-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.photo-viewer { display: grid; min-height: 220px; place-items: center; padding: 8px; background: #f2f5ef; border-radius: 14px; }
+.photo-viewer img { display: block; width: min(100%, 520px); max-height: 65vh; border-radius: 12px; object-fit: contain; }
+.profile-photo-section .photo-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+.profile-photo-section .photo-preview img {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid white;
+  box-shadow: 0 0 0 1px #dce5db;
+}
+@media (max-width: 480px) {
+  .profile-photo-section { padding: 14px; }
+  .photo-picker-avatar-layout { align-items: flex-start; gap: 13px; }
+  .photo-picker-avatar-image { width: 68px; height: 68px; }
+  .photo-picker-avatar-copy > b { font-size: 13px; }
+  .photo-picker-optional { font-size: 11px; }
+  .photo-crop-actions { flex-direction: column-reverse; }
+  .photo-crop-actions > button { width: 100%; justify-content: center; }
 }
 .small-avatar {
   width: 42px;
@@ -2519,9 +2589,9 @@ textarea:disabled {
   border: 1px solid #e1eae2;
   border-radius: 1rem 1rem 1rem 0.35rem;
   background: #edf3ee;
-  color: #33483d;
-  font-size: 0.88rem;
-  line-height: 1.5;
+  color: #263a30;
+  font-size: 0.96rem;
+  line-height: 1.6;
   overflow-wrap: anywhere;
   box-shadow: 0 0.2rem 0.7rem #173f3208;
 }
@@ -2530,19 +2600,21 @@ textarea:disabled {
 }
 .guide-speech-action {
   display: inline-flex;
-  min-height: 1.9rem;
+  min-height: 2.35rem;
   align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
-  padding: 0.2rem 0.45rem;
-  border: 0;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid #b5cbb9;
   border-radius: 999px;
-  background: transparent;
-  color: #486c57;
-  font-size: 0.7rem;
+  background: #fffef9;
+  color: #244c39;
+  font-size: 0.82rem;
   font-weight: 700;
+  cursor: pointer;
 }
-.guide-speech-action:hover { background: #e0eae1; }
+.guide-speech-action:hover { background: #e0eae1; border-color: #789982; }
+.guide-speech-action:focus-visible { outline: 3px solid #e36543; outline-offset: 2px; }
 .guide-voice-btn {
   display: grid;
   width: 2.7rem;
@@ -2554,6 +2626,9 @@ textarea:disabled {
   background: #fffef9;
   color: #315f49;
 }
+.guide-read-input { background: #edf3ee; border-color: #b5cbb9; }
+.guide-read-input:hover:not(:disabled) { background: #e0eae1; }
+.guide-read-input:disabled { color: #9aa69d; cursor: not-allowed; }
 .guide-voice-btn.is-recording { border-color: #c44b3a; background: #fff0eb; color: #b64031; animation: guide-pulse 1.2s infinite; }
 .guide-voice-error { margin: 0; padding: 0.25rem 0.85rem; color: #a43d31; font-size: 0.72rem; }
 @keyframes guide-pulse { 50% { box-shadow: 0 0 0 0.25rem #e3654328; } }
@@ -2716,15 +2791,16 @@ textarea:disabled {
 }
 .guide-input-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
   padding: 0.7rem 0.85rem;
   background: #fffef9;
   border-top: 1px solid #e5e9e2;
 }
-.guide-input-row input {
+.guide-input-row textarea {
   min-width: 0;
   min-height: 2.9rem;
+  max-height: 7.5rem;
   flex: 1;
   padding: 0.65rem 0.8rem;
   border: 1px solid #d9dfda;
@@ -2732,6 +2808,9 @@ textarea:disabled {
   background: white;
   color: #24362e;
   font-size: 0.9rem;
+  line-height: 1.45;
+  resize: none;
+  overflow-y: auto;
 }
 .guide-send {
   display: grid;
@@ -3169,4 +3248,59 @@ select:focus-visible {
 .emergency-needs-grid .check-field { min-height: 2.85rem; align-items: center; margin: 0; padding: .55rem .65rem; background: #fff; font-size: .82rem; }
 .pending-emergency-label { display: inline-flex; width: fit-content; padding: .3rem .55rem; border-radius: 999px; background: #fff0e7; color: #9b321f; font-size: .67rem; letter-spacing: .035em; }
 @media (max-width: 560px) { .emergency-request-fields { padding: .7rem; } .emergency-needs-grid { grid-template-columns: 1fr; } }
+
+/* Larger, roomier account creation without changing login or other dialogs. */
+.modal-dialog:has(.auth-registration-form) {
+  width: min(100% - 2rem, 51rem);
+  max-height: min(92dvh, 66rem);
+}
+.modal-dialog:has(.location-picker) {
+  width: min(100% - 2rem, 87rem);
+  max-width: 87rem;
+  max-height: min(92dvh, 66rem);
+}
+.modal-dialog:has(.auth-registration-form) .modal-header { padding: 1.5rem 1.75rem; }
+.modal-dialog:has(.auth-registration-form) .modal-header h2 { font-size: clamp(1.8rem, 4vw, 2.475rem); }
+.modal-dialog:has(.auth-registration-form) .modal-content { max-height: calc(min(92dvh, 66rem) - 6rem); padding: clamp(1.5rem, 4vw, 2.25rem); }
+.modal-dialog:has(.location-picker) .modal-header { padding: 1.5rem 1.75rem; }
+.modal-dialog:has(.location-picker) .modal-header h2 { font-size: clamp(1.8rem, 4vw, 2.475rem); }
+.modal-dialog:has(.location-picker) .modal-content { max-height: calc(min(92dvh, 66rem) - 6rem); padding: clamp(1.5rem, 4vw, 2.25rem); }
+.modal-dialog:has(.location-picker) .form-intro { margin-bottom: .5rem; font-size: 1.35rem; line-height: 1.5; }
+.modal-dialog:has(.auth-registration-form) .modal-header .eyebrow,
+.modal-dialog:has(.location-picker) .modal-header .eyebrow { font-size: .82rem; }
+.modal-dialog:has(.auth-registration-form) .modal-header .icon-button,
+.modal-dialog:has(.location-picker) .modal-header .icon-button { width: 3.75rem; height: 3.75rem; }
+.modal-dialog:has(.auth-registration-form) .form-intro { margin-bottom: 1.5rem; font-size: 1.35rem; line-height: 1.5; }
+.auth-registration-form { gap: 1.7rem; }
+.auth-registration-form .form-field { gap: .75rem; font-size: 1.2rem; }
+.auth-registration-form .form-field > span,
+.auth-registration-form .form-field > label { font-size: 1.2rem; }
+.auth-registration-form .form-field input { min-height: 4.65rem; padding: 1rem 1.1rem; font-size: 1.2rem; }
+.auth-registration-form > .consent-row { gap: 1rem; padding: 1.2rem 1.35rem; font-size: 1.2rem; line-height: 1.5; }
+.auth-registration-form > .consent-row input { width: 1.65rem; height: 1.65rem; margin-top: .12rem; }
+.auth-registration-form .auth-actions { gap: 1.15rem; margin-top: .3rem; }
+.auth-registration-form .auth-actions > .record-button { min-height: 4.5rem; font-size: 1.3rem; }
+.auth-registration-form .auth-actions > .text-action { min-height: 3.5rem; font-size: 1.15rem; }
+
+/* Reduce the registration dialog and its controls by 25%. */
+.modal-dialog:has(.auth-registration-form) {
+  width: min(100% - 2rem, 38.25rem);
+  max-height: min(92dvh, 49.5rem);
+}
+.modal-dialog:has(.auth-registration-form) .modal-header { padding: 1.125rem 1.3125rem; }
+.modal-dialog:has(.auth-registration-form) .modal-header h2 { font-size: clamp(1.35rem, 3vw, 1.856rem); }
+.modal-dialog:has(.auth-registration-form) .modal-content { max-height: calc(min(92dvh, 49.5rem) - 4.5rem); padding: clamp(1.125rem, 3vw, 1.6875rem); }
+.modal-dialog:has(.auth-registration-form) .modal-header .icon-button { width: 2.8125rem; height: 2.8125rem; }
+.modal-dialog:has(.auth-registration-form) .form-intro { margin-bottom: 1.125rem; font-size: 1.0125rem; line-height: 1.5; }
+.auth-registration-form { gap: 1.275rem; }
+.auth-registration-form .form-field { gap: .5625rem; font-size: .9rem; }
+.auth-registration-form .form-field > span,
+.auth-registration-form .form-field > label { font-size: .9rem; }
+.auth-registration-form .form-field input { min-height: 3.4875rem; padding: .75rem .825rem; font-size: .9rem; }
+.auth-registration-form > .consent-row { gap: .75rem; padding: .9rem 1.0125rem; font-size: .9rem; line-height: 1.5; }
+.auth-registration-form > .consent-row input { width: 1.2375rem; height: 1.2375rem; margin-top: .09rem; }
+.auth-registration-form .auth-actions { gap: .8625rem; margin-top: .225rem; }
+.auth-registration-form .auth-actions > .record-button { min-height: 3.375rem; font-size: .975rem; }
+.auth-registration-form .auth-actions > .text-action { min-height: 2.625rem; font-size: .8625rem; }
+
 
