@@ -150,3 +150,40 @@
   .post-location > summary { font-size: 17px; }
   .help-map-controls > .action-row { flex-wrap: wrap; }
 }
+
+/* More readable map selection controls on both desktop and mobile. */
+.modal-content .location-picker { gap: 1.1rem; }
+.modal-content .location-picker .form-field { gap: .6rem; font-size: 1.15rem; }
+.modal-content .location-picker .form-field > input,
+.modal-content .location-picker .location-search input { min-height: 4.35rem; padding: 1rem 1.1rem; font-size: 1.2rem; }
+.modal-content .location-picker .location-address-label { font-size: 1.2rem; }
+.modal-content .location-picker .location-search { gap: .75rem; }
+.modal-content .location-picker .location-search button { min-height: 4.35rem; padding-inline: 1.35rem; font-size: 1.1rem; }
+.modal-content .location-picker-tools { gap: .9rem; }
+.modal-content .location-picker-tools > span { font-size: 1.15rem; }
+.modal-content .location-picker-tools .outline-btn { min-height: 3.75rem; padding: .85rem 1.1rem; font-size: 1.05rem; }
+.modal-content .location-picker .compact-map .community-map { height: clamp(330px, 52.5vh, 450px); }
+.modal-content .location-picker .map-recenter { min-height: 3.4rem; padding: .8rem 1.2rem; font-size: 1.05rem; }
+.modal-content .location-picker .form-hint,
+.modal-content .location-picker .location-selection-state { font-size: 1rem; line-height: 1.5; }
+.registration-location { gap: 1.2rem; padding: 1.5rem; border-radius: 1.25rem; }
+.registration-location-heading { gap: 1rem; }
+.registration-location-icon { width: 3.75rem; height: 3.75rem; }
+.registration-location-heading b { font-size: 1.25rem; }
+.registration-location-heading small { font-size: 1rem; line-height: 1.5; }
+.registration-location .location-address-label { font-size: 1rem; }
+.registration-location .location-search input { min-height: 4.35rem; padding: 1rem 1.1rem; font-size: 1.15rem; }
+.registration-location .address-autocomplete > .form-hint { font-size: .9rem; }
+.registration-location-actions .registration-map-button { min-height: 4.25rem; padding: .95rem 1.2rem; font-size: 1.05rem; }
+.registration-location-privacy,
+.registration-location-selected { font-size: .9rem; }
+.registration-location-dialog-actions { gap: .9rem; padding-top: .35rem; }
+.registration-location-dialog-actions > button { min-height: 4rem; padding: .85rem 1.3rem; font-size: 1.05rem; }
+
+@media (max-width: 640px) {
+  .modal-content .location-picker .location-search { flex-direction: column; }
+  .modal-content .location-picker .location-search button { width: 100%; }
+  .modal-content .location-picker-tools { align-items: stretch; }
+  .modal-content .location-picker-tools .outline-btn { justify-content: center; }
+  .registration-location-dialog-actions { display: grid; grid-template-columns: 1fr 1.5fr; }
+}

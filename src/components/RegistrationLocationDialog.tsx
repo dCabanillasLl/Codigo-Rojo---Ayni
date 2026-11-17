@@ -15,9 +15,9 @@ export default function RegistrationLocationDialog({ value, online, onConfirm, o
   }
   return <Modal title="Selecciona tu ubicación" onClose={onClose} wide>
     <form className="form-stack" onSubmit={confirm}>
-      <p className="form-intro">Escribe una calle para ver sugerencias o pulsa un punto en el mapa para completar su dirección automáticamente. También puedes usar tu GPS.</p>
+      <p className="form-intro">Busca tu dirección o marca el punto en el mapa.</p>
       <LocationPicker value={draft} onChange={setDraft} online={online} onBusyChange={setBusy} addressField={{ label: 'Dirección o referencia', name: 'direccion-selector', required: true }}/>
-      <p className="form-hint">La dirección es aproximada: revísala antes de confirmar. Si no encontramos una calle para ese punto, puedes escribir una referencia manualmente.</p>
+      <p className="form-hint">Revisa la dirección antes de continuar. Si no aparece, escribe una referencia.</p>
       <div className="registration-location-dialog-actions"><button type="button" className="outline-btn" onClick={onClose}>Cancelar</button><button type="submit" className="record-button" disabled={busy || draft.address.trim().length < 3}>{busy ? 'Buscando ubicación…' : draft.coordinates ? 'Usar esta ubicación' : 'Usar esta referencia'}</button></div>
     </form>
   </Modal>;
