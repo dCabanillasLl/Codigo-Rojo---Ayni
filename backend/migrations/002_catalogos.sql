@@ -14,10 +14,9 @@ VALUES ('Alimentos', 'Productos de alimentación del barrio'),
        ('Otros', 'Otros productos y servicios');
 
 INSERT IGNORE INTO categorias_ayuda (nombre, descripcion)
-VALUES ('Préstamo', 'Prestar herramientas y objetos'),
+VALUES ('Préstamo de objetos', 'Pedir herramientas y objetos prestados, con devolución'),
        ('Un favor', 'Apoyo temporal entre vecinos'),
        ('Donación', 'Compartir bienes sin dinero'),
-       ('Intercambio', 'Intercambiar habilidades o apoyo'),
        ('Apoyo urgente', 'Necesidad comunitaria urgente');
 
 INSERT IGNORE INTO categorias_avisos (nombre, descripcion)

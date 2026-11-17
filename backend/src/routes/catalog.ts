@@ -9,7 +9,7 @@ router.get("/sectores", asyncHandler(async (_req, res) => {
 router.get("/catalogos", asyncHandler(async (_req, res) => {
   const [publicaciones, ayuda, avisos] = await Promise.all([
     query("SELECT CAST(categoria_id AS CHAR) AS id, nombre FROM categorias_publicacion ORDER BY nombre"),
-    query("SELECT CAST(categoria_ayuda_id AS CHAR) AS id, nombre FROM categorias_ayuda ORDER BY nombre"),
+    query("SELECT CAST(categoria_ayuda_id AS CHAR) AS id, nombre FROM categorias_ayuda WHERE nombre <> 'Intercambio' ORDER BY nombre"),
     query("SELECT CAST(categoria_aviso_id AS CHAR) AS id, nombre FROM categorias_avisos ORDER BY nombre"),
   ]);
   res.json({ data: { publicaciones, ayuda, avisos } });
