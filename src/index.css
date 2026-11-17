@@ -3282,3 +3282,25 @@ select:focus-visible {
 .auth-registration-form .auth-actions > .record-button { min-height: 4.5rem; font-size: 1.3rem; }
 .auth-registration-form .auth-actions > .text-action { min-height: 3.5rem; font-size: 1.15rem; }
 
+/* Reduce the registration dialog and its controls by 25%. */
+.modal-dialog:has(.auth-registration-form) {
+  width: min(100% - 2rem, 38.25rem);
+  max-height: min(92dvh, 49.5rem);
+}
+.modal-dialog:has(.auth-registration-form) .modal-header { padding: 1.125rem 1.3125rem; }
+.modal-dialog:has(.auth-registration-form) .modal-header h2 { font-size: clamp(1.35rem, 3vw, 1.856rem); }
+.modal-dialog:has(.auth-registration-form) .modal-content { max-height: calc(min(92dvh, 49.5rem) - 4.5rem); padding: clamp(1.125rem, 3vw, 1.6875rem); }
+.modal-dialog:has(.auth-registration-form) .modal-header .icon-button { width: 2.8125rem; height: 2.8125rem; }
+.modal-dialog:has(.auth-registration-form) .form-intro { margin-bottom: 1.125rem; font-size: 1.0125rem; line-height: 1.5; }
+.auth-registration-form { gap: 1.275rem; }
+.auth-registration-form .form-field { gap: .5625rem; font-size: .9rem; }
+.auth-registration-form .form-field > span,
+.auth-registration-form .form-field > label { font-size: .9rem; }
+.auth-registration-form .form-field input { min-height: 3.4875rem; padding: .75rem .825rem; font-size: .9rem; }
+.auth-registration-form > .consent-row { gap: .75rem; padding: .9rem 1.0125rem; font-size: .9rem; line-height: 1.5; }
+.auth-registration-form > .consent-row input { width: 1.2375rem; height: 1.2375rem; margin-top: .09rem; }
+.auth-registration-form .auth-actions { gap: .8625rem; margin-top: .225rem; }
+.auth-registration-form .auth-actions > .record-button { min-height: 3.375rem; font-size: .975rem; }
+.auth-registration-form .auth-actions > .text-action { min-height: 2.625rem; font-size: .8625rem; }
+
+
