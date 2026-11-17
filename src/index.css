@@ -2483,6 +2483,35 @@ textarea:disabled {
 .guide-message-text {
   margin: 0;
 }
+.guide-speech-action {
+  display: inline-flex;
+  min-height: 1.9rem;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #486c57;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.guide-speech-action:hover { background: #e0eae1; }
+.guide-voice-btn {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #d9dfda;
+  border-radius: 50%;
+  background: #fffef9;
+  color: #315f49;
+}
+.guide-voice-btn.is-recording { border-color: #c44b3a; background: #fff0eb; color: #b64031; animation: guide-pulse 1.2s infinite; }
+.guide-voice-error { margin: 0; padding: 0.25rem 0.85rem; color: #a43d31; font-size: 0.72rem; }
+@keyframes guide-pulse { 50% { box-shadow: 0 0 0 0.25rem #e3654328; } }
 .guide-message.you {
   align-self: flex-end;
   border-color: #315f49;

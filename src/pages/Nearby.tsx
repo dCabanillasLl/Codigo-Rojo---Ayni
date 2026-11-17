@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useApp } from '../AppContext';
 import { api, errorMessage, refreshData } from '../lib/api';
 import { areaQuery, useDebounced, useRemote } from '../lib/hooks';
@@ -17,13 +17,15 @@ import NearbyFilters from '../components/NearbyFilters';
 import PublicationReviews from '../components/PublicationReviews';
 
 function price(item: Publication) { return item.modalidadPrecio === 'gratis' ? 'Gratis' : item.modalidadPrecio === 'cotizar' ? 'Consultar precio' : `${item.modalidadPrecio === 'desde' ? 'Desde ' : ''}${new Intl.NumberFormat('es-PE',{style:'currency',currency:item.moneda || 'PEN'}).format(Number(item.precio))}`; }
+type ServiceDraft = { title: string; description: string; categoryHint?: string };
 
-export default function Nearby({ onLocation, onAsk, detailId }: { onLocation: () => void; onAsk: () => void; detailId?: string }) {
+export default function Nearby({ onLocation, onAsk, detailId, serviceDraft, onServiceDraftClose }: { onLocation: () => void; onAsk: () => void; detailId?: string; serviceDraft?: ServiceDraft; onServiceDraftClose?: () => void }) {
   const { user, area, setArea, catalogs, requireUser } = useApp();
   const [query,setQuery] = useState(''); const debouncedQuery = useDebounced(query);
   const [category,setCategory] = useState(''); const [kind,setKind] = useState(''); const [mine,setMine] = useState(false);
   const [creating,setCreating] = useState(false); const [editing,setEditing] = useState<Publication | null>(null);
   const [selected,setSelected] = useState('');
+  useEffect(() => { if (serviceDraft) setCreating(true); }, [serviceDraft]);
   const params = mine ? new URLSearchParams({mios:'1'}) : areaQuery(area);
   if(debouncedQuery) params.set('q',debouncedQuery); if(category) params.set('categoriaId',category);if(kind) params.set('tipo',kind);
   const publications = useRemote<Publication[]>(`/publicaciones?${params}`,user?.id || 'public');
@@ -36,19 +38,26 @@ export default function Nearby({ onLocation, onAsk, detailId }: { onLocation: ()
       {!publications.loading && publications.data?.length === 0 && <Empty title="Todavía no hay publicaciones aquí" text="Prueba otra búsqueda o comparte el primer producto o servicio de tu zona."/>}
       <div className="mt-5 grid gap-4 md:grid-cols-3">{publications.data?.map((item,index) => <article key={item.id} className="listing-card"><div className={`listing-art ${['gold','rose','green'][index%3]}`}><PublicationImage src={item.imagenUrl} alt={item.titulo} className="listing-photo" fallback={<Icon name={item.tipo === 'producto' ? 'store' : 'hands'} size={38}/>}/><span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-[#2f473d]">{distance(item.distanciaMetros, 'Distancia no disponible')}</span></div><div className="p-5"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-extrabold tracking-[.12em] text-[#799083]">{item.tipo === 'producto' ? 'PRODUCTO LOCAL' : 'SERVICIO'}</span><b className="text-sm">{price(item)}</b></div><h3 className="mt-2 text-[17px] font-bold leading-snug text-[#263a31]">{item.titulo}</h3><p className="mt-1 text-sm text-[#717d77]">{item.propietario}</p><p className="card-description">{item.descripcion}</p><p className="mt-3 text-xs text-[#65726b]">{Number(item.totalResenas) > 0 ? `${Number(item.promedioResenas).toFixed(1)}/5 · ${item.totalResenas} recomendaciones sin verificar` : 'Aún sin recomendaciones'}</p>{item.estado !== 'publicada' && <span className="state-badge mt-2">{statusLabel(item.estado)}</span>}<button className="offer-button" onClick={() => { window.location.hash = `cerca/${item.id}`; }}>Ver detalles<Icon name="arrow" size={16}/></button><button className="view-on-map" onClick={() => { setSelected(item.id);window.setTimeout(() => document.getElementById('services-map-title')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',block:'start'}),100); }}>Ver en el mapa<Icon name="pin" size={16}/></button>{item.propietarioId === user?.id && <button className="text-action mt-3" onClick={() => setEditing(item)}>Editar mi publicación</button>}</div></article>)}</div>
     </section>
-    {(creating || editing) && <PublicationForm initial={editing} onClose={() => {setCreating(false);setEditing(null);}}/>}
+    {(creating || editing) && <PublicationForm initial={editing} draft={creating ? serviceDraft : undefined} onClose={() => {setCreating(false);setEditing(null);onServiceDraftClose?.();}}/>}
     {detailId && <PublicationDetail id={detailId} onClose={() => {window.location.hash='cerca';}} onEdit={item => { window.location.hash = 'cerca'; setEditing(item); }}/>}
   </>;
 }
-function PublicationForm({ initial, onClose }: { initial: Publication | null; onClose: () => void }) {
+function PublicationForm({ initial, draft, onClose }: { initial: Publication | null; draft?: ServiceDraft; onClose: () => void }) {
   const { area, postingSectorId, catalogs, online, notify } = useApp();
   const [mode, setMode] = useState(initial?.modalidadPrecio || 'cotizar');
+  const [categoryId, setCategoryId] = useState(initial?.categoriaId || '');
   const sectorId = initial?.sectorId || postingSectorId;
   const [location, setLocation] = useState<LocationDraft>({ coordinates: initial ? null : area.coordinates, address: '' });
   const [photo, setPhoto] = useState<string | null | undefined>(undefined);
   const [readingPhoto, setReadingPhoto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useEffect(() => {
+    if (initial?.categoriaId || categoryId || !draft?.categoryHint) return;
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    const match = catalogs.data?.publicaciones.find(item => normalize(item.nombre) === normalize(draft.categoryHint!));
+    if (match) setCategoryId(match.id);
+  }, [initial?.categoriaId, categoryId, draft?.categoryHint, catalogs.data?.publicaciones]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const data = new FormData(event.currentTarget); setBusy(true); setError('');
     try {
@@ -64,17 +73,15 @@ function PublicationForm({ initial, onClose }: { initial: Publication | null; on
   }
   return <Modal title={initial ? 'Editar publicación' : 'Comparte lo que ofreces'} onClose={onClose} wide>
     <form className="form-stack" onSubmit={submit}>
-      <Field label="¿Qué ofreces?"><input name="titulo" required minLength={3} maxLength={160} defaultValue={initial?.titulo} placeholder="Por ejemplo: arreglo bicicletas"/></Field>
-      <Field label="Cuéntanos más"><textarea name="descripcion" rows={3} maxLength={4000} defaultValue={initial?.descripcion || ''}/></Field>
+      <Field label="¿Qué ofreces?"><input name="titulo" required minLength={3} maxLength={160} defaultValue={initial?.titulo ?? draft?.title ?? ''} placeholder="Por ejemplo: arreglo bicicletas"/></Field>
+      <Field label="Cuéntanos más"><textarea name="descripcion" rows={3} maxLength={4000} defaultValue={initial?.descripcion || draft?.description || ''}/></Field>
       <PhotoPicker value={photo} currentUrl={initial?.imagenUrl} onChange={setPhoto} onBusyChange={setReadingPhoto} disabled={busy}/>
       <div className="form-columns">
         <Field label="Tipo"><select name="tipo" defaultValue={initial?.tipo || 'servicio'}><option value="servicio">Servicio</option><option value="producto">Producto</option></select></Field>
-        <Field label="Categoría"><select name="categoriaId" required defaultValue={initial?.categoriaId || ''}><option value="" disabled>Elige una categoría</option>{catalogs.data?.publicaciones.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Field>
+        <Field label="Categoría"><select name="categoriaId" required value={categoryId} onChange={event => setCategoryId(event.target.value)}><option value="" disabled>Elige una categoría</option>{catalogs.data?.publicaciones.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Field>
       </div>
-      <div className="form-columns">
-        <Field label="Precio"><select value={mode} onChange={event => setMode(event.target.value as Publication['modalidadPrecio'])}><option value="cotizar">Consultar precio</option><option value="gratis">Gratis</option><option value="fijo">Precio fijo</option><option value="desde">Desde un precio</option></select></Field>
-        {['fijo', 'desde'].includes(mode) && <Field label="Monto en soles"><input name="precio" type="number" min={0} max={99999999} step="0.01" required defaultValue={initial?.precio || ''}/></Field>}
-      </div>
+      <Field label="Precio"><select value={mode} onChange={event => setMode(event.target.value as Publication['modalidadPrecio'])}><option value="cotizar">Consultar precio</option><option value="gratis">Gratis</option><option value="fijo">Precio fijo</option><option value="desde">Desde un precio</option></select></Field>
+      {['fijo', 'desde'].includes(mode) && <Field label="Monto en soles"><input name="precio" type="number" min={0} max={99999999} step="0.01" required defaultValue={initial?.precio || ''}/></Field>}
       <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde ofreces este producto o servicio?</summary><p className="form-hint">{initial ? 'Conservamos el punto actual si no eliges uno nuevo.' : 'Elige un punto para aparecer en el mapa. Si lo omites, se usará la ubicación de tu perfil si existe.'} Tu dirección exacta es privada y tu perfil no cambia.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy} initialCenter={initial ? mapPoint(initial) : null}/></details>
       {initial && <Field label="Visibilidad"><select name="estado" defaultValue={initial.estado}><option value="publicada">Publicada</option><option value="pausada">Pausada</option><option value="archivada">Archivada</option><option value="borrador">Borrador</option></select></Field>}
       <RemoteState {...catalogs}/><ErrorBox message={error}/>
