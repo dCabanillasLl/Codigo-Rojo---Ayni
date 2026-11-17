@@ -62,7 +62,6 @@ export default function AddressAutocomplete({ value, onChange, onSelect, online,
     </div>
     {open && <ul id={`${id}-results`} role="listbox" className="address-suggestions" aria-label="Sugerencias de direcciones">{results.map((place, index) => <li key={place.id} id={`${id}-option-${index}`} role="option" aria-selected={index === active} className={index === active ? 'active' : ''} onPointerDown={event => event.preventDefault()} onClick={() => select(place)}><Icon name="pin" size={16}/><span>{place.nombre}</span></li>)}</ul>}
     {loading && <small className="form-hint" role="status">Buscando sugerencias…</small>}
-    <small className="form-hint">El texto se consulta en <a href="https://photon.komoot.io/" target="_blank" rel="noreferrer">Photon</a> para sugerir direcciones con datos de OpenStreetMap.</small>
     <ErrorBox message={error}/>
   </div>;
 }

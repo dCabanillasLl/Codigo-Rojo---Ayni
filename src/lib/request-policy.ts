@@ -61,13 +61,32 @@ export function blockedRequestReason(text: string): string | undefined {
   return undefined;
 }
 
+function shortTitle(text: string, maxLength = 48): string {
+  const trimmed = text.trim().replace(/\s+/g, ' ').replace(/[,:;\s]+$/, '');
+  if (trimmed.length <= maxLength) return trimmed;
+  const prefix = trimmed.slice(0, maxLength - 1);
+  const boundary = prefix.lastIndexOf(' ');
+  return `${prefix.slice(0, boundary > 24 ? boundary : maxLength - 1).trimEnd()}…`;
+}
+
 export function requestTitle(text: string): string {
   const normalized = text.trim().replace(/\s+/g, ' ');
-  const noGreeting = normalized.replace(/^(?:hola|buenas|buenos dias|buenas tardes)[,!\s]+/i, '');
-  const concise = noGreeting.replace(/^(?:por favor[,\s]+)?(?:necesito|necesitamos|busco|quisiera|quiero pedir|me hace falta)\s+/i, '');
-  const firstSentence = (concise || noGreeting || normalized).split(/[.!?\n]/)[0].trim();
-  if (firstSentence.length <= 100) return firstSentence || 'Pedido de ayuda vecinal';
-  const prefix = firstSentence.slice(0, 97);
-  const boundary = prefix.lastIndexOf(' ');
-  return `${prefix.slice(0, boundary > 55 ? boundary : 97).trimEnd()}…`;
+  const noGreeting = normalized.replace(/^(?:(?:hola|buenas(?:\s+(?:dias|tardes|noches))?|vecinos?)[,!:;\s]+)+/i, '');
+  const noApology = noGreeting.replace(/^(?:(?:disculpen?|perdon(?:en)?|una consulta)[,!:;\s]+)+/i, '');
+  const concise = noApology.replace(/^(?:por favor[,\s]+)?(?:necesito|necesitamos|busco|quisiera|quiero pedir|quiero|me hace falta)\s+/i, '');
+  const firstSentence = (concise || noApology || normalized).split(/[.!?\n]/)[0].trim();
+  if (!firstSentence) return 'Pedido de ayuda vecinal';
+  return shortTitle(firstSentence.charAt(0).toLocaleUpperCase('es') + firstSentence.slice(1));
+}
+
+export function displayRequestTitle(title: string, description: string): string {
+  if (/pedido de emergencia por sismo|emergencia:/i.test(`${title}\n${description}`)) {
+    const needs = description.match(/^Necesidades:\s*(.+)$/im)?.[1]?.trim() || title.replace(/^.*?Necesidades:\s*/i, '').split(/[\n.]/)[0].trim();
+    if (needs) {
+      const items = needs.split(',').map(item => item.trim()).filter(Boolean);
+      return `Sismo: ${items.slice(0, 2).join(', ')}${items.length > 2 ? ` y ${items.length - 2} más` : ''}`;
+    }
+    return 'Emergencia por sismo';
+  }
+  return requestTitle(title);
 }
