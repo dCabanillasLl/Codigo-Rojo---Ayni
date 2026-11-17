@@ -22,7 +22,18 @@ export async function apiEnvelope<T>(path: string, options: ApiOptions = {}): Pr
       cache: 'no-store',
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new ApiError(response.status, payload?.error?.code || 'API_ERROR', payload?.error?.message || 'No pudimos completar la operación. Inténtalo de nuevo.');
+    if (!response.ok) {
+      let message = payload?.error?.message || 'No pudimos completar la operación. Inténtalo de nuevo.';
+      if (payload?.error?.code === 'VALIDATION_ERROR' && Array.isArray(payload.error.details)) {
+        const labels: Record<string, string> = { fotoPerfil: 'Foto de perfil', correo: 'Correo', telefono: 'Celular', telefonoPublico: 'Visibilidad del celular', notificacionesCorreo: 'Avisos por correo' };
+        const details = payload.error.details
+          .filter((detail: unknown): detail is { campo: string; mensaje: string } => Boolean(detail) && typeof (detail as { campo?: unknown }).campo === 'string' && typeof (detail as { mensaje?: unknown }).mensaje === 'string')
+          .slice(0, 3)
+          .map((detail: { campo: string; mensaje: string }) => `${labels[detail.campo] || detail.campo || 'Formulario'}: ${detail.mensaje}`);
+        if (details.length) message += ` ${details.join(' ')}`;
+      }
+      throw new ApiError(response.status, payload?.error?.code || 'API_ERROR', message);
+    }
     if (!payload || !('data' in payload)) throw new ApiError(502, 'INVALID_RESPONSE', 'El servidor no devolvió una respuesta válida.');
     return payload as ApiEnvelope<T>;
   } catch (error) {

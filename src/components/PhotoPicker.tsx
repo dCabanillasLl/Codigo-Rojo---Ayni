@@ -19,6 +19,7 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
 }) {
   const { language } = useLanguage();
   const quechua = language === 'qu';
+  const maxInputMegabytes = variant === 'avatar' ? 10 : 5;
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
@@ -43,8 +44,8 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setError('Elige una foto JPG, PNG o WebP.'); field.value = ''; return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('La foto debe pesar como máximo 5 MB.'); field.value = ''; return;
+    if (file.size > maxInputMegabytes * 1024 * 1024) {
+      setError(`La foto debe pesar como máximo ${maxInputMegabytes} MB.`); field.value = ''; return;
     }
     setReading(true); onBusyChange(true);
     try {
@@ -103,7 +104,7 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
       </span>
       <div className="photo-picker-avatar-copy">
         <b>{label}</b><span className="photo-picker-optional">{quechua ? 'Munaspalla; llaqtamasiykikuna riqsisunaykipaq yanapan.' : 'Opcional, pero ayuda a que tus vecinos te reconozcan.'}</span>
-        <p id={`${id}-hint`} className="form-hint">JPG, PNG o WebP · Máximo 5 MB</p>
+        <p id={`${id}-hint`} className="form-hint">JPG, PNG o WebP · Máximo {maxInputMegabytes} MB</p>
         <div className="photo-picker-avatar-actions">
           <label htmlFor={id} className={`photo-picker-select ${disabled || reading ? 'is-disabled' : ''}`}>{reading ? (quechua ? 'Wakichichkan…' : 'Preparando…') : preview ? (quechua ? 'Siq’ita tikray' : 'Cambiar foto') : (quechua ? 'Siq’ita akllay' : 'Elegir foto')}</label>
           {preview && <button type="button" className="photo-picker-remove" disabled={disabled || reading} onClick={removePhoto}><Icon name="close" size={14}/>{quechua ? 'Qichuy' : 'Quitar'}</button>}
