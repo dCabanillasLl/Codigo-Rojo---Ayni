@@ -1,3 +1,18 @@
+/* Responsive spacing between the notice introduction, tabs and results. */
+.notices-page > .form-hint {
+  margin-top: clamp(1.25rem, 2.5vw, 1.75rem);
+  line-height: 1.65;
+}
+.notices-page > .notice-view-switch {
+  margin-top: clamp(1.5rem, 3vw, 2rem);
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+  gap: clamp(0.5rem, 1.5vw, 0.85rem);
+}
+.notices-page > .empty-state {
+  gap: 1rem;
+  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 2.5rem);
+}
+.notices-page > .empty-state p { line-height: 1.65; }
 .notice-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 1.25rem; margin-top: 1.25rem; }
 .notice-back-link { display: inline-flex; min-height: 44px; align-items: center; margin-bottom: 0.5rem; }
 .notice-card {

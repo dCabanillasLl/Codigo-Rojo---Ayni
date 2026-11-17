@@ -75,7 +75,7 @@ export default function Notices({ view, noticeDraft, onNoticeDraftClose }: { vie
     return () => { window.clearTimeout(timer); window.removeEventListener('focus', update); document.removeEventListener('visibilitychange', update); };
   }, [notices.data, now]);
   const visible = notices.data?.filter(item => !deletedIds.has(item.id) && (detailId || tab !== 'cerca' || noticeVisible(item, Math.max(now, Date.now()))));
-  return <section data-tour="tour-notices">
+  return <section className="notices-page" data-tour="tour-notices">
     {detailId && <button type="button" className="text-action notice-back-link" onClick={() => { window.location.hash = 'avisos'; }}>{localize(language,'\u2190 Ver todos los avisos','\u2190 View all notices','\u2190 Llapan willaykunata qhaway')}</button>}
     <PageHeading eyebrow={localize(language,'LO QUE PASA CERCA','WHAT IS HAPPENING NEARBY','QAYLLAYKIPI KACHKACHKAN')} title={localize(language,'Avisos del barrio','Neighborhood notices','Llaqtaykip willakuyninkuna')} text={localize(language,'Actividades, campa\u00f1as y avisos compartidos por vecinos.','Activities, campaigns, and notices shared by neighbors.','Llaqtamasikuna rakisqanku ruraykuna, hu\u00f1unakuypi ruraykuna, willakuykunapas.')}>
       <button data-tour="tour-notices" className="record-button" onClick={() => requireUser() && setCreating(true)}><Icon name="plus"/>{localize(language,'Crear aviso','Create notice','Willakuyta ruway')}</button>
