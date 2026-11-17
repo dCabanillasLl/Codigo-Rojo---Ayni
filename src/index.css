@@ -3211,7 +3211,7 @@ select:focus-visible {
 .publication-reviews-header .section-subtitle { margin: .4rem 0 0; }
 .publication-reviews-header > div > p:last-child { margin: .35rem 0 0; color: #6d7a71; font-size: .88rem; line-height: 1.5; }
 .recommendation-total { flex: 0 0 auto; padding: .4rem .65rem; border-radius: 999px; background: #e8f0e9; color: #315f49; font-size: .75rem; font-weight: 750; }
-.recommendation-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+.recommendation-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
 .recommendation-summary > div { display: grid; align-content: center; gap: .2rem; min-height: 4.25rem; padding: .65rem .7rem; border: 1px solid #e1e8e0; border-radius: .85rem; background: #fffefa; }
 .recommendation-summary b { color: #234a39; font-size: 1.05rem; line-height: 1.2; }
 .recommendation-summary span { color: #738078; font-size: .7rem; line-height: 1.3; }
@@ -3376,3 +3376,18 @@ select:focus-visible {
 .publication-share-panel .publication-share-actions { grid-template-columns: minmax(0, 1fr); margin-top: 12px; gap: 8px; }
 .publication-share-panel .publication-share-actions > a,
 .publication-share-panel .publication-share-actions > button { justify-content: flex-start; padding-inline: 14px; }
+
+/* Publication details scroll as one sheet, anchored while remote data loads. */
+.modal-dialog.modal-scroll-with-header {
+  margin-block: max(0.5rem, env(safe-area-inset-top)) auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-anchor: none;
+  animation: none;
+}
+.modal-dialog.modal-scroll-with-header[open] { display: block; }
+.modal-scroll-with-header .modal-header { position: static; }
+.modal-dialog.modal-scroll-with-header .modal-content {
+  overflow: visible;
+  max-height: none;
+}
