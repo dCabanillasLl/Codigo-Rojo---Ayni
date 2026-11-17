@@ -1,3 +1,4 @@
+import { useDictation } from '../lib/use-dictation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 import Icon, { type IconName } from './Icon';
@@ -11,9 +12,6 @@ type NoticeDraft = { title: string; content: string; categoryHint?: string; date
 type MessageAction = { key: GuideAction; label: string; icon: IconName; requestDraft?: RequestDraft; serviceDraft?: ServiceDraft; noticeDraft?: NoticeDraft; searchQuery?: string };
 type Message = { id: string; from: 'bot' | 'you'; text: string; action?: MessageAction };
 type GuideBotProps = { onNavigate: (page: Destination) => void; onAsk: (draft?: RequestDraft) => void; onOffer: () => void; onOfferService: (draft?: ServiceDraft) => void; onFindService: (query: string) => void; onCreateNotice: (draft?: NoticeDraft) => void; onLocation: () => void };
-type RecognitionResult = { resultIndex: number; results: { length: number; [index: number]: { isFinal: boolean; [index: number]: { transcript: string } } } };
-type Recognition = { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
-type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 type TourStep = { page: Destination; target: string; title: string; text: string };
 type TourSpotlight = { top: number; left: number; width: number; height: number; right: number; bottom: number; tooltipTop: number; tooltipLeft: number; tooltipWidth: number; placement: 'above' | 'below' };
 
@@ -141,7 +139,6 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [voiceError, setVoiceError] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     newMessage('bot', '¡Hola! Soy tu guía de AYNI. Elige lo que quieres hacer y te acompaño paso a paso.'),
@@ -150,10 +147,9 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   const [spotlight, setSpotlight] = useState<TourSpotlight | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const recognition = useRef<Recognition | null>(null);
-  const Voice = (window as VoiceWindow).SpeechRecognition || (window as VoiceWindow).webkitSpeechRecognition;
+  const { recording, supported: Voice, toggle: dictate, cancel: cancelDictation } = useDictation(input, setInput, setVoiceError, 600);
 
-  useEffect(() => () => { recognition.current?.stop(); window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
 
   useEffect(() => {
     const list = listRef.current;
@@ -212,6 +208,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
 
   function beginVisualTour(label = 'Enséñame AYNI en pantalla') {
     setMessages(current => [...current, newMessage('you', label), newMessage('bot', '¡Vamos! Te iré señalando cada parte. Pulsa “Siguiente” cuando quieras continuar.')]);
+    cancelDictation();
     setOpen(false);
     setTourIndex(0);
     onNavigate(tutorial[0].page);
@@ -330,21 +327,6 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
     return { title, content: content.charAt(0).toLocaleUpperCase('es') + content.slice(1), categoryHint, dateTime: parseNoticeDateTime(text), locationQuery: parseNoticeLocation(content) };
   }
 
-  function dictate() {
-    if (recording) { recognition.current?.stop(); return; }
-    if (!Voice) { setVoiceError('El dictado no está disponible en este navegador. Puedes escribir tu pregunta.'); return; }
-    setVoiceError('');
-    const session = new Voice(); recognition.current = session;
-    session.lang = 'es-PE'; session.continuous = false; session.interimResults = true;
-    session.onresult = event => {
-      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index]?.[0]?.transcript ?? '').join(' ').trim();
-      if (transcript) setInput(transcript);
-    };
-    session.onerror = event => { setRecording(false); setVoiceError(event.error === 'not-allowed' ? 'Permite el micrófono para dictar, o escribe tu pregunta.' : 'No entendí la voz. Intenta otra vez o escribe tu pregunta.'); };
-    session.onend = () => setRecording(false);
-    try { session.start(); setRecording(true); } catch { setVoiceError('El micrófono no está disponible. Puedes escribir tu pregunta.'); }
-  }
-
   function selectAction(item: MessageAction & { description?: string }) {
     if (item.key === 'tutorial') { beginVisualTour(item.label); return; }
     setMessages(current => [...current, newMessage('you', item.label)]);
@@ -378,7 +360,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = input.trim();
-    if (!value || thinking) return;
+    if (!value || thinking || recording) return;
     setInput('');
     const simpleAnswer = basicReply(value);
     if (simpleAnswer) {
@@ -459,13 +441,13 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
 
   return <>
     {open && <section className="guide-panel" aria-label="Guía sencilla de AYNI">
-      <header className="guide-header"><span className="guide-avatar"><img src="/ayni-logo.png" alt=""/></span><div><b>Tu guía vecinal</b><small>Estoy aquí para ayudarte</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => setOpen(false)}><Icon name="close" size={18}/></button></header>
+      <header className="guide-header"><span className="guide-avatar"><img src="/ayni-logo.png" alt=""/></span><div><b>Tu guía vecinal</b><small>Estoy aquí para ayudarte</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => { cancelDictation(); window.speechSynthesis?.cancel(); setOpen(false); }}><Icon name="close" size={18}/></button></header>
       <div className="guide-messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
         {messages.map(message => <div key={message.id} className={`guide-message ${message.from}`}>
           <span className="sr-only">{message.from === 'bot' ? 'Guía AYNI: ' : 'Tú: '}</span>
           <p className="guide-message-text">{message.text}</p>
           {message.action && <button type="button" className="guide-card-action" onClick={() => runAction(message.action!)}><Icon name={message.action.icon} size={17}/>{message.action.label}<Icon name="arrow" size={16}/></button>}
-          {message.from === 'bot' && message.text.length > 0 && <button type="button" className="guide-speech-action" aria-label="Escuchar mensaje de AYNI" onClick={() => { if (!speak(message.text)) setVoiceError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones" size={16}/>Escuchar mensaje</button>}
+          {message.from === 'bot' && message.text.length > 0 && <button type="button" className="guide-speech-action" disabled={recording} aria-label="Escuchar mensaje de AYNI" onClick={() => { if (!speak(message.text)) setVoiceError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones" size={16}/>Escuchar mensaje</button>}
         </div>)}
         {thinking && <div className="guide-message bot" role="status"><p className="guide-message-text">Estoy pensando cómo ayudarte…</p></div>}
         {messages.length === 1 && <div className="guide-home-actions" aria-label="Elige qué quieres hacer">
@@ -475,11 +457,12 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
       <div className="guide-quick-actions" aria-label="Sugerencias rápidas">
         {homeActions.filter(action => ['nearby', 'ask', 'tutorial'].includes(action.key)).map(action => <button type="button" key={action.key} className="guide-chip" onClick={() => selectAction(action)}>{action.label}</button>)}
       </div>
+      {recording && <p className="recording-message" role="status">Escuchando… Habla y pulsa Terminar dictado cuando acabes.</p>}
       {voiceError && <p className="guide-voice-error" role="status">{voiceError}</p>}
-      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><textarea ref={inputRef} id="guide-question" rows={1} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Escribe lo que necesitas…" maxLength={600} disabled={thinking}/><button type="button" className="guide-voice-btn guide-read-input" aria-label="Escuchar texto escrito" title="Escuchar texto escrito" onClick={() => { if (!speak(input.trim())) setVoiceError(input.trim() ? 'La lectura en voz alta no está disponible en este navegador.' : 'Escribe un mensaje para poder escucharlo.'); }} disabled={!input.trim() || thinking}><Icon name="headphones" size={18}/></button>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={!input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
+      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><textarea ref={inputRef} id="guide-question" rows={1} value={input} onChange={event => { cancelDictation(); setInput(event.target.value); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Escribe lo que necesitas…" maxLength={600} disabled={thinking}/><button type="button" className="guide-voice-btn guide-read-input" aria-label="Escuchar texto escrito" title="Escuchar texto escrito" onClick={() => { if (!speak(input.trim())) setVoiceError(input.trim() ? 'La lectura en voz alta no está disponible en este navegador.' : 'Escribe un mensaje para poder escucharlo.'); }} disabled={recording || !input.trim() || thinking}><Icon name="headphones" size={18}/></button>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={recording || !input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
       <p className="guide-privacy-note">No escribas tu DNI, dirección ni contraseñas.</p>
     </section>}
-    <button type="button" className={`guide-launcher ${open ? 'is-open' : ''}`} aria-label={open ? 'Cerrar guía AYNI' : 'Abrir guía AYNI'} aria-expanded={open} onClick={() => setOpen(value => !value)}>
+    <button type="button" className={`guide-launcher ${open ? 'is-open' : ''}`} aria-label={open ? 'Cerrar guía AYNI' : 'Abrir guía AYNI'} aria-expanded={open} onClick={() => { cancelDictation(); window.speechSynthesis?.cancel(); setOpen(value => !value); }}>
       {open ? <Icon name="close" size={23}/> : <><Icon name="hands" size={22}/><span>¿Te ayudo?</span></>}
     </button>
     {tourIndex !== null && spotlight && <>
