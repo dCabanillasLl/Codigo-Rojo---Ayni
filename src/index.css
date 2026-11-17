@@ -3354,3 +3354,10 @@ select:focus-visible {
 .auth-registration-form .auth-actions > .text-action { min-height: 2.625rem; font-size: .8625rem; }
 
 
+
+.publication-share-actions > .publication-share-toggle { grid-column: 1 / -1; }
+.publication-share-panel { margin-top: 12px; padding: 18px; border: 1px solid #d4dfd4; border-radius: 16px; background: #f2f6ef; }
+.publication-share-panel > p { margin-top: 6px; font-size: 13px; color: #52675b; }
+.publication-share-link { display: grid; gap: 6px; margin-top: 14px; font-size: 12px; color: #52675b; }
+.publication-share-link input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #cbd8cc; border-radius: 8px; background: #fffef9; font-size: 13px; }
+@media (max-width: 440px) { .publication-share-actions { grid-template-columns: minmax(0, 1fr); } }
