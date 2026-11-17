@@ -50,10 +50,7 @@ export function formatDate(value: string | null | undefined) { if (!value) retur
 export function distance(value: number | null | undefined, fallback: string) { return value == null ? fallback : Number(value) < 1000 ? `Aprox. ${Math.round(Number(value) / 50) * 50} m` : `Aprox. ${(Number(value)/1000).toFixed(1)} km`; }
 export function initials(name: string) { return name.trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase(); }
 export function statusLabel(state: string) { return ({ abierta: 'Espera ayuda', en_curso: 'Ayuda en curso', completada: 'Completada', cancelada: 'Cancelada', vencida: 'Vencida', pendiente: 'Propuesta', aceptada: 'Aceptada', retirada: 'Retirada', rechazada: 'Rechazada', reservada: 'Reservada', entregada: 'Entregada', publicada: 'Publicada', publicado: 'Publicado', pausada: 'Pausada', borrador: 'Borrador', archivada: 'Archivada' } as Record<string,string>)[state] || state; }
-export function speak(text: string) {
-  if (!('speechSynthesis' in window)) return false;
-  window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'es-PE'; window.speechSynthesis.speak(utterance); return true;
-}
+export { speak, stopSpeaking } from '../lib/voice';
 export async function shareItem(title: string, text: string, hash: string) {
   const url = `${window.location.origin}${window.location.pathname}${hash}`;
   if (navigator.share) await navigator.share({ title, text, url });

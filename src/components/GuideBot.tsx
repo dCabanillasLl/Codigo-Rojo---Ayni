@@ -2,7 +2,7 @@ import { useDictation } from '../lib/use-dictation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 import Icon, { type IconName } from './Icon';
-import { speak } from './UI';
+import { speak, stopSpeaking } from './UI';
 
 type Destination = 'cerca' | 'ayuda' | 'avisos';
 type GuideAction = 'nearby' | 'ask' | 'offer' | 'service' | 'serviceSearch' | 'notice' | 'notices' | 'location' | 'tutorial';
@@ -149,7 +149,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { recording, supported: Voice, toggle: dictate, cancel: cancelDictation } = useDictation(input, setInput, setVoiceError, 600);
 
-  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { stopSpeaking(); }, []);
 
   useEffect(() => {
     const list = listRef.current;
@@ -441,13 +441,13 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
 
   return <>
     {open && <section className="guide-panel" aria-label="Guía sencilla de AYNI">
-      <header className="guide-header"><span className="guide-avatar"><img src="/ayni-logo.png" alt=""/></span><div><b>Tu guía vecinal</b><small>Estoy aquí para ayudarte</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => { cancelDictation(); window.speechSynthesis?.cancel(); setOpen(false); }}><Icon name="close" size={18}/></button></header>
+      <header className="guide-header"><span className="guide-avatar"><img src="/ayni-logo.png" alt=""/></span><div><b>Tu guía vecinal</b><small>Estoy aquí para ayudarte</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => { cancelDictation(); stopSpeaking(); setOpen(false); }}><Icon name="close" size={18}/></button></header>
       <div className="guide-messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
         {messages.map(message => <div key={message.id} className={`guide-message ${message.from}`}>
           <span className="sr-only">{message.from === 'bot' ? 'Guía AYNI: ' : 'Tú: '}</span>
           <p className="guide-message-text">{message.text}</p>
           {message.action && <button type="button" className="guide-card-action" onClick={() => runAction(message.action!)}><Icon name={message.action.icon} size={17}/>{message.action.label}<Icon name="arrow" size={16}/></button>}
-          {message.from === 'bot' && message.text.length > 0 && <button type="button" className="guide-speech-action" disabled={recording} aria-label="Escuchar mensaje de AYNI" onClick={() => { if (!speak(message.text)) setVoiceError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones" size={16}/>Escuchar mensaje</button>}
+          {message.from === 'bot' && message.text.length > 0 && <button type="button" className="guide-speech-action" disabled={recording} aria-label="Escuchar mensaje de AYNI" onClick={async () => { if (!await speak(message.text)) setVoiceError('No pudimos leer el texto. Revisa el volumen y el motor de voz del dispositivo.'); }}><Icon name="headphones" size={16}/>Escuchar mensaje</button>}
         </div>)}
         {thinking && <div className="guide-message bot" role="status"><p className="guide-message-text">Estoy pensando cómo ayudarte…</p></div>}
         {messages.length === 1 && <div className="guide-home-actions" aria-label="Elige qué quieres hacer">
@@ -459,10 +459,10 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
       </div>
       {recording && <p className="recording-message" role="status">Escuchando… Habla y pulsa Terminar dictado cuando acabes.</p>}
       {voiceError && <p className="guide-voice-error" role="status">{voiceError}</p>}
-      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><textarea ref={inputRef} id="guide-question" rows={1} value={input} onChange={event => { cancelDictation(); setInput(event.target.value); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Escribe lo que necesitas…" maxLength={600} disabled={thinking}/><button type="button" className="guide-voice-btn guide-read-input" aria-label="Escuchar texto escrito" title="Escuchar texto escrito" onClick={() => { if (!speak(input.trim())) setVoiceError(input.trim() ? 'La lectura en voz alta no está disponible en este navegador.' : 'Escribe un mensaje para poder escucharlo.'); }} disabled={recording || !input.trim() || thinking}><Icon name="headphones" size={18}/></button>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={recording || !input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
+      <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><textarea ref={inputRef} id="guide-question" rows={1} value={input} onChange={event => { cancelDictation(); setInput(event.target.value); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Escribe lo que necesitas…" maxLength={600} disabled={thinking}/><button type="button" className="guide-voice-btn guide-read-input" aria-label="Escuchar texto escrito" title="Escuchar texto escrito" onClick={async () => { if (!await speak(input.trim())) setVoiceError(input.trim() ? 'No pudimos leer el texto. Revisa el volumen y el motor de voz del dispositivo.' : 'Escribe un mensaje para poder escucharlo.'); }} disabled={recording || !input.trim() || thinking}><Icon name="headphones" size={18}/></button>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={recording || !input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
       <p className="guide-privacy-note">No escribas tu DNI, dirección ni contraseñas.</p>
     </section>}
-    <button type="button" className={`guide-launcher ${open ? 'is-open' : ''}`} aria-label={open ? 'Cerrar guía AYNI' : 'Abrir guía AYNI'} aria-expanded={open} onClick={() => { cancelDictation(); window.speechSynthesis?.cancel(); setOpen(value => !value); }}>
+    <button type="button" className={`guide-launcher ${open ? 'is-open' : ''}`} aria-label={open ? 'Cerrar guía AYNI' : 'Abrir guía AYNI'} aria-expanded={open} onClick={() => { cancelDictation(); stopSpeaking(); setOpen(value => !value); }}>
       {open ? <Icon name="close" size={23}/> : <><Icon name="hands" size={22}/><span>¿Te ayudo?</span></>}
     </button>
     {tourIndex !== null && spotlight && <>
