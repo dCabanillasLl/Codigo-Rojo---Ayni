@@ -19,13 +19,14 @@ import PublicationReviews from '../components/PublicationReviews';
 function price(item: Publication) { return item.modalidadPrecio === 'gratis' ? 'Gratis' : item.modalidadPrecio === 'cotizar' ? 'Consultar precio' : `${item.modalidadPrecio === 'desde' ? 'Desde ' : ''}${new Intl.NumberFormat('es-PE',{style:'currency',currency:item.moneda || 'PEN'}).format(Number(item.precio))}`; }
 type ServiceDraft = { title: string; description: string; categoryHint?: string };
 
-export default function Nearby({ onLocation, onAsk, detailId, serviceDraft, onServiceDraftClose }: { onLocation: () => void; onAsk: () => void; detailId?: string; serviceDraft?: ServiceDraft; onServiceDraftClose?: () => void }) {
+export default function Nearby({ onLocation, onAsk, detailId, serviceDraft, onServiceDraftClose, initialServiceSearch, onServiceSearchApplied }: { onLocation: () => void; onAsk: () => void; detailId?: string; serviceDraft?: ServiceDraft; onServiceDraftClose?: () => void; initialServiceSearch?: string; onServiceSearchApplied?: () => void }) {
   const { user, area, setArea, catalogs, requireUser } = useApp();
   const [query,setQuery] = useState(''); const debouncedQuery = useDebounced(query);
   const [category,setCategory] = useState(''); const [kind,setKind] = useState(''); const [mine,setMine] = useState(false);
   const [creating,setCreating] = useState(false); const [editing,setEditing] = useState<Publication | null>(null);
   const [selected,setSelected] = useState('');
   useEffect(() => { if (serviceDraft) setCreating(true); }, [serviceDraft]);
+  useEffect(() => { if (initialServiceSearch) { setQuery(initialServiceSearch); setKind('servicio'); setMine(false); onServiceSearchApplied?.(); } }, [initialServiceSearch, onServiceSearchApplied]);
   const params = mine ? new URLSearchParams({mios:'1'}) : areaQuery(area);
   if(debouncedQuery) params.set('q',debouncedQuery); if(category) params.set('categoriaId',category);if(kind) params.set('tipo',kind);
   const publications = useRemote<Publication[]>(`/publicaciones?${params}`,user?.id || 'public');

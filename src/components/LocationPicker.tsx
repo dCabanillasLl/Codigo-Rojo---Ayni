@@ -6,11 +6,11 @@ import AddressAutocomplete, { type AddressSuggestion } from './AddressAutocomple
 import Icon from './Icon';
 import { ErrorBox, Field } from './UI';
 
-export default function LocationPicker({ value, onChange, online, disabled = false, initialCenter, addressField, onBusyChange, publicVenue = false }: {
+export default function LocationPicker({ value, onChange, online, disabled = false, initialCenter, initialSearch, addressField, onBusyChange, publicVenue = false }: {
   value: LocationDraft; onChange: (value: LocationDraft) => void; online: boolean; disabled?: boolean; initialCenter?: Coordinates | null;
-  addressField?: { label: string; name: string; required?: boolean }; onBusyChange?: (busy: boolean) => void; publicVenue?: boolean;
+  initialSearch?: string; addressField?: { label: string; name: string; required?: boolean }; onBusyChange?: (busy: boolean) => void; publicVenue?: boolean;
 }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialSearch || '');
   const [suggesting, setSuggesting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [resolving, setResolving] = useState(false);
@@ -93,11 +93,11 @@ export default function LocationPicker({ value, onChange, online, disabled = fal
     geoTimer.current = window.setTimeout(() => finish(best), 12000);
   }
   return <div className="location-picker">
-    <AddressAutocomplete label={addressField?.label || 'Buscar dirección o calle'} name={addressField?.name} required={addressField?.required} value={addressField ? value.address : query} onChange={addressField ? updateAddress : text => { cancelLocation(); setQuery(text); }} onSelect={chooseAddress} bias={value.coordinates || initialCenter} online={online} disabled={disabled} onBusyChange={setSuggesting}/>
-    <div className="location-picker-tools"><button type="button" className="outline-btn" onClick={locate} disabled={disabled || locating || !online}><Icon name="pin" size={17}/>{locating ? 'Detectando ubicación…' : 'Usar mi ubicación'}</button><span>o elige un punto en el mapa</span></div>
+    <AddressAutocomplete label={addressField?.label || 'Buscar dirección o calle'} name={addressField?.name} required={addressField?.required} value={addressField ? value.address : query} onChange={addressField ? updateAddress : text => { cancelLocation(); setQuery(text); }} onSelect={chooseAddress} bias={value.coordinates || initialCenter} online={online} disabled={disabled} onBusyChange={setSuggesting} autoSearch={Boolean(initialSearch)}/>
+    <div className="location-picker-tools"><span className="location-map-prompt">Ajusta el pin en el mapa</span><button type="button" className="outline-btn" onClick={locate} disabled={disabled || locating || !online}><Icon name="pin" size={17}/>{locating ? 'Buscando ubicación…' : 'Usar mi ubicación'}</button></div>
     <CommunityMap center={value.coordinates || initialCenter} picked={value.coordinates} onPick={disabled || !online ? undefined : point => pick(point)} onPickStart={() => { cancelLocation(); setAccuracy(null); }} accuracy={accuracy} online={online} compact fitAll={false} label="Elegir ubicación. Arrastra el pin o usa las flechas para mover el mapa y Enter para elegir el centro."/>
     {resolving && <p className="success-text" role="status">Completando la dirección del punto seleccionado…</p>}
-    <p className="form-hint">{value.coordinates ? 'Ubicación seleccionada.' : 'Aún no has elegido una ubicación.'}</p>
+    <p className={`location-selection-state ${value.coordinates ? 'is-selected' : ''}`} role="status">{value.coordinates ? 'Punto seleccionado' : 'Busca una dirección o selecciona un punto'}</p>
     {accuracy != null && value.coordinates && <p className="location-accuracy" role="status">Precisión del GPS: aproximadamente ±{Math.max(1, Math.round(accuracy))} m.</p>}
     {!addressField && <Field label={publicVenue ? 'Dirección o referencia de la actividad' : 'Dirección o referencia privada'} hint="Se completa al elegir un punto. Puedes corregirla antes de guardar."><input value={value.address} onChange={event => updateAddress(event.target.value)} maxLength={255} placeholder="Calle, número o referencia" disabled={disabled}/></Field>}
     {message && <p className="success-text" role="status">{message}</p>}

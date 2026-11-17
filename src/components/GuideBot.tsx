@@ -4,12 +4,13 @@ import Icon, { type IconName } from './Icon';
 import { speak } from './UI';
 
 type Destination = 'cerca' | 'ayuda' | 'avisos';
-type GuideAction = 'nearby' | 'ask' | 'offer' | 'service' | 'notices' | 'location' | 'tutorial';
-type RequestDraft = { description: string; helpType: string; urgent: boolean; earthquake: boolean; emergencyNeeds: string[]; peopleCount?: number };
+type GuideAction = 'nearby' | 'ask' | 'offer' | 'service' | 'serviceSearch' | 'notice' | 'notices' | 'location' | 'tutorial';
+type RequestDraft = { description: string; helpType: string; urgent: boolean; earthquake: boolean; emergencyNeeds: string[]; peopleCount?: number; locationQuery?: string };
 type ServiceDraft = { title: string; description: string; categoryHint?: string };
-type MessageAction = { key: GuideAction; label: string; icon: IconName; requestDraft?: RequestDraft; serviceDraft?: ServiceDraft };
+type NoticeDraft = { title: string; content: string; categoryHint?: string; dateTime?: string; locationQuery?: string };
+type MessageAction = { key: GuideAction; label: string; icon: IconName; requestDraft?: RequestDraft; serviceDraft?: ServiceDraft; noticeDraft?: NoticeDraft; searchQuery?: string };
 type Message = { id: string; from: 'bot' | 'you'; text: string; action?: MessageAction };
-type GuideBotProps = { onNavigate: (page: Destination) => void; onAsk: (draft?: RequestDraft) => void; onOffer: () => void; onOfferService: (draft?: ServiceDraft) => void; onLocation: () => void };
+type GuideBotProps = { onNavigate: (page: Destination) => void; onAsk: (draft?: RequestDraft) => void; onOffer: () => void; onOfferService: (draft?: ServiceDraft) => void; onFindService: (query: string) => void; onCreateNotice: (draft?: NoticeDraft) => void; onLocation: () => void };
 type RecognitionResult = { resultIndex: number; results: { length: number; [index: number]: { isFinal: boolean; [index: number]: { transcript: string } } } };
 type Recognition = { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
@@ -32,13 +33,71 @@ function isEarthquakeHelpRequest(text: string) {
 
 function isServiceOffer(text: string) {
   const normalized = normalizeAssistantText(text);
-  return /(?:ofrezco|brindo|realizo|dicto|ensen|publico|hago|presto|me dedico a|quiero publicar|quiero ofrecer).{0,60}(?:servicio|clase|repar|tutoria|oficio|limpieza|jardin|gasfiter|electric|mudanza)|(?:servicios?|clases?|reparaciones?|tutorias)\s+(?:de|para)\s/.test(normalized);
+  return /(?:ofrezco|brindo|realizo|dicto|doy|ensen|publico|hago|presto|me dedico a|quiero publicar|quiero ofrecer).{0,60}(?:servicio|clase|repar|tutoria|oficio|limpieza|jardin|gasfiter|electric|mudanza)/.test(normalized);
+}
+
+function isNoticeDraftIntent(text: string) {
+  const normalized = normalizeAssistantText(text);
+  return /quiero (?:publicar|crear|redactar|anunciar)|ayudame a (?:publicar|crear|redactar|anunciar)|(?:publica|crea|redacta|anuncia)r?\s+(?:un\s+)?aviso|^anuncio(?:\s|:)|convoca(?:r|mos)?|invito(?:\s|\b)|invitamos(?:\s|\b)|habra|se realizara|se llevara a cabo/.test(normalized);
+}
+
+function parseNoticeDateTime(text: string) {
+  const normalized = normalizeAssistantText(text);
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+  let dateParts: { year: number; month: number; day: number } | undefined;
+  const namedDate = normalized.match(/\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)(?:\s+de\s+(\d{4}))?\b/);
+  const numericDate = normalized.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?\b/);
+  if (namedDate) {
+    const month = namedDate[2] === 'septiembre' ? 8 : monthNames.indexOf(namedDate[2]);
+    let year = Number(namedDate[3] || new Date().getFullYear());
+    const monthIndex = month;
+    if (!namedDate[3] && new Date(year, monthIndex, Number(namedDate[1])) < new Date(new Date().setHours(0, 0, 0, 0))) year++;
+    dateParts = { year, month: monthIndex, day: Number(namedDate[1]) };
+  } else if (numericDate) {
+    let year = Number(numericDate[3] || new Date().getFullYear());
+    const monthIndex = Number(numericDate[2]) - 1;
+    if (!numericDate[3] && new Date(year, monthIndex, Number(numericDate[1])) < new Date(new Date().setHours(0, 0, 0, 0))) year++;
+    dateParts = { year, month: monthIndex, day: Number(numericDate[1]) };
+  } else if (/\bmanana\b/.test(normalized)) {
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    dateParts = { year: tomorrow.getFullYear(), month: tomorrow.getMonth(), day: tomorrow.getDate() };
+  } else if (/\bhoy\b/.test(normalized)) {
+    const today = new Date(); dateParts = { year: today.getFullYear(), month: today.getMonth(), day: today.getDate() };
+  } else {
+    const weekdays = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const weekdayMatch = normalized.match(/\b(?:este\s+|el\s+|proximo\s+)?(domingo|lunes|martes|miercoles|jueves|viernes|sabado)\b/);
+    if (weekdayMatch) {
+      const today = new Date();
+      let daysAhead = (weekdays.indexOf(weekdayMatch[1]) - today.getDay() + 7) % 7;
+      if (daysAhead === 0) daysAhead = 7;
+      today.setDate(today.getDate() + daysAhead);
+      dateParts = { year: today.getFullYear(), month: today.getMonth(), day: today.getDate() };
+    }
+  }
+  if (!dateParts) return undefined;
+  const time = normalized.match(/\b(?:a\s+las?|desde\s+las?)\s+(\d{1,2})(?::(\d{2}))?(?:\s*(am|pm|a\.?\s*m\.?|p\.?\s*m\.?))?(?=\s|$|[,;.!?])/);
+  if (!time) return undefined;
+  let hour = Number(time[1]);
+  const minute = Number(time[2] || 0);
+  const meridiem = time[3]?.replace(/\s|\./g, '');
+  if (meridiem === 'pm' && hour < 12) hour += 12;
+  if (meridiem === 'am' && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return undefined;
+  const value = new Date(dateParts.year, dateParts.month, dateParts.day, hour, minute);
+  if (value.getFullYear() !== dateParts.year || value.getMonth() !== dateParts.month || value.getDate() !== dateParts.day) return undefined;
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}T${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+}
+
+function parseNoticeLocation(text: string) {
+  const match = text.match(/\b(?:en|lugar:|direccion:)\s+((?:el|la|los|las)\s+)?([^.!?]+)/i);
+  if (!match) return undefined;
+  return `${match[1] || ''}${match[2]}`.trim().replace(/\s+(?:a las|desde las)\b.*$/i, '').replace(/\s+/g, ' ') || undefined;
 }
 
 function basicReply(text: string) {
   const normalized = normalizeAssistantText(text).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   if (/^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|que tal)$/.test(normalized)) {
-    return '¡Hola! Puedo ayudarte a buscar cerca, preparar un pedido de ayuda, ofrecer apoyo o redactar un servicio para publicar. También puedo mostrarte avisos y ayudarte con tu ubicación.';
+    return '¡Hola! Puedo ayudarte a buscar cerca, preparar un pedido de ayuda, ofrecer apoyo, redactar un servicio o crear un aviso. También puedo mostrarte actividades y ayudarte con tu ubicación.';
   }
   if (/^(gracias|muchas gracias|te agradezco|ok gracias|listo gracias)$/.test(normalized)) {
     return '¡Con gusto! Aquí estoy si necesitas buscar algo, pedir ayuda o conocer otra función de AYNI.';
@@ -60,6 +119,7 @@ const homeActions: Array<MessageAction & { description: string }> = [
   { key: 'ask', label: 'Pedir ayuda', description: 'Cuenta qué necesitas', icon: 'hands' },
   { key: 'offer', label: 'Ofrecer ayuda', description: 'Apoya a un vecino', icon: 'heart' },
   { key: 'service', label: 'Publicar un servicio', description: 'Comparte lo que sabes hacer', icon: 'store' },
+  { key: 'notice', label: 'Crear un aviso', description: 'Anuncia una actividad o campaña', icon: 'megaphone' },
   { key: 'notices', label: 'Ver avisos', description: 'Novedades del barrio', icon: 'megaphone' },
   { key: 'location', label: 'Configurar ubicación', description: 'Mejora lo que ves cerca', icon: 'pin' },
   { key: 'tutorial', label: 'Enséñame AYNI', description: 'Guía rápida en 4 pasos', icon: 'check' },
@@ -77,7 +137,7 @@ function newMessage(from: Message['from'], text: string, extra: Partial<Message>
   return { id: crypto.randomUUID(), from, text, ...extra };
 }
 
-export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, onLocation }: GuideBotProps) {
+export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, onFindService, onCreateNotice, onLocation }: GuideBotProps) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -171,6 +231,8 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
     if (key === 'ask') onAsk(action.requestDraft);
     if (key === 'offer') onOffer();
     if (key === 'service') onOfferService(action.serviceDraft);
+    if (key === 'serviceSearch') onFindService(action.searchQuery || 'servicio');
+    if (key === 'notice') onCreateNotice(action.noticeDraft);
     if (key === 'notices') onNavigate('avisos');
     if (key === 'location') onLocation();
     if (key === 'tutorial') beginVisualTour();
@@ -211,7 +273,21 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
     const details = earthquake ? clean.split(/\b(?:necesito|necesitamos|necesita|necesitan|requiero|requerimos)\b/i)[0].trim() : clean;
     const description = details.charAt(0).toLocaleUpperCase('es') + details.slice(1);
     const urgent = isUrgentBloodRequest(clean);
-    return { description, helpType: inferHelpType(clean), urgent: urgent || earthquake, earthquake, emergencyNeeds, peopleCount };
+    return { description, helpType: inferHelpType(clean), urgent: urgent || earthquake, earthquake, emergencyNeeds, peopleCount, locationQuery: parseNoticeLocation(clean) };
+  }
+
+  function prepareServiceSearch(text: string) {
+    const normalized = normalizeAssistantText(text);
+    if (/mover.{0,30}mueble|mudanza/.test(normalized)) return 'mudanza';
+    if (/traslad|transport/.test(normalized)) return 'transporte';
+    if (/limpieza/.test(normalized)) return 'limpieza';
+    if (/repar|arreglar/.test(normalized)) return 'reparación';
+    if (/instalar|instalación/.test(normalized)) return 'instalación';
+    return text.trim()
+      .replace(/^(?:necesito|necesitamos|busco|quiero contratar|requiero)\s+(?:ayuda\s+)?(?:para\s+)?/i, '')
+      .split(/[.!?\n]/)[0]
+      .replace(/\s+(?:a mi nuevo|en mi nuevo|a mi|en el|en la|en)\b.*$/i, '')
+      .trim() || 'servicio';
   }
 
   function prepareService(text: string): ServiceDraft {
@@ -228,6 +304,22 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
         : /comida|menu|postre|torta|alimento/.test(normalized) ? 'Alimentos'
           : /hogar|limpieza|jardin|mudanza/.test(normalized) ? 'Hogar' : undefined;
     return { title, description: description.charAt(0).toLocaleUpperCase('es') + description.slice(1), categoryHint };
+  }
+
+  function prepareNotice(text: string): NoticeDraft {
+    const content = text.trim()
+      .replace(/^(?:quiero\s+(?:publicar|crear|redactar|anunciar)|quisiera\s+anunciar|anuncio|aviso\s+para\s+(?:mis\s+)?vecinos)\s*[:,!-]?\s*/i, '')
+      .replace(/^que\s+/i, '');
+    const eventLead = content.match(/^\s*(?:este|el)\s+(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)\s+(?:habra|se realizara|se llevara a cabo)\s+(?:un[oa]?\s+)?(.+)/i);
+    const titleBase = eventLead?.[1] || content.split(/\b(?:el\s+(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo|\d{1,2}\s+de)|a\s+las|desde\s+las)\b/i)[0];
+    let title = titleBase.split(/[.!?\n]/)[0].trim().replace(/^(?:un|una|el|la|que)\s+/i, '');
+    if (title.length > 72) title = `${title.slice(0, 69).trimEnd()}…`;
+    if (!title) title = 'Aviso para el barrio';
+    title = title.charAt(0).toLocaleUpperCase('es') + title.slice(1);
+    const normalized = normalizeAssistantText(content);
+    const categoryHint = /campana|recoleccion|colecta|donacion/.test(normalized) ? 'Campañas'
+      : /actividad|jornada|reunion|taller|festival|feria|celebracion|evento/.test(normalized) ? 'Actividades' : 'Aviso vecinal';
+    return { title, content: content.charAt(0).toLocaleUpperCase('es') + content.slice(1), categoryHint, dateTime: parseNoticeDateTime(text), locationQuery: parseNoticeLocation(content) };
   }
 
   function dictate() {
@@ -253,15 +345,19 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
       ask: 'En unos pasos publicarás tu pedido. Escribe qué necesitas, revisa el texto y confirma.',
       offer: 'Aquí puedes leer lo que necesitan tus vecinos y elegir un pedido para ofrecer tu ayuda.',
       service: 'Cuéntame qué servicio ofreces y prepararé una publicación para que la revises.',
+      serviceSearch: 'Voy a mostrarte servicios cercanos que podrían ayudarte.',
+      notice: 'Cuéntame qué actividad, campaña o información quieres compartir y redactaré el aviso para que lo revises.',
       notices: 'Aquí encontrarás avisos y actividades compartidos por vecinos.',
       location: 'Configura tu ubicación para ordenar los resultados por cercanía. Tu dirección exacta permanece privada.',
     };
-    setMessages(current => [...current, newMessage('bot', guidance[item.key as Exclude<GuideAction, 'tutorial'>], { action: { key: item.key, label: item.key === 'nearby' ? 'Ir a Cerca de mí' : item.key === 'ask' ? 'Crear un pedido' : item.key === 'offer' ? 'Explorar pedidos' : item.key === 'service' ? 'Redactar servicio' : item.key === 'notices' ? 'Abrir avisos' : 'Configurar ubicación', icon: item.icon } })]);
+    setMessages(current => [...current, newMessage('bot', guidance[item.key as Exclude<GuideAction, 'tutorial'>], { action: { key: item.key, label: item.key === 'nearby' ? 'Ir a Cerca de mí' : item.key === 'ask' ? 'Crear un pedido' : item.key === 'offer' ? 'Explorar pedidos' : item.key === 'service' ? 'Redactar servicio' : item.key === 'serviceSearch' ? 'Buscar servicios' : item.key === 'notice' ? 'Crear aviso' : item.key === 'notices' ? 'Abrir avisos' : 'Configurar ubicación', icon: item.icon } })]);
   }
 
   function classify(text: string): GuideAction | 'fallback' {
     const normalized = normalizeAssistantText(text);
     if (/tutorial|ensename|como funciona|soy nuevo|guia/.test(normalized)) return 'tutorial';
+    if (isNoticeDraftIntent(text)) return 'notice';
+    if (/(?:necesit|busco|quiero contratar|requier).{0,70}(?:mover|mudanza|traslad|transportar|limpieza|reparar|instalar|gasfiter|electricista)/.test(normalized)) return 'serviceSearch';
     if (isServiceOffer(text)) return 'service';
     if (/ubicacion|zona|direccion|gps|cerca de mi/.test(normalized)) return 'location';
     if (/aviso|evento|noticia/.test(normalized)) return 'notices';
@@ -291,6 +387,21 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
       const serviceDraft = prepareService(value);
       const categoryNote = serviceDraft.categoryHint ? ` Sugerí ${serviceDraft.categoryHint} como categoría.` : '';
       setMessages(current => [...current, userMessage, newMessage('bot', `Preparé un borrador de tu servicio.${categoryNote} Revisa el título, la descripción, el precio y la ubicación antes de publicarlo.`, { action: { key: 'service', label: 'Revisar publicación del servicio', icon: 'store', serviceDraft } })]);
+      return;
+    }
+    if (intent === 'serviceSearch') {
+      const searchQuery = prepareServiceSearch(value);
+      setMessages(current => [...current, userMessage, newMessage('bot', `Entiendo que buscas un servicio para “${searchQuery}”. Te llevaré a Cerca de mí con el filtro de servicios aplicado para que revises las opciones publicadas por vecinos.`, { action: { key: 'serviceSearch', label: 'Buscar servicios cercanos', icon: 'search', searchQuery } })]);
+      return;
+    }
+    if (intent === 'notice') {
+      const noticeDraft = prepareNotice(value);
+      const details = [
+        `categoría ${noticeDraft.categoryHint}`,
+        noticeDraft.dateTime ? 'fecha y hora detectadas' : 'completa la fecha y la hora',
+        noticeDraft.locationQuery ? `lugar detectado: ${noticeDraft.locationQuery}; confirma una sugerencia para fijar el punto` : 'indica el lugar y selecciona el punto en el mapa',
+      ].join('; ');
+      setMessages(current => [...current, userMessage, newMessage('bot', `Preparé un borrador de aviso con título breve y contenido. Detecté ${details}. Revisa los datos antes de publicarlo.`, { action: { key: 'notice', label: 'Revisar aviso', icon: 'megaphone', noticeDraft } })]);
       return;
     }
     const replies: Record<Exclude<typeof intent, 'tutorial' | 'fallback'>, MessageAction> = {

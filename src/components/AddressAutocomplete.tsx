@@ -6,10 +6,10 @@ import Icon from './Icon';
 import { ErrorBox } from './UI';
 
 export type AddressSuggestion = { id: string; nombre: string; latitud: number; longitud: number };
-export default function AddressAutocomplete({ value, onChange, onSelect, online, disabled = false, label, name, required = false, bias, showSearchButton = true, onBusyChange }: {
+export default function AddressAutocomplete({ value, onChange, onSelect, online, disabled = false, label, name, required = false, bias, showSearchButton = true, onBusyChange, autoSearch = false }: {
   value: string; onChange: (text: string) => void; onSelect: (place: AddressSuggestion) => void;
   online: boolean; disabled?: boolean; label: string; name?: string; required?: boolean;
-  bias?: Coordinates | null; showSearchButton?: boolean; onBusyChange?: (busy: boolean) => void;
+  bias?: Coordinates | null; showSearchButton?: boolean; onBusyChange?: (busy: boolean) => void; autoSearch?: boolean;
 }) {
   const id = useId();
   const [typed, setTyped] = useState('');
@@ -19,10 +19,18 @@ export default function AddressAutocomplete({ value, onChange, onSelect, online,
   const [results, setResults] = useState<AddressSuggestion[]>([]);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const autoSearched = useRef(false);
   const [error, setError] = useState('');
   const request = useRef<AbortController | null>(null);
   const sequence = useRef(0);
   const point = bias || COMMUNITY_CENTER;
+  useEffect(() => {
+    if (!autoSearch || autoSearched.current || !value.trim()) return;
+    autoSearched.current = true;
+    setTyped(value);
+    setFocused(true);
+    setVersion(current => current + 1);
+  }, [autoSearch, value]);
   useEffect(() => { onBusyChange?.(loading); return () => onBusyChange?.(false); }, [loading, onBusyChange]);
   useEffect(() => {
     const operation = ++sequence.current;

@@ -15,7 +15,7 @@ type Recognition = { lang: string; continuous: boolean; interimResults: boolean;
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 const emergencyNeeds = ['Agua', 'Alimentos', 'Medicinas', 'Abrigo', 'Primeros auxilios', 'Apoyo para evacuar', 'Personas atrapadas', 'Personas heridas', 'Asistencia especial'];
 
-export default function RequestForm({ onClose, initialRequest }: { onClose: () => void; initialRequest?: { description: string; helpType: string; urgent: boolean; earthquake: boolean; emergencyNeeds: string[]; peopleCount?: number } }) {
+export default function RequestForm({ onClose, initialRequest }: { onClose: () => void; initialRequest?: { description: string; helpType: string; urgent: boolean; earthquake: boolean; emergencyNeeds: string[]; peopleCount?: number; locationQuery?: string } }) {
   const { catalogs, postingSectorId, area, online, submitRequest, notify } = useApp();
   const { t } = useLanguage();
   const [description, setDescription] = useState(initialRequest?.description ?? '');
@@ -24,7 +24,7 @@ export default function RequestForm({ onClose, initialRequest }: { onClose: () =
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>(initialRequest?.emergencyNeeds ?? []);
   const [peopleCount, setPeopleCount] = useState(String(initialRequest?.peopleCount ?? 1));
   const sectorId = postingSectorId;
-  const [location, setLocation] = useState<LocationDraft>({ coordinates: area.coordinates, address: '' });
+  const [location, setLocation] = useState<LocationDraft>({ coordinates: initialRequest?.locationQuery ? null : area.coordinates, address: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -37,10 +37,18 @@ export default function RequestForm({ onClose, initialRequest }: { onClose: () =
   const policyMessage = blockedRequestReason(description);
   const helpCategories = visibleHelpCategories(catalogs.data?.ayuda);
   useEffect(() => {
-    if (!initialRequest?.urgent || selectedCategoryId) return;
-    const urgentCategory = helpCategories.find(category => category.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').includes('urgente'));
-    if (urgentCategory) setSelectedCategoryId(urgentCategory.id);
-  }, [initialRequest?.urgent, helpCategories, selectedCategoryId]);
+    if (!initialRequest || selectedCategoryId) return;
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    const helpType = normalize(initialRequest.helpType);
+    const match = initialRequest.urgent || initialRequest.earthquake
+      ? helpCategories.find(category => normalize(category.nombre).includes('urgente'))
+      : /prestamo|articulo/.test(helpType)
+        ? helpCategories.find(category => normalize(category.nombre).includes('prestamo'))
+        : /bienes|primera necesidad/.test(helpType)
+          ? helpCategories.find(category => normalize(category.nombre).includes('donacion'))
+          : helpCategories.find(category => normalize(category.nombre).includes('favor'));
+    if (match) setSelectedCategoryId(match.id);
+  }, [initialRequest, helpCategories, selectedCategoryId]);
   const suggestedTitle = emergencyMode
     ? selectedNeeds.length ? `Sismo: ${selectedNeeds.slice(0, 2).join(', ')}${selectedNeeds.length > 2 ? ` y ${selectedNeeds.length - 2} más` : ''}` : ''
     : description.trim() ? requestTitle(description) : '';
@@ -128,7 +136,7 @@ export default function RequestForm({ onClose, initialRequest }: { onClose: () =
       </div>
       {recording && <p role="status" className="recording-message"><span className="recording-dot"/>{t('listening')} Habla con naturalidad; revisa el texto antes de publicarlo.</p>}
         {!emergencyMode && <Field label="Tipo de ayuda" hint={initialRequest?.urgent ? 'Sugerimos Apoyo urgente por la donación de sangre. Puedes cambiarlo si no corresponde.' : initialRequest ? `Según tu mensaje: ${initialRequest.helpType}. Elige la categoría que mejor describe cómo pueden ayudarte.` : undefined}><select name="categoriaId" required value={selectedCategoryId} onChange={event => setSelectedCategoryId(event.target.value)}><option value="" disabled>Elige una opción</option>{helpCategories.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>}
-      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige dónde necesitas ayuda. Tu dirección exacta es privada.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
+      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige dónde necesitas ayuda. Tu dirección exacta es privada.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy} initialCenter={area.coordinates} initialSearch={initialRequest?.locationQuery}/></details>
       <RemoteState {...catalogs}/>
       {!online && <p className="offline-banner">Se guardará en este dispositivo como pendiente de envío. La comunidad aún no lo recibirá; se enviará al recuperar conexión con tu sesión activa.</p>}
       {!helpCategories.length && <ErrorBox message="Necesitamos cargar las categorías al menos una vez con conexión antes de crear pedidos."/>}
