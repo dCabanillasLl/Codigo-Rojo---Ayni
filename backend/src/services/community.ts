@@ -63,7 +63,7 @@ interface OfferLock {
   confirmada_en: Date | null;
 }
 interface PublicRequest {
-  id: string; solicitanteId: string; solicitante: string; categoriaId: string;
+  id: string; solicitanteId: string; solicitante: string; solicitanteFotoPerfilUrl: string | null; categoriaId: string;
   categoria: string; sectorId: string; sectorNombre: string; titulo: string;
   descripcion: string; urgencia: string; estado: RequestState; creadoEn: Date; venceEn: Date | null;
   distanciaMetros: number | string | null; clientRequestId: string | null;
@@ -72,6 +72,7 @@ interface PublicRequest {
 }
 const requestColumns = `CAST(s.solicitud_id AS CHAR) AS id,
   CAST(s.solicitante_id AS CHAR) AS solicitanteId, ${publicName('u')} AS solicitante,
+  CASE WHEN u.foto_perfil_hash IS NULL THEN NULL ELSE CONCAT('/api/auth/users/', CAST(u.usuario_id AS CHAR), '/foto-perfil?v=', u.foto_perfil_hash) END AS solicitanteFotoPerfilUrl,
   CAST(s.categoria_ayuda_id AS CHAR) AS categoriaId, c.nombre AS categoria,
   CAST(l.sector_id AS CHAR) AS sectorId, v.nombre AS sectorNombre,
   s.titulo, s.descripcion, s.urgencia, s.estado, s.creado_en AS creadoEn, s.vence_en AS venceEn,
