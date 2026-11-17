@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AyniVoice, nativeVoice, stopSpeaking } from './voice';
 
 type ResultEvent = { results: { length: number; [index: number]: { [index: number]: { transcript: string } } } };
 type Recognition = {
@@ -13,11 +14,13 @@ type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitS
 export function useDictation(value: string, onChange: (text: string) => void, onError: (message: string) => void, maxLength: number) {
   const [recording, setRecording] = useState(false);
   const sessionRef = useRef<Recognition | null>(null);
+  const nativeSession = useRef<symbol | null>(null);
   const callbacks = useRef({ onChange, onError });
   callbacks.current = { onChange, onError };
   const Voice = (window as VoiceWindow).SpeechRecognition || (window as VoiceWindow).webkitSpeechRecognition;
 
   function cancel() {
+    nativeSession.current = null;
     const session = sessionRef.current;
     sessionRef.current = null;
     if (session) {
@@ -28,6 +31,7 @@ export function useDictation(value: string, onChange: (text: string) => void, on
   }
 
   useEffect(() => () => {
+    nativeSession.current = null;
     const session = sessionRef.current;
     sessionRef.current = null;
     if (session) {
@@ -36,7 +40,28 @@ export function useDictation(value: string, onChange: (text: string) => void, on
     }
   }, []);
 
-  function toggle() {
+  async function toggle() {
+    if (nativeVoice()) {
+      if (nativeSession.current) return;
+      const token = Symbol('dictation');
+      nativeSession.current = token;
+      const base = value.trim();
+      callbacks.current.onError('');
+      setRecording(true);
+      stopSpeaking();
+      try {
+        const result = await AyniVoice.recognize();
+        if (nativeSession.current !== token) return;
+        const text = result.text?.replace(/\s+/g, ' ').trim();
+        if (text) callbacks.current.onChange([base, text].filter(Boolean).join(' ').slice(0, maxLength));
+        else if (!result.cancelled) callbacks.current.onError('No se detectó texto. Vuelve a dictar.');
+      } catch (error) {
+        if (nativeSession.current === token) callbacks.current.onError(error instanceof Error ? error.message : 'No pudimos iniciar el dictado de Android. Revisa el servicio de voz y sus permisos.');
+      } finally {
+        if (nativeSession.current === token) { nativeSession.current = null; setRecording(false); }
+      }
+      return;
+    }
     if (sessionRef.current) { sessionRef.current.stop(); return; }
     if (!Voice) { callbacks.current.onError('El dictado no está disponible en este navegador. Puedes escribir tu pedido.'); return; }
     callbacks.current.onError('');
@@ -44,7 +69,7 @@ export function useDictation(value: string, onChange: (text: string) => void, on
     let received = false;
     let failed = false;
     try {
-      window.speechSynthesis?.cancel();
+      stopSpeaking();
       const session = new Voice();
       sessionRef.current = session;
       session.lang = 'es-PE';
@@ -87,5 +112,5 @@ export function useDictation(value: string, onChange: (text: string) => void, on
       callbacks.current.onError('El micrófono no está disponible. Revisa los permisos e intenta de nuevo.');
     }
   }
-  return { recording, supported: Boolean(Voice), toggle, cancel };
+  return { recording, supported: nativeVoice() || Boolean(Voice), toggle, cancel };
 }

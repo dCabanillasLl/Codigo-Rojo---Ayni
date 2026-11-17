@@ -2,7 +2,7 @@ import { useDictation } from '../lib/use-dictation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useApp } from '../AppContext';
 import { errorMessage } from '../lib/api';
-import { Modal, Field, ErrorBox, RemoteState, speak } from './UI';
+import { Modal, Field, ErrorBox, RemoteState, speak, stopSpeaking } from './UI';
 import Icon from './Icon';
 import { useLanguage } from '../lib/language';
 import type { LocationDraft } from '../types';
@@ -24,10 +24,12 @@ export default function RequestForm({ onClose, initialRequest }: { onClose: () =
   const sectorId = postingSectorId;
   const [location, setLocation] = useState<LocationDraft>({ coordinates: initialRequest?.locationQuery ? null : area.coordinates, address: '' });
   const [error, setError] = useState('');
+  const [voiceError, setVoiceError] = useState('');
+  useEffect(() => () => { stopSpeaking(); }, []);
   const [busy, setBusy] = useState(false);
   const uuid = useRef(crypto.randomUUID());
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
-  const { recording, supported: Voice, toggle: record, cancel: cancelDictation } = useDictation(description, setDescription, setError, 4000);
+  const { recording, supported: Voice, toggle: record, cancel: cancelDictation } = useDictation(description, setDescription, setVoiceError, 4000);
   const policyMessage = blockedRequestReason(description);
   const helpCategories = visibleHelpCategories(catalogs.data?.ayuda);
   useEffect(() => {
@@ -81,8 +83,9 @@ export default function RequestForm({ onClose, initialRequest }: { onClose: () =
       <Field label={emergencyMode ? 'Detalle adicional (opcional)' : 'Tu pedido'} hint={emergencyMode ? 'Describe qué pasó o qué necesitan para coordinar la ayuda. Las necesidades, el número de personas y la zona se agregarán automáticamente.' : undefined}><div className="request-textarea-wrap"><textarea ref={descriptionRef} className="request-area" value={description} onChange={event => { cancelDictation(); setDescription(event.target.value); }} required={!emergencyMode} minLength={emergencyMode ? 0 : 5} maxLength={4000} placeholder={emergencyMode ? 'Ej. El edificio no tiene agua y hay una persona mayor que necesita sus medicinas.' : 'Por ejemplo: necesito una escalera por una hora mañana por la mañana.'} rows={4}/>{description && <button type="button" className="clear-request" aria-label="Borrar todo el texto del pedido" title="Borrar texto" onClick={() => { cancelDictation(); setDescription(''); descriptionRef.current?.focus(); }}><Icon name="close" size={16}/></button>}</div></Field>
       <div className="request-voice-tools" aria-label="Opciones de voz">
         {Voice && <button type="button" className={`outline-btn voice-record-btn ${recording ? 'is-recording' : ''}`} onClick={record} disabled={!online || busy}><Icon name="mic"/>{recording ? 'Terminar dictado' : t('dictate')}</button>}
-        <button type="button" className="outline-btn voice-listen-btn" disabled={recording || !description.trim()} onClick={() => { if (!speak(description)) setError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones"/>Escuchar</button>
+        <button type="button" className="outline-btn voice-listen-btn" disabled={recording || !description.trim()} onClick={async () => { setVoiceError(''); if (!await speak(description)) setVoiceError('No pudimos leer el texto. Revisa el volumen y el motor de texto a voz en los ajustes del dispositivo.'); }}><Icon name="headphones"/>Escuchar</button>
       </div>
+      <ErrorBox message={voiceError}/>
       {recording && <p role="status" className="recording-message"><span className="recording-dot"/>{t('listening')} Habla con naturalidad; revisa el texto antes de publicarlo.</p>}
         {!emergencyMode && <Field label="Tipo de ayuda" hint={initialRequest?.urgent ? 'Sugerimos Apoyo urgente por la donación de sangre. Puedes cambiarlo si no corresponde.' : initialRequest ? `Según tu mensaje: ${initialRequest.helpType}. Elige la categoría que mejor describe cómo pueden ayudarte.` : undefined}><select name="categoriaId" required value={selectedCategoryId} onChange={event => setSelectedCategoryId(event.target.value)}><option value="" disabled>Elige una opción</option>{helpCategories.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>}
       <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige dónde necesitas ayuda. Tu dirección exacta es privada.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy} initialCenter={area.coordinates} initialSearch={initialRequest?.locationQuery}/></details>

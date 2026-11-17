@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WhatsAppSharePlugin.class);
+        registerPlugin(AyniVoicePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
