@@ -5,6 +5,7 @@ import type { Coordinates } from '../types';
 import { COMMUNITY_CENTER } from '../lib/location';
 import { spreadMapPoints } from '../lib/map-layout';
 import { kindLabels, markerHtml, mapSymbols, type MapKind, type MapSymbol } from '../lib/map-symbols';
+import { localize, localizePublicationCategory, useLanguage } from '../lib/language';
 
 export type MapPin = { id: string; point: Coordinates; title: string; label: string; kind?: MapKind; symbol?: MapSymbol; category?: string };
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export default function CommunityMap({ center, reference, pins = [], selectedId, onSelect, onPick, onPickStart, picked, radius, accuracy, online, label, compact, fitAll = true, zoomPosition = 'topleft' }: Props) {
+  const { language } = useLanguage();
   const host = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const tiles = useRef<L.TileLayer | null>(null);
@@ -54,12 +56,12 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     if (!host.current || !online) return;
     const start = initialCenter.current;
     const instance = L.map(host.current, {
-      scrollWheelZoom: false, keyboard: true, zoomControl: true,
+      scrollWheelZoom: false, keyboard: true, zoomControl: false,
       touchZoom: true, dragging: true, bounceAtZoomLimits: false,
     })
       .setView([start.latitude, start.longitude], compact ? 15 : 14);
     map.current = instance;
-    instance.zoomControl.setPosition(zoomPosition);
+    L.control.zoom({ position: zoomPosition, zoomInTitle: localize(language, 'Acercar', 'Zoom in', 'Asuyachiy'), zoomOutTitle: localize(language, 'Alejar', 'Zoom out', 'Karuyachiy') }).addTo(instance);
     tiles.current = L.tileLayer(import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: import.meta.env.VITE_MAP_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -78,7 +80,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     const observer = new ResizeObserver(() => { instance.invalidateSize({ pan: false }); fitView.current(); });
     observer.observe(container);
     return () => { observer.disconnect(); container.removeEventListener('keydown', keydown); instance.remove(); map.current = null; layers.current = null; tiles.current = null; };
-  }, [online, compact, zoomPosition]);
+  }, [online, compact, zoomPosition, language]);
 
   // Keep the editable marker outside the layers redrawn when the map pans.
   // Leaflet can then auto-pan during a drag without replacing the active pin.
@@ -93,8 +95,8 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     });
     const marker = L.marker([point.latitude, point.longitude], {
       icon, draggable: true, autoPan: true, keyboard: true, bubblingMouseEvents: false,
-      title: 'Arrastra el pin para elegir tu ubicación', alt: 'Ubicación ajustable: arrastra el pin o elige un punto con el teclado', zIndexOffset: 1000,
-    }).bindTooltip(picked ? 'Arrastra para ajustar la ubicación' : 'Arrastra para elegir la ubicación').addTo(instance);
+      title: localize(language, 'Arrastra el pin para elegir tu ubicación', 'Drag the pin to choose your location', 'Kayniykita akllanapaq pin nisqata aysay'), alt: localize(language, 'Ubicación ajustable: arrastra el pin o elige un punto con el teclado', 'Adjustable location: drag the pin or choose a point with the keyboard', 'Kayta tikrayta atinki: pin nisqata aysay utaq teclado nisqawan akllay'), zIndexOffset: 1000,
+    }).bindTooltip(picked ? localize(language, 'Arrastra para ajustar la ubicación', 'Drag to adjust the location', 'Kayta allinchaypaq aysay') : localize(language, 'Arrastra para elegir la ubicación', 'Drag to choose the location', 'Kayta akllanapaq aysay')).addTo(instance);
     marker.on('dragstart', () => { callbacks.current.onPickStart?.(); marker.closeTooltip(); marker.getElement()?.classList.add('is-dragging'); });
     marker.on('dragend', () => {
       marker.getElement()?.classList.remove('is-dragging');
@@ -102,7 +104,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
       callbacks.current.onPick?.({ latitude: position.lat, longitude: position.lng });
     });
     return () => { marker.remove(); };
-  }, [online, compact, zoomPosition, editable, picked?.latitude, picked?.longitude, center?.latitude, center?.longitude]);
+  }, [online, compact, zoomPosition, editable, language, picked?.latitude, picked?.longitude, center?.latitude, center?.longitude]);
 
   useEffect(() => {
     if (!map.current || !layers.current) return;
@@ -115,7 +117,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
       if (radius) L.circle(latlng, { radius, color: '#39765d', fillOpacity: 0.06, weight: 1.5, dashArray: '6 7', interactive: false }).addTo(group);
       if (picked && accuracy) L.circle(latlng, { radius: accuracy, color: '#367fc0', fillOpacity: 0.08, weight: 1, interactive: false }).addTo(group);
       if (!editable) L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#2879c7', fillOpacity: 1 })
-        .bindTooltip(picked ? 'Punto elegido' : 'Tu punto de búsqueda').addTo(group);
+        .bindTooltip(picked ? localize(language, 'Punto elegido', 'Selected point', 'Akllasqa kay') : localize(language, 'Tu punto de búsqueda', 'Your search point', 'Maskanaykipaq kay')).addTo(group);
     }
     const layout = spreadMapPoints(pins.map(pin => ({ id: pin.id, ...instance.latLngToContainerPoint([pin.point.latitude, pin.point.longitude]) })));
     const pinById = new Map(pins.map(pin => [pin.id, pin]));
@@ -136,7 +138,7 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
         L.circleMarker([pin.point.latitude, pin.point.longitude], { radius: 3, color: '#fff', fillColor: '#687c70', fillOpacity: 1, weight: 1, interactive: false }).addTo(group);
       }
       const icon = L.divIcon({ className: `community-pin ${kind}-pin symbol-${symbol} ${symbol === 'urgent' ? 'urgent-pin' : ''} ${selected ? 'is-selected' : ''}`, html: markerHtml(kind, symbol), iconSize: [40, 46], iconAnchor: [20, 43] });
-      const name = `${kindLabels[kind]} · ${pin.category || mapSymbols[symbol].label}: ${pin.title}`;
+      const name = `${localizePublicationCategory(language, kindLabels[kind])} · ${localizePublicationCategory(language, pin.category || mapSymbols[symbol].label)}: ${pin.title}`;
       const marker = L.marker(displayPoint, { icon, title: name, alt: name, keyboard: true, riseOnHover: true, zIndexOffset: selected ? 500 : 0 });
       const text = document.createElement('span'); text.textContent = name;
       marker.bindTooltip(text).on('click', (event: L.LeafletMouseEvent) => { L.DomEvent.stopPropagation(event); callbacks.current.onSelect?.(pin.id); }).addTo(group);
@@ -146,16 +148,16 @@ export default function CommunityMap({ center, reference, pins = [], selectedId,
     draw();
     instance.on('zoomend moveend', draw);
     return () => { instance.off('zoomend moveend', draw); };
-  }, [online, reference, picked, pins, selectedId, radius, accuracy, editable]);
+  }, [online, reference, picked, pins, selectedId, radius, accuracy, editable, language]);
 
   useEffect(() => {
     fitView.current();
   }, [online, geometryKey, center?.latitude, center?.longitude, reference?.latitude, reference?.longitude, picked?.latitude, picked?.longitude, radius, fitAll]);
 
-  if (!online) return <p className="map-offline" role="status">El mapa necesita internet. Tus publicaciones y pedidos guardados siguen disponibles.</p>;
+  if (!online) return <p className="map-offline" role="status">{localize(language, 'El mapa necesita internet. Tus publicaciones y pedidos guardados siguen disponibles.', 'The map needs internet. Your listings and saved requests remain available.', 'Mapa nisqaqa internetta necesitakun. Willaykikuna, waqaychasqa mañakuyniykipas hapillanmi.')}</p>;
   return <div className={`community-map-wrap ${compact ? 'compact-map' : ''}`}>
     <div ref={host} className="community-map" style={fitAll && sharedCount > 25 ? { minHeight: Math.ceil(Math.sqrt(sharedCount)) * 50 + 100 } : undefined} role="region" aria-label={label} tabIndex={0}/>
-    {!fitAll && <button type="button" className="map-recenter" onClick={() => fitView.current()}>Centrar punto</button>}
-    {tileError && <div className="map-tile-error" role="status">No se pudieron cargar algunas calles. <button type="button" onClick={() => { setTileError(false); tiles.current?.redraw(); }}>Reintentar mapa</button></div>}
+    {!fitAll && <button type="button" className="map-recenter" onClick={() => fitView.current()}>{localize(language, 'Centrar punto', 'Center point', 'Kay chawpichay')}</button>}
+    {tileError && <div className="map-tile-error" role="status">{localize(language, 'No se pudieron cargar algunas calles.', 'Some streets could not be loaded.', 'Wakin ñankunaqa manam cargarikunchu.')} <button type="button" onClick={() => { setTileError(false); tiles.current?.redraw(); }}>{localize(language, 'Reintentar mapa', 'Retry map', 'Mapata yapamanta qhawachiy')}</button></div>}
   </div>;
 }

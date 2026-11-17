@@ -59,3 +59,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useLanguage() { const value = useContext(Context); if (!value) throw new Error('LanguageProvider missing'); return value; }
+export function localize(language: Language, spanish: string, english: string, quechua: string) {
+  return language === 'qu' ? quechua : language === 'en' ? english : spanish;
+}
+export function localizePublicationCategory(language: Language, category: string) {
+  const labels: Record<string, [string, string]> = {
+    Alimentos: ['Food', 'Mikhuykuna'], Reparaciones: ['Repairs', 'Allichaykuna'], Hogar: ['Home', 'Wasi'],
+    'Clases y oficios': ['Classes and trades', 'Yachachiykuna, llamk’aykuna'], Otros: ['Other', 'Hukkunapas'],
+    Producto: ['Product', 'Rantikuypa kaqninkuna'], Servicio: ['Service', 'Yanapakuy'], Ayuda: ['Help', 'Yanapay'],
+    'Ayuda vecinal': ['Neighbor help', 'Llaqtamasikunapa yanapaynin'], 'Donación': ['Donation', 'Haywarikuy'],
+    'Préstamo de objetos': ['Borrowing items', 'Imakunata mañakuy'], 'Ayuda urgente': ['Urgent help', 'Utqay yanapay'],
+    'Reparaciones y herramientas': ['Repairs and tools', 'Allichaykuna, llamk’ana imakuna'],
+    'Clases y aprendizaje': ['Classes and learning', 'Yachachiykuna, yachay'], 'Tecnología': ['Technology', 'Tecnología'], Mascotas: ['Pets', 'Uywakuna'], Bicicletas: ['Bicycles', 'Bicicletakuna'],
+  };
+  const translated = labels[category];
+  return language === 'qu' ? translated?.[1] || category : language === 'en' ? translated?.[0] || category : category;
+}

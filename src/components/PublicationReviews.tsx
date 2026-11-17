@@ -9,6 +9,7 @@ import {
   submitPublicationRecommendation, type RecommendationFilter,
 } from '../lib/recommendations';
 import type { PublicationInteraction, PublicationRecommendation, RecommendationPage, RecommendationSummary } from '../types';
+import { localize, useLanguage } from '../lib/language';
 
 const FILTERS: { id: RecommendationFilter; label: string }[] = [
   { id: 'todas', label: 'Todas' }, { id: 'verificadas', label: 'Verificadas' },
@@ -64,6 +65,7 @@ function ReviewForm({ publicationId, interactions, loadingInteractions, interact
   onSubmit: (rating: number, comment: string, interactionId?: string) => Promise<boolean>;
   busy: boolean; error: string; disabled: boolean;
 }) {
+  const { language } = useLanguage();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [interactionId, setInteractionId] = useState('');
@@ -79,15 +81,15 @@ function ReviewForm({ publicationId, interactions, loadingInteractions, interact
     }
   }
 
-  return <form className="recommendation-form" onSubmit={event => void handleSubmit(event)} aria-label="Escribir una recomendación">
-    <div className="recommendation-form-heading"><span><Icon name="star" size={19}/></span><div><b>Comparte tu experiencia</b><p>Ayuda a otros vecinos a elegir con confianza.</p></div></div>
-    <Field label="Tu calificación"><div className="review-stars" role="group" aria-label="Califica de 1 a 5 estrellas">{[1, 2, 3, 4, 5].map(star => <button key={star} type="button" aria-label={`${star} de 5 estrellas`} aria-pressed={rating === star} onClick={() => setRating(star)}><Icon name="star" size={24}/></button>)}</div></Field>
-    <Field label="Comentario (opcional)" hint={`${comment.length}/1200 · AYNI no admite contenido ofensivo, sexual o comercial no permitido.`}>
-      <textarea value={comment} onChange={event => setComment(event.target.value)} maxLength={1200} rows={3} placeholder="¿Cómo fue tu experiencia con este producto o servicio?" aria-label="Comentario de la recomendación"/>
+  return <form className="recommendation-form" onSubmit={event => void handleSubmit(event)} aria-label={localize(language,'Escribir una recomendaci\u00f3n','Write a review','Allin rimayta qillqay')}>
+    <div className="recommendation-form-heading"><span><Icon name="star" size={19}/></span><div><b>{localize(language,'Comparte tu experiencia','Share your experience','Rurasqaykita willay')}</b><p>{localize(language,'Ayuda a otros vecinos a elegir con confianza.','Help other neighbors choose with confidence.','Llaqtamasiykikunata allin akllanankupaq yanapay.')}</p></div></div>
+    <Field label={localize(language,'Tu calificaci\u00f3n','Your rating','Allin rimayniyki')}><div className="review-stars" role="group" aria-label={localize(language,'Califica de 1 a 5 estrellas','Rate from 1 to 5 stars','Hukmanta pichqakama chaskiyta akllay')}>{[1, 2, 3, 4, 5].map(star => <button key={star} type="button" aria-label={localize(language,`${star} de 5 estrellas`,`${star} out of 5 stars`,`${star} pichqamanta chaskiykuna`)} aria-pressed={rating === star} onClick={() => setRating(star)}><Icon name="star" size={24}/></button>)}</div></Field>
+    <Field label={localize(language,'Comentario (opcional)','Comment (optional)','Rimay (munaspalla)')} hint={`${comment.length}/1200 \u00b7 ${localize(language,'AYNI no admite contenido ofensivo, sexual o comercial no permitido.','AYNI does not allow offensive, sexual, or prohibited commercial content.','AYNI ukhupi millay, sexual nisqa utaq mana saqisqa qhatuq willayqa manam saqisqachu.')}`}>
+      <textarea value={comment} onChange={event => setComment(event.target.value)} maxLength={1200} rows={3} placeholder={localize(language,'\u00bfC\u00f3mo fue tu experiencia con este producto o servicio?','How was your experience with this product or service?','\u00bfImaynatan kay rantikuypi utaq yanapakuypi kasharqanki?')} aria-label={localize(language,'Comentario de la recomendaci\u00f3n','Review comment','Allin rimaypa willaynin')}/>
     </Field>
-    <Field label="Vincular una experiencia (opcional)" hint="Una experiencia confirmada no garantiza el sello: también se revisan la identidad y la zona.">
-      <select value={interactionId} onChange={event => setInteractionId(event.target.value)} disabled={loadingInteractions || busy} aria-label="Selecciona una experiencia existente">
-        <option value="">Publicar sin vincular una experiencia</option>
+    <Field label={localize(language,'Vincular una experiencia (opcional)','Link an experience (optional)','Huk rurasqaykiwan tupanachiy (munaspalla)')} hint={localize(language,'Una experiencia confirmada no garantiza el sello: tambi?n se revisan la identidad y la zona.','A confirmed experience does not guarantee a badge: identity and area are also reviewed.','Takyachisqa rurasqaykiqa manam sello nisqata garantizanchu: runa kayniyki, llaqta kaqniykipas qhawasqa kanqa.')}>
+      <select value={interactionId} onChange={event => setInteractionId(event.target.value)} disabled={loadingInteractions || busy} aria-label={localize(language,'Selecciona una experiencia existente','Select an existing experience','Kunan kachkaq rurasqaykita akllay')}>
+        <option value="">{localize(language,'Publicar sin vincular una experiencia','Post without linking an experience','Rurasqaykiwan mana tupachispa willayta apachiy')}</option>
         {relevant.map(item => <option key={item.id} value={item.id} disabled={item.resenaCreada}>{interactionLabel(item)}</option>)}
       </select>
     </Field>
