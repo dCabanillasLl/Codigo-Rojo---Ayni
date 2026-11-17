@@ -18,6 +18,8 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
   const { catalogs, postingSectorId, area, online, submitRequest, notify } = useApp();
   const { t } = useLanguage();
   const [description, setDescription] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
+  const [titleEdited, setTitleEdited] = useState(false);
   const [emergencyMode, setEmergencyMode] = useState(false);
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
   const [peopleCount, setPeopleCount] = useState('1');
@@ -34,6 +36,10 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
   const voiceBaseDescription = useRef('');
   const Voice = (window as VoiceWindow).SpeechRecognition || (window as VoiceWindow).webkitSpeechRecognition;
   const policyMessage = blockedRequestReason(description);
+  const suggestedTitle = emergencyMode
+    ? selectedNeeds.length ? `Sismo: ${selectedNeeds.slice(0, 2).join(', ')}${selectedNeeds.length > 2 ? ` y ${selectedNeeds.length - 2} más` : ''}` : ''
+    : description.trim() ? requestTitle(description) : '';
+  const requestHeading = titleEdited ? customTitle : suggestedTitle;
   useEffect(() => () => { recognition.current?.abort(); }, []);
   function record() {
     if (recording) { recognition.current?.stop(); return; }
@@ -94,10 +100,8 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
       const requestDescription = emergencyMode
         ? [`PEDIDO DE EMERGENCIA POR SISMO`, `Necesidades: ${selectedNeeds.join(', ')}`, `Personas afectadas: ${Math.max(1, Number(peopleCount) || 1)}`, zoneReference.trim() ? `Zona aproximada: ${zoneReference.trim()}` : '', description.trim() ? `Detalle adicional: ${description.trim()}` : ''].filter(Boolean).join('\n')
         : description.trim();
-      const requestHeading = emergencyMode && !description.trim()
-        ? selectedNeeds.slice(0, 2).join(' y ')
-        : requestTitle(description);
-      const result = await submitRequest({ clientRequestId: uuid.current, titulo: emergencyMode ? `Emergencia: ${requestHeading}` : requestHeading, descripcion: requestDescription, categoriaId: String(selectedCategory?.id || data.get('categoriaId')), sectorId, ubicacion: locationInput(location), urgencia: emergencyMode || selectedCategory?.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal' });
+      const requestHeading = String(data.get('titulo') || '').trim();
+      const result = await submitRequest({ clientRequestId: uuid.current, titulo: requestHeading, descripcion: requestDescription, categoriaId: String(selectedCategory?.id || data.get('categoriaId')), sectorId, ubicacion: locationInput(location), urgencia: emergencyMode || selectedCategory?.nombre.toLocaleLowerCase('es').includes('urgente') ? 'urgente' : 'normal' });
       notify(result === 'published' ? 'Tu pedido está publicado. Ya pueden ofrecerte ayuda.' : 'Pedido guardado en este dispositivo. Todavía no se ha enviado.');
       onClose(); window.location.hash = 'ayuda';
     } catch (error) { setError(errorMessage(error)); } finally { setBusy(false); }
@@ -115,14 +119,16 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
         <p className="emergency-complement-hint">Las opciones de arriba ya indican qué necesitan, cuántas personas son y dónde están. Usa el texto libre solo para contar detalles que ayuden a coordinar; no necesitas repetir esos datos.</p>
         {!selectedNeeds.length && <p className="form-hint">Elige por lo menos una opción. Marca si hay personas atrapadas o heridas; agrega más detalle solo si ayuda a coordinar.</p>}
       </section>}
+
       <Field label={emergencyMode ? 'Detalle adicional (opcional)' : 'Tu pedido'} hint={emergencyMode ? 'Describe qué pasó o qué necesitan para coordinar la ayuda. Las necesidades, el número de personas y la zona se agregarán automáticamente.' : undefined}><div className="request-textarea-wrap"><textarea ref={descriptionRef} className="request-area" value={description} onChange={event => setDescription(event.target.value)} required={!emergencyMode} minLength={emergencyMode ? 0 : 5} maxLength={4000} placeholder={emergencyMode ? 'Ej. El edificio no tiene agua y hay una persona mayor que necesita sus medicinas.' : 'Por ejemplo: necesito una escalera por una hora mañana por la mañana.'} rows={4}/>{description && <button type="button" className="clear-request" aria-label="Borrar todo el texto del pedido" title="Borrar texto" onClick={() => { setDescription(''); descriptionRef.current?.focus(); }}><Icon name="close" size={16}/></button>}</div></Field>
+      <Field label="Título del pedido" hint="Proponemos un título breve. Revísalo y ajústalo para que describa claramente lo que necesitas."><input name="titulo" value={requestHeading} onChange={event => { setCustomTitle(event.target.value); setTitleEdited(true); }} required minLength={3} maxLength={48} placeholder="Ej. Agua y abrigo para una familia"/></Field>
       <div className="request-voice-tools" aria-label="Opciones de voz">
         {Voice && <button type="button" className={`outline-btn voice-record-btn ${recording ? 'is-recording' : ''}`} onClick={record} disabled={!online || busy}><Icon name="mic"/>{recording ? 'Terminar dictado' : t('dictate')}</button>}
         <button type="button" className="outline-btn voice-listen-btn" disabled={!description.trim()} onClick={() => { if (!speak(description)) setError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones"/>Escuchar</button>
       </div>
       {recording && <p role="status" className="recording-message"><span className="recording-dot"/>{t('listening')} Habla con naturalidad; revisa el texto antes de publicarlo.</p>}
         {!emergencyMode && <Field label="Tipo de ayuda"><select name="categoriaId" required defaultValue=""><option value="" disabled>Elige una opción</option>{catalogs.data?.ayuda.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>}
-      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige un punto para este pedido. Tu perfil no cambia y otros vecinos ven solo una zona aproximada. Si lo omites, se usará la ubicación de tu perfil si existe.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
+      <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige dónde necesitas ayuda. Tu dirección exacta es privada.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
       <RemoteState {...catalogs}/>
       {!online && <p className="offline-banner">Se guardará en este dispositivo como pendiente de envío. La comunidad aún no lo recibirá; se enviará al recuperar conexión con tu sesión activa.</p>}
       {!catalogs.data?.ayuda.length && <ErrorBox message="Necesitamos cargar las categorías al menos una vez con conexión antes de crear pedidos."/>}
