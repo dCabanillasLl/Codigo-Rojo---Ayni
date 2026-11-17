@@ -9,6 +9,7 @@ import { neighborRank } from '../lib/ranks';
 import { useLanguage, type Language } from '../lib/language';
 import PhoneField from '../components/PhoneField';
 import NeighborRankIcon from '../components/NeighborRankIcon';
+import PhotoPicker from '../components/PhotoPicker';
 
 export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBusy, signOutError }: { onLocation: () => void; onReviewHelp: () => void; onSignOut: () => void; signOutBusy: boolean; signOutError?: string }) {
   const { user, setUser, online, notify, setAuthOpen } = useApp();
@@ -23,6 +24,8 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
   const [success, setSuccess] = useState('');
   const [emailCode, setEmailCode] = useState('');
   const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<string | null | undefined>(undefined);
+  const [profilePhotoBusy, setProfilePhotoBusy] = useState(false);
   const rank = reputation.data ? neighborRank(reputation.data.colaboracionesConfirmadas) : null;
   if (!user) return <section className="profile-card max-w-2xl"><p className="eyebrow">TU CUENTA</p><h1 className="font-display mt-2 text-3xl font-bold">Mi perfil</h1><p className="mt-2">Inicia sesión para ver tu perfil, tus recomendaciones y tu actividad.</p></section>;
 
@@ -41,8 +44,9 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         notificacionesCorreo,
         telefono: String(form.get('telefono') || '').trim() || null,
         telefonoPublico: form.get('telefonoPublico') === 'on',
+        ...(profilePhoto !== undefined ? { fotoPerfil: profilePhoto } : {}),
       } });
-      profileSaved = true; setUser(updated); refreshData();
+      profileSaved = true; setUser(updated); setProfilePhoto(undefined); refreshData();
       if (emailNeedsConfirmation) { await api('/auth/email/verification', { method: 'POST', body: {} }); setEmailCodeSent(true); setSuccess('Perfil guardado. Te enviamos un código para confirmar el correo.'); }
       else setSuccess('Perfil actualizado.');
     } catch (cause) {
@@ -88,6 +92,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
   return <section className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
     <article className="profile-card">
       <p className="eyebrow">TU CUENTA</p><h1 className="font-display mt-2 text-3xl font-bold">{user.nombres} {user.apellidos}</h1><p className="mt-2">{user.correo || 'Acceso con DNI'}</p>
+      <div className="profile-photo-section"><PhotoPicker value={profilePhoto} currentUrl={user.fotoPerfilUrl} onChange={setProfilePhoto} onBusyChange={setProfilePhotoBusy} disabled={busy || !online} label="Foto de perfil" variant="avatar"/></div>
       <div className="profile-location-card mt-5"><div className="profile-location-copy"><span className="eyebrow">MI UBICACIÓN PRIVADA</span><p>{user.direccion || 'Agrega una dirección o detecta tu ubicación con GPS.'}</p><small>Tu dirección exacta no se comparte con otros vecinos.</small></div><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={16}/>{user.direccion ? 'Editar ubicación' : 'Configurar ubicación'}</button></div>
       <div className="mt-5"><Field label={t('language')}><select value={language} onChange={event => setLanguage(event.target.value as Language)}><option value="es">Español</option><option value="en">English</option><option value="qu">Quechua sureño</option></select></Field><p className="form-hint">{t('languageNote')}</p></div>
       <form className="form-stack mt-6" onSubmit={updateProfile}>
@@ -123,7 +128,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>Permitir que contacten mi teléfono por WhatsApp desde mis publicaciones</label>
         <p className="form-hint">El teléfono se oculta por defecto. Si lo haces público, cualquier persona que vea una publicación tuya podrá abrir un chat de WhatsApp.</p>
         <ErrorBox message={error}/>{success && <p className="success-message" role="status">{success}</p>}
-        <button type="submit" className="record-button justify-center" disabled={busy || !online}>{busy ? 'Guardando…' : 'Guardar perfil'}</button>
+        <button type="submit" className="record-button justify-center" disabled={busy || profilePhotoBusy || !online}>{busy ? 'Guardando…' : profilePhotoBusy ? 'Preparando foto…' : 'Guardar perfil'}</button>
       </form>
       <ErrorBox message={signOutError}/><button type="button" className="outline-btn profile-signout-button mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </article>

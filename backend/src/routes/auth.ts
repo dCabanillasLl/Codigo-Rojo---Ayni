@@ -11,6 +11,8 @@ import { AppError, asyncHandler } from "../lib/http.js";
 import { changePasswordSchema, idSchema, phoneSchema, registerSchema } from "../lib/validation.js";
 import { clearSession, requireAuth, setSession } from "../middlewares/auth.js";
 import { sendCommunityEmail } from "../services/email.js";
+import { publicationJson } from "../middlewares/json.js";
+import { photoSchema, preparePhoto } from "../lib/photos.js";
 
 const router = Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHeaders: "draft-7", legacyHeaders: false,
@@ -18,6 +20,7 @@ const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHe
 const dummyHash = bcrypt.hashSync("ayni-only-used-for-login-timing", 12);
 
 export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u.apellidos, u.correo, u.telefono,
+  CASE WHEN u.foto_perfil_hash IS NULL THEN NULL ELSE CONCAT('/api/auth/users/', CAST(u.usuario_id AS CHAR), '/foto-perfil?v=', u.foto_perfil_hash) END AS fotoPerfilUrl,
   u.correo_verificado AS correoVerificado, u.notificaciones_correo AS notificacionesCorreo, u.telefono_publico AS telefonoPublico,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
   l.direccion AS direccion, l.latitud AS latitud, l.longitud AS longitud
@@ -111,6 +114,16 @@ router.get("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   res.json({ data: user });
 }));
 
+router.get("/auth/users/:id/foto-perfil", asyncHandler(async (req, res) => {
+  const id = idSchema.parse(req.params.id);
+  const { v } = z.object({ v: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().parse(req.query);
+  const photo = await one<{ foto: Buffer | null; hash: string | null }>(
+    "SELECT foto_perfil AS foto, foto_perfil_hash AS hash FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo'", [id]);
+  if (!photo?.foto || !photo.hash || (v && v !== photo.hash)) throw new AppError(404, "PHOTO_NOT_FOUND", "Esta foto de perfil no está disponible.");
+  res.set({ "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=0, must-revalidate", "Cross-Origin-Resource-Policy": "cross-origin", ETag: `\"${photo.hash}\"` });
+  res.send(photo.foto);
+}));
+
 const emailLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: "draft-7", legacyHeaders: false });
 router.post("/auth/email/verification", requireAuth, emailLimiter, asyncHandler(async (req, res) => {
   const account = await one<{ correo: string | null; correoVerificado: number }>("SELECT correo, correo_verificado AS correoVerificado FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo'", [req.userId]);
@@ -145,12 +158,13 @@ router.post("/auth/email/verify", requireAuth, emailLimiter, asyncHandler(async 
   res.json({ data: await one(`${userSelect} WHERE u.usuario_id = ?`, [req.userId]) });
 }));
 
-router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
+router.patch("/auth/me", requireAuth, publicationJson, asyncHandler(async (req, res) => {
   const body = z.object({
     correo: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable().optional(),
     notificacionesCorreo: z.boolean().optional(),
     telefono: phoneSchema.nullable().optional(),
     telefonoPublico: z.boolean().optional(),
+    fotoPerfil: photoSchema,
     sectorId: idSchema.optional(),
     direccion: z.string().trim().min(3).max(255).optional(),
     latitud: z.number().finite().min(-90).max(90).optional(),
@@ -158,6 +172,7 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   }).strict().refine((value) => Object.keys(value).length > 0, "Indica qué deseas actualizar")
     .refine((value) => (value.latitud === undefined) === (value.longitud === undefined), "Proporciona ambas coordenadas")
     .parse(req.body);
+  const profilePhoto = await preparePhoto(body.fotoPerfil);
   await transaction(async (connection) => {
     const [locked] = await connection.execute<RowDataPacket[]>(`SELECT u.usuario_id, u.telefono, u.correo, u.notificaciones_correo,
       CAST(l.sector_id AS CHAR) AS sector_id, l.direccion, l.latitud, l.longitud
@@ -194,6 +209,7 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
       fields.push("telefono_publico = ?");
       values.push(body.telefono === null ? false : body.telefonoPublico ?? false);
     }
+    if (profilePhoto !== undefined) { fields.push("foto_perfil = ?", "foto_perfil_hash = ?"); values.push(profilePhoto?.buffer ?? null, profilePhoto?.hash ?? null); }
     const locationChanged = body.sectorId !== undefined || body.direccion !== undefined || body.latitud !== undefined;
     if (locationChanged) {
       const sectorId = body.sectorId ?? String(locked[0].sector_id ?? '');
