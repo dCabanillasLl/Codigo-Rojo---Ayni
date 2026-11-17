@@ -69,6 +69,11 @@ Usar una cuenta con permisos DDL, verificar la base de destino y hacer respaldo.
     opiniones sin evidencia vinculada. Las reseñas históricas mantienen `NO_VERIFICADA`; la
     API calcula el sello vigente para reflejar revocaciones y vencimientos.
 
+`021_fotos_perfil.sql` añade `foto` y `foto_hash` opcionales a `usuarios`. Las cuentas
+existentes quedan sin foto y conservan sus datos. Aplicarla antes de iniciar la API
+actualizada. La foto se normaliza a JPEG y se consulta solo con la sesión de su dueño;
+los JSON del usuario incluyen una URL con versión, nunca el BLOB.
+
 Las migraciones con el mismo prefijo numérico surgieron en ramas paralelas. El runner
 las identifica por el nombre completo: conservar los nombres y los archivos ya
 aplicados, sin renumerarlos, permite integrar ambas bases sin repetir SQL.

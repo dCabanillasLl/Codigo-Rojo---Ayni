@@ -11,6 +11,8 @@ import { AppError, asyncHandler } from "../lib/http.js";
 import { changePasswordSchema, idSchema, phoneSchema, registerSchema } from "../lib/validation.js";
 import { clearSession, requireAuth, setSession } from "../middlewares/auth.js";
 import { sendCommunityEmail } from "../services/email.js";
+import { publicationJson } from "../middlewares/json.js";
+import { photoSchema, preparePhoto } from "../lib/photos.js";
 
 const router = Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHeaders: "draft-7", legacyHeaders: false,
@@ -19,6 +21,7 @@ const dummyHash = bcrypt.hashSync("ayni-only-used-for-login-timing", 12);
 
 export const userSelect = `SELECT CAST(u.usuario_id AS CHAR) AS id, u.nombres, u.apellidos, u.correo, u.telefono,
   u.correo_verificado AS correoVerificado, u.notificaciones_correo AS notificacionesCorreo, u.telefono_publico AS telefonoPublico,
+  CASE WHEN u.foto_hash IS NULL THEN NULL ELSE CONCAT('/api/auth/me/foto?v=', u.foto_hash) END AS fotoUrl,
   CAST(l.sector_id AS CHAR) AS sectorId, s.nombre AS sectorNombre,
   l.direccion AS direccion, l.latitud AS latitud, l.longitud AS longitud
   FROM usuarios u LEFT JOIN ubicaciones l ON l.ubicacion_id = u.ubicacion_id
@@ -111,6 +114,18 @@ router.get("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   res.json({ data: user });
 }));
 
+router.get("/auth/me/foto", requireAuth, asyncHandler(async (req, res) => {
+  const { v } = z.object({ v: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().parse(req.query);
+  const photo = await one<{ foto: Buffer | null; foto_hash: string | null }>(
+    "SELECT foto, foto_hash FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo'", [req.userId]);
+  if (!photo?.foto || !photo.foto_hash || (v && v !== photo.foto_hash)) {
+    throw new AppError(404, "PHOTO_NOT_FOUND", "Esta foto de perfil no está disponible.");
+  }
+  res.set({ "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=0, must-revalidate",
+    "Cross-Origin-Resource-Policy": "cross-origin", ETag: `"${photo.foto_hash}"` });
+  res.send(photo.foto);
+}));
+
 const emailLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: "draft-7", legacyHeaders: false });
 router.post("/auth/email/verification", requireAuth, emailLimiter, asyncHandler(async (req, res) => {
   const account = await one<{ correo: string | null; correoVerificado: number }>("SELECT correo, correo_verificado AS correoVerificado FROM usuarios WHERE usuario_id = ? AND estado_cuenta = 'activo'", [req.userId]);
@@ -145,12 +160,13 @@ router.post("/auth/email/verify", requireAuth, emailLimiter, asyncHandler(async 
   res.json({ data: await one(`${userSelect} WHERE u.usuario_id = ?`, [req.userId]) });
 }));
 
-router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
+router.patch("/auth/me", requireAuth, publicationJson, asyncHandler(async (req, res) => {
   const body = z.object({
     correo: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable().optional(),
     notificacionesCorreo: z.boolean().optional(),
     telefono: phoneSchema.nullable().optional(),
     telefonoPublico: z.boolean().optional(),
+    foto: photoSchema,
     sectorId: idSchema.optional(),
     direccion: z.string().trim().min(3).max(255).optional(),
     latitud: z.number().finite().min(-90).max(90).optional(),
@@ -158,6 +174,7 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
   }).strict().refine((value) => Object.keys(value).length > 0, "Indica qué deseas actualizar")
     .refine((value) => (value.latitud === undefined) === (value.longitud === undefined), "Proporciona ambas coordenadas")
     .parse(req.body);
+  const photo = await preparePhoto(body.foto);
   await transaction(async (connection) => {
     const [locked] = await connection.execute<RowDataPacket[]>(`SELECT u.usuario_id, u.telefono, u.correo, u.notificaciones_correo,
       CAST(l.sector_id AS CHAR) AS sector_id, l.direccion, l.latitud, l.longitud
@@ -180,6 +197,10 @@ router.patch("/auth/me", requireAuth, asyncHandler(async (req, res) => {
     }
     const fields: string[] = [];
     const values: unknown[] = [];
+    if (photo !== undefined) {
+      fields.push("foto = ?", "foto_hash = ?");
+      values.push(photo?.buffer ?? null, photo?.hash ?? null);
+    }
     for (const key of ["correo", "telefono"] as const) {
       if (body[key] !== undefined) { fields.push(`${key} = ?`); values.push(body[key]); }
     }

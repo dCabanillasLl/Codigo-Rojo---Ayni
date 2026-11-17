@@ -31,6 +31,7 @@ const files = [
   '017_ciclo_interacciones_publicacion.sql',
   '018_estado_recomendaciones.sql',
   '019_recuperacion_contrasena.sql',
+  '021_fotos_perfil.sql',
 ];
 const sources = await Promise.all(files.map(async (name) => {
   let sql = await readFile(fileURLToPath(new URL(`../migrations/${name}`, import.meta.url)), 'utf8');

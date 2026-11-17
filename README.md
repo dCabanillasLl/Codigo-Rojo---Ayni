@@ -73,6 +73,21 @@ contiene solamente el frontend; publicar esa carpeta no despliega la API ni MySQ
 
 ## Recorrido de demostración
 
+### Foto de perfil
+
+En **Mi perfil → Foto de perfil** puedes elegir una imagen local JPG, PNG o WebP
+de hasta 5 MB. La vista previa es circular. **Guardar perfil** aplica la foto a tu
+cuenta y al avatar de la barra superior; **Quitar foto** la elimina al guardar y
+**Descartar cambio de foto** recupera la foto anterior. Sin foto se muestran tus iniciales.
+Cambiar otros datos del perfil conserva la foto y un error al guardar permite reintentar.
+
+Antes de iniciar esta versión, aplicar `021_fotos_perfil.sql` con el runner de
+migraciones descrito arriba. Añade dos columnas opcionales a `usuarios`, sin modificar
+las cuentas existentes. Se guarda el JPEG normalizado sin metadatos en MySQL;
+no se necesita almacenamiento de archivos adicional. La imagen se consulta con sesión
+en `GET /api/auth/me/foto`. El proxy de producción debe permitir JSON de hasta 8 MB
+también en `PATCH /api/auth/me`.
+
 ### Fotos opcionales en productos y servicios
 
 En **Ofrecer producto o servicio** hay un campo de foto opcional con vista previa.
@@ -88,7 +103,8 @@ publicación; no necesita archivos locales persistentes ni un servicio externo d
 La publicación y la foto se guardan en la misma transacción. No se modifican fotos de
 otros vecinos y las imágenes de publicaciones no públicas solo son accesibles por su dueño.
 El proxy de producción debe permitir cuerpos JSON de hasta 8 MB en POST/PATCH de
-publicaciones y avisos. Las demás rutas conservan el límite de 64 KB.
+publicaciones y avisos, y en PATCH de `/api/auth/me` para la foto de perfil.
+Las demás rutas conservan el límite de 64 KB.
 
 ### Flyers y vigencia de avisos
 

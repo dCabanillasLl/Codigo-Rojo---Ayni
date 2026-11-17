@@ -2,10 +2,11 @@ import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { apiAssetUrl } from '../lib/api';
 import { ErrorBox } from './UI';
 import Icon from './Icon';
+import UserAvatar from './UserAvatar';
 
-export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange, disabled = false, label = 'Foto del producto o servicio' }: {
+export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange, disabled = false, label = 'Foto del producto o servicio', profileName }: {
   value: string | null | undefined; currentUrl?: string | null;
-  onChange: (photo: string | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean; label?: string;
+  onChange: (photo: string | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean; label?: string; profileName?: string;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -14,6 +15,7 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
   const [error, setError] = useState('');
   const preview = value === undefined ? currentUrl : value;
   useEffect(() => () => { sequence.current++; onBusyChange(false); }, [onBusyChange]);
+  useEffect(() => { if (value == null && input.current) input.current.value = ''; }, [value]);
   async function choose(event: ChangeEvent<HTMLInputElement>) {
     const field = event.currentTarget;
     const file = field.files?.[0]; if (!file) return;
@@ -41,12 +43,16 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
       if (sequence.current === operation) { setReading(false); onBusyChange(false); }
     }
   }
-  return <div className="photo-picker">
+  return <div className={`photo-picker${profileName ? ' profile-photo-picker' : ''}`}>
     <label htmlFor={id} className="photo-picker-label">{label} <span>(opcional)</span></label>
-    <p id={`${id}-hint`} className="form-hint">Puedes publicar sin foto. Aceptamos JPG, PNG y WebP de hasta 5 MB.</p>
+    <p id={`${id}-hint`} className="form-hint">{profileName ? 'Elige una foto de tu equipo. Guarda el perfil para aplicar los cambios.' : 'Puedes publicar sin foto.'} Aceptamos JPG, PNG y WebP de hasta 5 MB.</p>
     <input ref={input} id={id} type="file" accept="image/jpeg,image/png,image/webp" aria-describedby={`${id}-hint`} disabled={disabled || reading} onChange={event => void choose(event)}/>
     {reading && <p className="form-hint" role="status">Preparando vista previa…</p>}
-    {preview && <div className="photo-preview"><img src={preview.startsWith('data:') ? preview : apiAssetUrl(preview)} crossOrigin={preview.startsWith('data:') ? undefined : 'use-credentials'} alt="Vista previa de la foto de tu publicación"/><button type="button" className="outline-btn" disabled={disabled || reading} onClick={() => { sequence.current++; onChange(null); setError(''); if (input.current) input.current.value = ''; }}><Icon name="close" size={16}/>Quitar foto</button></div>}
+    {(preview || profileName) && <div className="photo-preview">{profileName
+      ? <UserAvatar src={preview} name={profileName} className="user-avatar-large" alt="Vista previa de tu foto de perfil"/>
+      : preview && <img src={preview.startsWith('data:') ? preview : apiAssetUrl(preview)} crossOrigin={preview.startsWith('data:') ? undefined : 'use-credentials'} alt="Vista previa de la foto de tu publicación"/>}
+      {preview && <button type="button" className="outline-btn" disabled={disabled || reading} onClick={() => { sequence.current++; onChange(null); setError(''); if (input.current) input.current.value = ''; }}><Icon name="close" size={16}/>Quitar foto</button>}
+    </div>}
     <ErrorBox message={error}/>
   </div>;
 }

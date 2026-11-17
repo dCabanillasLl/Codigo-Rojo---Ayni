@@ -31,10 +31,11 @@ Los endpoints autenticados rechazan cuentas suspendidas o eliminadas.
 | POST `/api/auth/login` | `{identificador: DNI,contrasena}` (la API mantiene compatibilidad con correo para clientes antiguos) → `{data: Usuario}` y cookie HttpOnly | 200 |
 | POST `/api/identity/dni/lookup` | `{dni,consentimiento:true}` → `{data:{nombres,apellidos,proof,venceEnSegundos}}`; devuelve solo nombres y apellidos, no dirección ni ubigeos. Máximo 8 consultas/15 min/IP. | 200 |
 | GET `/api/auth/me` | Sin cuerpo → `{data: Usuario}` de la sesión | 200 |
-| PATCH `/api/auth/me` | `{correo?,notificacionesCorreo?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
+| PATCH `/api/auth/me` | `{foto?,correo?,notificacionesCorreo?,telefono?,telefonoPublico?,sectorId?,direccion?,latitud?,longitud?}` → `{data: Usuario}` actualizado | 200 |
+| GET `/api/auth/me/foto?v=hash` | JPEG de la foto del usuario con sesión; `v` opcional | 200 / 304 |
 | POST `/api/auth/logout` | `{}` → `{data:{cerrado:true}}`, elimina cookie | 200 |
 
-Usuario: `{id,nombres,apellidos,correo|null,telefono,telefonoPublico,sectorId,sectorNombre,direccion,latitud,longitud}`. Dirección y coordenadas solo se devuelven en las respuestas autenticadas de la propia cuenta; nunca se incluyen en listados o fichas vecinales. Correo y teléfono
+Usuario: `{id,nombres,apellidos,fotoUrl|null,correo|null,telefono,telefonoPublico,sectorId,sectorNombre,direccion,latitud,longitud}`. Dirección y coordenadas solo se devuelven en las respuestas autenticadas de la propia cuenta; nunca se incluyen en listados o fichas vecinales. Correo y teléfono
 solo se devuelven al propio usuario. `telefonoPublico` es consentimiento opcional; para activarlo
 se requiere teléfono E.164 (`+` y prefijo de país). En registro y edición de perfil,
 `telefono` es opcional y debe ser un celular peruano de nueve dígitos que empiece con 9.
@@ -67,6 +68,15 @@ o se confirma su recepción. Configura `EMAIL_PROVIDER=gmail`, `GMAIL_USER`,
 dominio. Resend sigue disponible seleccionando `EMAIL_PROVIDER=resend`, con clave API y
 dominio remitente verificado. Sin configuración del proveedor se guarda el perfil, pero
 no se entrega correo. Consulta [GMAIL_SETUP.md](GMAIL_SETUP.md) para los pasos.
+
+La foto de perfil requiere `021_fotos_perfil.sql`. `PATCH /auth/me` acepta `foto`
+como data URI JPG, PNG o WebP de hasta 5 MB. Omitirla conserva la foto actual;
+`null` la elimina. Se valida el contenido real y se guarda JPEG de hasta 1600 px
+y 2 MB sin EXIF/GPS, en la misma transacción que el resto del perfil. Solo esta
+ruta de perfil admite JSON de hasta 8 MB, después de autenticar al usuario.
+`fotoUrl` incluye la huella de la imagen; su GET requiere la sesión del dueño,
+admite ETag y devuelve 404 si no hay foto o si la versión ya cambió. Las demás
+respuestas del usuario nunca contienen el BLOB ni el archivo original.
 
 ## Catálogos
 
@@ -152,7 +162,8 @@ La foto y los datos de la publicación se guardan juntos, sin archivos huérfano
   La caché es privada y requiere revalidación para respetar cambios de visibilidad.
 
 POST/PATCH de publicaciones admiten JSON de hasta 8 MB después de autenticar, manteniendo
-las comprobaciones de origen y cabecera. El resto de rutas admite 64 KB.
+las comprobaciones de origen y cabecera. También admiten ese límite POST/PATCH de
+avisos y PATCH de `/auth/me` para fotos de perfil; las demás rutas admiten 64 KB.
 Errores específicos: 400 `INVALID_PHOTO`, `PHOTO_DIMENSIONS_TOO_LARGE`,
 `ANIMATED_PHOTO_NOT_SUPPORTED`; 413 `PHOTO_TOO_LARGE` o `BODY_TOO_LARGE`.
 

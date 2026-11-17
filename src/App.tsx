@@ -12,6 +12,7 @@ import { LocationDialog } from './components/LocationDialog';
 import NotificationCenter from './components/NotificationCenter';
 import { useLanguage } from './lib/language';
 import GuideBot from './components/GuideBot';
+import UserAvatar from './components/UserAvatar';
 
 type Destination = 'cerca' | 'ayuda' | 'avisos' | 'perfil';
 const navItems: { id: Destination; label: string; icon: 'home' | 'hands' | 'megaphone' | 'user' }[] = [
@@ -68,7 +69,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <span className={`status-pill hidden sm:flex ${!online ? 'offline' : ''}`} role="status"><span className="status-dot"/>{online ? t('connected') : t('offline')}</span>
           <button type="button" className="icon-button relative" aria-label={`Notificaciones${unreadNotifications ? ` sin leer: ${unreadNotifications}` : ''}`} onClick={() => { if (!requireUser()) return; setNotificationsOpen(true); markNotificationsRead(); }}><Icon name="bell" size={21}/>{unreadNotifications > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#e76444] ring-2 ring-white"/>}</button>
-          <button type="button" className="avatar" onClick={() => user ? navigate('perfil') : setAuthOpen(true)} aria-label={user ? `Perfil de ${user.nombres}` : 'Iniciar sesión'}>{user ? `${user.nombres[0]}${user.apellidos[0]}` : '?'}</button>
+          <button type="button" className="avatar" onClick={() => user ? navigate('perfil') : setAuthOpen(true)} aria-label={user ? `Perfil de ${user.nombres}` : 'Iniciar sesión'}>{user ? <UserAvatar key={user.id} src={user.fotoUrl} name={`${user.nombres.split(' ')[0]} ${user.apellidos.split(' ')[0]}`}/> : '?'}</button>
         </div>
       </div>
     </header>

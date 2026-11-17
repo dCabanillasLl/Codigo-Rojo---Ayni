@@ -3,12 +3,14 @@ import { after, test } from 'node:test';
 import express from 'express';
 import request from 'supertest';
 import sharp from 'sharp';
+import { randomBytes } from 'node:crypto';
 import { preparePhoto, photoSchema, MAX_PHOTO_BYTES } from '../src/lib/photos.js';
 import { defaultJson, publicationJson } from '../src/middlewares/json.js';
 import { protectMutations } from '../src/middlewares/security.js';
 import { requireAuth } from '../src/middlewares/auth.js';
 import { errorHandler } from '../src/middlewares/errors.js';
 import publications, { publicationFields } from '../src/routes/publications.js';
+import auth from '../src/routes/auth.js';
 import { config } from '../src/config.js';
 import { pool } from '../src/db/index.js';
 // The migration runner is native JS and normalizes only line endings.
@@ -162,4 +164,76 @@ test('las migraciones aceptan LF y CRLF, pero rechazan cualquier cambio de SQL',
   assert.deepEqual(lf.compatible, windows.compatible);
   const changed = migrationChecksums('ALTER TABLE publicaciones\n  ADD COLUMN otra BLOB NULL;\n');
   assert.ok(!lf.compatible.has(changed.checksum));
+});
+
+test('la foto de perfil se guarda, conserva, reemplaza y elimina solo en la cuenta activa', async context => {
+  const previousConfigured = config.dbConfigured;
+  config.dbConfigured = true;
+  context.after(() => { config.dbConfigured = previousConfigured; });
+  // Isolated SQL fixture; never reads or changes real users or the configured database.
+  const users = new Map(['1', '2'].map(id => [id, { foto: null as Buffer | null, foto_hash: null as string | null, telefono: null as string | null }]));
+  const connection = {
+    beginTransaction: async () => undefined, commit: async () => undefined, rollback: async () => undefined, release: () => undefined,
+    execute: async (sql: string, values: unknown[]) => {
+      const id = String(values.at(-1));
+      const user = users.get(id);
+      if (sql.startsWith('SELECT u.usuario_id')) return [user ? [{ ...user, correo: null, notificaciones_correo: 0 }] : []];
+      if (sql.startsWith('UPDATE usuarios SET') && user) {
+        const fields = sql.slice('UPDATE usuarios SET '.length, sql.indexOf(' WHERE')).split(', ').map(field => field.split(' = ')[0]);
+        fields.forEach((field, index) => {
+          if (field === 'foto') user.foto = values[index] as Buffer | null;
+          if (field === 'foto_hash') user.foto_hash = values[index] as string | null;
+          if (field === 'telefono') user.telefono = values[index] as string | null;
+        });
+        return [{ affectedRows: 1 }];
+      }
+      throw new Error('SQL inesperado en la prueba de fotos de perfil');
+    },
+  };
+  context.mock.method(pool, 'getConnection', async () => connection);
+  context.mock.method(pool, 'execute', async (sql: string, values: unknown[]) => {
+    const id = String(values[0]);
+    const user = users.get(id);
+    if (!user) return [[]];
+    if (sql.startsWith('SELECT foto, foto_hash')) return [[user]];
+    return [[{ id, nombres: 'Alba', apellidos: 'Prueba', telefono: user.telefono,
+      fotoUrl: user.foto_hash ? `/api/auth/me/foto?v=${user.foto_hash}` : null }]];
+  });
+  const app = express();
+  app.use(protectMutations([origin]), defaultJson);
+  app.use((req, _res, next) => { const user = req.get('X-Test-User'); if (user) req.userId = user; next(); });
+  app.use('/api', auth); app.use(errorHandler);
+  await request(app).get('/api/auth/me/foto').expect(401);
+  await request(app).get('/api/auth/me/foto').set('X-Test-User', '1').expect(404);
+  const input = await sharp(randomBytes(200 * 200 * 3), { raw: { width: 200, height: 200, channels: 3 } }).png().toBuffer();
+  assert.ok(input.length > 64 * 1024, 'Exercises the authenticated parser beyond the ordinary 64 KB limit');
+  const payload = { foto: dataUri(input) };
+  await request(app).patch('/api/auth/me').set({ Origin: origin, 'X-AYNI-Client': 'web' }).send(payload).expect(401);
+  await request(app).patch('/api/auth/me').set({ ...headers, 'X-AYNI-User': '2' }).send(payload).expect(409);
+  assert.equal(users.get('1')!.foto, null);
+  const created = await request(app).patch('/api/auth/me').set(headers).send(payload).expect(200);
+  const url = created.body.data.fotoUrl;
+  assert.match(url, /^\/api\/auth\/me\/foto\?v=[a-f0-9]{64}$/);
+  const image = await request(app).get(url).set('X-Test-User', '1').expect(200).expect('Content-Type', /image\/jpeg/);
+  assert.deepEqual(image.body, users.get('1')!.foto);
+  assert.match(image.headers['cache-control'], /private/);
+  await request(app).get(url).set({ 'X-Test-User': '1', 'If-None-Match': image.headers.etag }).expect(304);
+  await request(app).get(url).set('X-Test-User', '2').expect(404);
+  const preserved = await request(app).patch('/api/auth/me').set(headers).send({ telefono: '+51987654321' }).expect(200);
+  assert.equal(preserved.body.data.fotoUrl, url, 'Editing contact details preserves the photo');
+  const firstHash = users.get('1')!.foto_hash;
+  await request(app).patch('/api/auth/me').set(headers).send({ foto: dataUri(Buffer.from('not an image')) }).expect(400);
+  await request(app).patch('/api/auth/me').set(headers).send({ foto: dataUri(Buffer.alloc(MAX_PHOTO_BYTES + 1)) }).expect(413);
+  await request(app).patch('/api/auth/me').set(headers).send({ usuarioId: '2', foto: null }).expect(400);
+  assert.equal(users.get('1')!.foto_hash, firstHash);
+  const replacement = await sharp({ create: { width: 12, height: 20, channels: 3, background: '#3355dd' } }).webp().toBuffer();
+  const replaced = await request(app).patch('/api/auth/me').set(headers).send({ foto: dataUri(replacement, 'image/webp') }).expect(200);
+  assert.notEqual(replaced.body.data.fotoUrl, url);
+  await request(app).get(url).set('X-Test-User', '1').expect(404);
+  const removed = await request(app).patch('/api/auth/me').set(headers).send({ foto: null }).expect(200);
+  assert.equal(removed.body.data.fotoUrl, null);
+  assert.equal(users.get('1')!.foto, null);
+  assert.equal(users.get('1')!.foto_hash, null);
+  assert.equal(users.get('2')!.foto, null);
+  await request(app).get('/api/auth/me/foto').set('X-Test-User', '1').expect(404);
 });
