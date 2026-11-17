@@ -2589,9 +2589,9 @@ textarea:disabled {
   border: 1px solid #e1eae2;
   border-radius: 1rem 1rem 1rem 0.35rem;
   background: #edf3ee;
-  color: #33483d;
-  font-size: 0.88rem;
-  line-height: 1.5;
+  color: #263a30;
+  font-size: 0.96rem;
+  line-height: 1.6;
   overflow-wrap: anywhere;
   box-shadow: 0 0.2rem 0.7rem #173f3208;
 }
@@ -2600,19 +2600,21 @@ textarea:disabled {
 }
 .guide-speech-action {
   display: inline-flex;
-  min-height: 1.9rem;
+  min-height: 2.35rem;
   align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
-  padding: 0.2rem 0.45rem;
-  border: 0;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid #b5cbb9;
   border-radius: 999px;
-  background: transparent;
-  color: #486c57;
-  font-size: 0.7rem;
+  background: #fffef9;
+  color: #244c39;
+  font-size: 0.82rem;
   font-weight: 700;
+  cursor: pointer;
 }
-.guide-speech-action:hover { background: #e0eae1; }
+.guide-speech-action:hover { background: #e0eae1; border-color: #789982; }
+.guide-speech-action:focus-visible { outline: 3px solid #e36543; outline-offset: 2px; }
 .guide-voice-btn {
   display: grid;
   width: 2.7rem;
@@ -2624,6 +2626,9 @@ textarea:disabled {
   background: #fffef9;
   color: #315f49;
 }
+.guide-read-input { background: #edf3ee; border-color: #b5cbb9; }
+.guide-read-input:hover:not(:disabled) { background: #e0eae1; }
+.guide-read-input:disabled { color: #9aa69d; cursor: not-allowed; }
 .guide-voice-btn.is-recording { border-color: #c44b3a; background: #fff0eb; color: #b64031; animation: guide-pulse 1.2s infinite; }
 .guide-voice-error { margin: 0; padding: 0.25rem 0.85rem; color: #a43d31; font-size: 0.72rem; }
 @keyframes guide-pulse { 50% { box-shadow: 0 0 0 0.25rem #e3654328; } }
@@ -2786,15 +2791,16 @@ textarea:disabled {
 }
 .guide-input-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
   padding: 0.7rem 0.85rem;
   background: #fffef9;
   border-top: 1px solid #e5e9e2;
 }
-.guide-input-row input {
+.guide-input-row textarea {
   min-width: 0;
   min-height: 2.9rem;
+  max-height: 7.5rem;
   flex: 1;
   padding: 0.65rem 0.8rem;
   border: 1px solid #d9dfda;
@@ -2802,6 +2808,9 @@ textarea:disabled {
   background: white;
   color: #24362e;
   font-size: 0.9rem;
+  line-height: 1.45;
+  resize: none;
+  overflow-y: auto;
 }
 .guide-send {
   display: grid;

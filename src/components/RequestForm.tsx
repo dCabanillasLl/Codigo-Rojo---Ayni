@@ -46,7 +46,7 @@ export default function RequestForm({ onClose, initialRequest }: { onClose: () =
         ? helpCategories.find(category => normalize(category.nombre).includes('prestamo'))
         : /bienes|primera necesidad/.test(helpType)
           ? helpCategories.find(category => normalize(category.nombre).includes('donacion'))
-          : helpCategories.find(category => normalize(category.nombre).includes('favor'));
+          : undefined;
     if (match) setSelectedCategoryId(match.id);
   }, [initialRequest, helpCategories, selectedCategoryId]);
   const suggestedTitle = emergencyMode
