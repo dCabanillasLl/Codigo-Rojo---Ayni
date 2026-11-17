@@ -145,6 +145,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   ]);
   const [tourIndex, setTourIndex] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<TourSpotlight | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { recording, supported: Voice, toggle: dictate, cancel: cancelDictation } = useDictation(input, setInput, setVoiceError, 600);
@@ -152,9 +153,32 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   useEffect(() => () => { stopSpeaking(); }, []);
 
   useEffect(() => {
+    if (!open) return;
+    // Android may resize the WebView or only its visual viewport for the IME.
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      panel.style.setProperty('--guide-viewport-height', `${viewport?.height ?? window.innerHeight}px`);
+      panel.style.setProperty('--guide-viewport-top', `${viewport?.offsetTop ?? 0}px`);
+    };
+    document.body.classList.add('guide-is-open');
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    return () => {
+      document.body.classList.remove('guide-is-open');
+      window.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+    };
+  }, [open]);
+
+  useEffect(() => {
     const list = listRef.current;
     if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
-  }, [messages, open]);
+  }, [messages, open, recording, voiceError]);
 
   useEffect(() => {
     const field = inputRef.current;
@@ -232,6 +256,11 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
 
   function runAction(action: MessageAction) {
     const { key } = action;
+    if (key !== 'tutorial' && window.matchMedia('(max-width: 767.98px)').matches) {
+      cancelDictation();
+      stopSpeaking();
+      setOpen(false);
+    }
     if (key === 'nearby') onNavigate('cerca');
     if (key === 'ask') onAsk(action.requestDraft);
     if (key === 'offer') onOffer();
@@ -440,7 +469,7 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
   }
 
   return <>
-    {open && <section className="guide-panel" aria-label="Guía sencilla de AYNI">
+    {open && <section ref={panelRef} className="guide-panel" aria-label="Guía sencilla de AYNI">
       <header className="guide-header"><span className="guide-avatar"><img src="/ayni-logo.png" alt=""/></span><div><b>Tu guía vecinal</b><small>Estoy aquí para ayudarte</small></div><button type="button" className="icon-button" aria-label="Cerrar guía" onClick={() => { cancelDictation(); stopSpeaking(); setOpen(false); }}><Icon name="close" size={18}/></button></header>
       <div className="guide-messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
         {messages.map(message => <div key={message.id} className={`guide-message ${message.from}`}>
@@ -453,12 +482,12 @@ export default function GuideBot({ onNavigate, onAsk, onOffer, onOfferService, o
         {messages.length === 1 && <div className="guide-home-actions" aria-label="Elige qué quieres hacer">
           {homeActions.map(action => <button type="button" className="guide-home-card" key={action.key} onClick={() => selectAction(action)}><span className="guide-home-icon"><Icon name={action.icon} size={18}/></span><span className="guide-home-copy"><b>{action.label}</b><small>{action.description}</small></span><Icon name="chevron" size={16}/></button>)}
         </div>}
+        {recording && <p className="recording-message" role="status">Escuchando… Habla y pulsa Terminar dictado cuando acabes.</p>}
+        {voiceError && <p className="guide-voice-error" role="status">{voiceError}</p>}
       </div>
       <div className="guide-quick-actions" aria-label="Sugerencias rápidas">
         {homeActions.filter(action => ['nearby', 'ask', 'tutorial'].includes(action.key)).map(action => <button type="button" key={action.key} className="guide-chip" onClick={() => selectAction(action)}>{action.label}</button>)}
       </div>
-      {recording && <p className="recording-message" role="status">Escuchando… Habla y pulsa Terminar dictado cuando acabes.</p>}
-      {voiceError && <p className="guide-voice-error" role="status">{voiceError}</p>}
       <form className="guide-input-row" onSubmit={send}><label className="sr-only" htmlFor="guide-question">Escribe una pregunta o lo que necesitas</label><textarea ref={inputRef} id="guide-question" rows={1} value={input} onChange={event => { cancelDictation(); setInput(event.target.value); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Escribe lo que necesitas…" maxLength={600} disabled={thinking}/><button type="button" className="guide-voice-btn guide-read-input" aria-label="Escuchar texto escrito" title="Escuchar texto escrito" onClick={async () => { if (!await speak(input.trim())) setVoiceError(input.trim() ? 'No pudimos leer el texto. Revisa el volumen y el motor de voz del dispositivo.' : 'Escribe un mensaje para poder escucharlo.'); }} disabled={recording || !input.trim() || thinking}><Icon name="headphones" size={18}/></button>{Voice && <button type="button" className={`guide-voice-btn ${recording ? 'is-recording' : ''}`} aria-label={recording ? 'Terminar dictado' : 'Dictar pregunta'} title={recording ? 'Terminar dictado' : 'Dictar pregunta'} onClick={dictate} disabled={thinking}><Icon name="mic" size={18}/></button>}<button type="submit" className="guide-send" aria-label="Enviar pregunta" disabled={recording || !input.trim() || thinking}><Icon name="arrow" size={19}/></button></form>
       <p className="guide-privacy-note">No escribas tu DNI, dirección ni contraseñas.</p>
     </section>}
