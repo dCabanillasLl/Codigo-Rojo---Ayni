@@ -5,7 +5,7 @@ import { localize, useLanguage } from '../lib/language';
 const modalScrollLocks = new Set<symbol>();
 let originalBodyOverflow = '';
 
-export function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+export function Modal({ title, children, onClose, wide = false, scrollWithHeader = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean; scrollWithHeader?: boolean }) {
   const { language } = useLanguage();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -24,7 +24,7 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
       if (previous?.isConnected) previous.focus();
     };
   }, []);
-  return <dialog ref={ref} className={`help-modal modal-dialog ${wide ? 'modal-wide' : ''}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); closeRef.current(); }} onClick={event => { if (event.target === event.currentTarget) closeRef.current(); }}>
+  return <dialog ref={ref} className={`help-modal modal-dialog ${wide ? 'modal-wide' : ''} ${scrollWithHeader ? 'modal-scroll-with-header' : ''}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); closeRef.current(); }} onClick={event => { if (event.target === event.currentTarget) closeRef.current(); }}>
     <div className="modal-header"><div><p className="eyebrow">{localize(language,'AYNI · TU BARRIO TE ACOMPAÑA','AYNI · YOUR NEIGHBORHOOD IS HERE FOR YOU','AYNI · LLAQTAYKI QAYLLAPIYANMI')}</p><h2 id={titleId} className="font-display">{title}</h2></div><button type="button" className="icon-button" aria-label={localize(language,'Cerrar','Close','Wisq’ay')} onClick={onClose}><Icon name="close" /></button></div>
     <div className="modal-content">{children}</div>
   </dialog>;

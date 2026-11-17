@@ -30,9 +30,13 @@ for (const mobile of [false, true]) {
     const close = await dialog.getByRole('button', { name: 'Cerrar', exact: true }).boundingBox();
     expect(close!.width).toBe(close!.height);
     expect(close!.width).toBeGreaterThanOrEqual(44);
-    const content = await dialog.locator('.modal-content').boundingBox();
-    const bounds = await dialog.boundingBox();
-    expect(content!.y + content!.height).toBeLessThanOrEqual(bounds!.y + bounds!.height);
+    // The heading and body share one scroll container, even with a long title.
+    await dialog.evaluate(el => { el.scrollTop = 0; });
+    const headingTop = (await dialog.locator('.modal-header').boundingBox())!.y;
+    await dialog.evaluate(el => { el.scrollTop = 160; });
+    expect((await dialog.locator('.modal-header').boundingBox())!.y).toBeLessThan(headingTop);
+    expect(await dialog.locator('.modal-content').evaluate(el => el.scrollTop)).toBe(0);
+    await dialog.evaluate(el => { el.scrollTop = 0; });
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     await dialog.screenshot({ path: test.info().outputPath('compartir.png') });
     await toggle.click();
