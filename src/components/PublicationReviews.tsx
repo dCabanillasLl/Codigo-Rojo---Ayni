@@ -81,7 +81,7 @@ function ReviewForm({ publicationId, interactions, loadingInteractions, interact
 
   return <form className="recommendation-form" onSubmit={event => void handleSubmit(event)} aria-label="Escribir una recomendación">
     <div className="recommendation-form-heading"><span><Icon name="star" size={19}/></span><div><b>Comparte tu experiencia</b><p>Ayuda a otros vecinos a elegir con confianza.</p></div></div>
-    <Field label="Tu calificación"><div className="review-stars" role="group" aria-label="Califica de 1 a 5 estrellas">{[1, 2, 3, 4, 5].map(star => <button key={star} type="button" aria-label={`${star} de 5 estrellas`} aria-pressed={rating === star} onClick={() => setRating(star)}><Icon name="star" size={24}/></button>)}</div></Field>
+    <Field label="Tu calificación"><div className="review-stars" role="group" aria-label="Califica de 1 a 5 estrellas">{[1, 2, 3, 4, 5].map(star => <button key={star} type="button" className={star <= rating ? 'is-filled' : ''} aria-label={`${star} de 5 estrellas`} aria-pressed={rating === star} onClick={() => setRating(star)}><Icon name="star" size={24}/></button>)}</div></Field>
     <Field label="Comentario (opcional)" hint={`${comment.length}/1200 · AYNI no admite contenido ofensivo, sexual o comercial no permitido.`}>
       <textarea value={comment} onChange={event => setComment(event.target.value)} maxLength={1200} rows={3} placeholder="¿Cómo fue tu experiencia con este producto o servicio?" aria-label="Comentario de la recomendación"/>
     </Field>

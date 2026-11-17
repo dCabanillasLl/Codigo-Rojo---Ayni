@@ -89,12 +89,14 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
     catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   }
 
-  return <section className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
+  return <section className="profile-page">
     <article className="profile-card">
-      <p className="eyebrow">TU CUENTA</p><h1 className="font-display mt-2 text-3xl font-bold">{user.nombres} {user.apellidos}</h1><p className="mt-2">{user.correo || 'Acceso con DNI'}</p>
+      <p className="eyebrow">TU CUENTA</p><h1 className="profile-title font-display mt-2 font-bold">{user.nombres} {user.apellidos}</h1><p className="profile-account-email mt-2">{user.correo || 'Acceso con DNI'}</p>
       <div className="profile-photo-section"><PhotoPicker value={profilePhoto} currentUrl={user.fotoPerfilUrl} onChange={setProfilePhoto} onBusyChange={setProfilePhotoBusy} disabled={busy || !online} label="Foto de perfil" variant="avatar"/></div>
       <div className="profile-location-card mt-5"><div className="profile-location-copy"><span className="eyebrow">MI UBICACIÓN PRIVADA</span><p>{user.direccion || 'Agrega una dirección o detecta tu ubicación con GPS.'}</p><small>Tu dirección exacta no se comparte con otros vecinos.</small></div><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={16}/>{user.direccion ? 'Editar ubicación' : 'Configurar ubicación'}</button></div>
-      <div className="mt-5"><Field label={t('language')}><select value={language} onChange={event => setLanguage(event.target.value as Language)}><option value="es">Español</option><option value="en">English</option><option value="qu">Quechua sureño</option></select></Field><p className="form-hint">{t('languageNote')}</p></div>
+      <div className="profile-language-section mt-5"><span className="profile-language-label">{t('language')}</span><div className="profile-language-picker" role="group" aria-label={t('language')}>
+        {([{ code: 'es', name: 'Español' }, { code: 'en', name: 'English' }, { code: 'qu', name: 'Quechua sureño' }] as const).map(option => <button key={option.code} type="button" aria-pressed={language === option.code} onClick={() => setLanguage(option.code)}>{option.name}</button>)}
+      </div><p className="form-hint">{t('languageNote')}</p></div>
       <form className="form-stack mt-6" onSubmit={updateProfile}>
         <div className="form-columns profile-identity-fields"><Field label="Nombres"><input value={user.nombres} readOnly aria-readonly="true"/></Field><Field label="Apellidos"><input value={user.apellidos} readOnly aria-readonly="true"/></Field></div>
         <p className="profile-identity-note">Nombres y apellidos provienen del DNI verificado y no se pueden editar.</p>
@@ -128,7 +130,7 @@ export default function Profile({ onLocation, onReviewHelp, onSignOut, signOutBu
         <label className="check-field"><input name="telefonoPublico" type="checkbox" defaultChecked={Boolean(user.telefonoPublico)}/>Permitir que contacten mi teléfono por WhatsApp desde mis publicaciones</label>
         <p className="form-hint">El teléfono se oculta por defecto. Si lo haces público, cualquier persona que vea una publicación tuya podrá abrir un chat de WhatsApp.</p>
         <ErrorBox message={error}/>{success && <p className="success-message" role="status">{success}</p>}
-        <button type="submit" className="record-button justify-center" disabled={busy || profilePhotoBusy || !online}>{busy ? 'Guardando…' : profilePhotoBusy ? 'Preparando foto…' : 'Guardar perfil'}</button>
+        <button type="submit" className="record-button profile-save-button justify-center" disabled={busy || profilePhotoBusy || !online}>{busy ? 'Guardando…' : profilePhotoBusy ? 'Preparando foto…' : 'Guardar perfil'}</button>
       </form>
       <ErrorBox message={signOutError}/><button type="button" className="outline-btn profile-signout-button mt-5" onClick={onSignOut} disabled={signOutBusy || !online}>{signOutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </article>
