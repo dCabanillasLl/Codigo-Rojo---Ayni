@@ -8,6 +8,7 @@ import type { LocationDraft } from '../types';
 import LocationPicker from './LocationPicker';
 import { locationInput } from '../lib/location';
 import { blockedRequestReason, requestTitle } from '../lib/request-policy';
+import { visibleHelpCategories } from '../lib/help-categories';
 
 type RecognitionResult = { resultIndex: number; results: { length: number; [index: number]: { isFinal: boolean; [index: number]: { transcript: string } } } };
 type Recognition = { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void; abort: () => void };
@@ -36,6 +37,7 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
   const voiceBaseDescription = useRef('');
   const Voice = (window as VoiceWindow).SpeechRecognition || (window as VoiceWindow).webkitSpeechRecognition;
   const policyMessage = blockedRequestReason(description);
+  const helpCategories = visibleHelpCategories(catalogs.data?.ayuda);
   const suggestedTitle = emergencyMode
     ? selectedNeeds.length ? `Sismo: ${selectedNeeds.slice(0, 2).join(', ')}${selectedNeeds.length > 2 ? ` y ${selectedNeeds.length - 2} más` : ''}` : ''
     : description.trim() ? requestTitle(description) : '';
@@ -127,14 +129,14 @@ export default function RequestForm({ onClose }: { onClose: () => void }) {
         <button type="button" className="outline-btn voice-listen-btn" disabled={!description.trim()} onClick={() => { if (!speak(description)) setError('La lectura en voz alta no está disponible en este navegador.'); }}><Icon name="headphones"/>Escuchar</button>
       </div>
       {recording && <p role="status" className="recording-message"><span className="recording-dot"/>{t('listening')} Habla con naturalidad; revisa el texto antes de publicarlo.</p>}
-        {!emergencyMode && <Field label="Tipo de ayuda"><select name="categoriaId" required defaultValue=""><option value="" disabled>Elige una opción</option>{catalogs.data?.ayuda.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>}
+        {!emergencyMode && <Field label="Tipo de ayuda"><select name="categoriaId" required defaultValue=""><option value="" disabled>Elige una opción</option>{helpCategories.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></Field>}
       <details className="post-location" open><summary><Icon name="pin" size={18}/>¿Dónde necesitas ayuda?</summary><p className="form-hint">Elige dónde necesitas ayuda. Tu dirección exacta es privada.</p><LocationPicker value={location} onChange={setLocation} online={online} disabled={busy}/></details>
       <RemoteState {...catalogs}/>
       {!online && <p className="offline-banner">Se guardará en este dispositivo como pendiente de envío. La comunidad aún no lo recibirá; se enviará al recuperar conexión con tu sesión activa.</p>}
-      {!catalogs.data?.ayuda.length && <ErrorBox message="Necesitamos cargar las categorías al menos una vez con conexión antes de crear pedidos."/>}
+      {!helpCategories.length && <ErrorBox message="Necesitamos cargar las categorías al menos una vez con conexión antes de crear pedidos."/>}
       <ErrorBox message={policyMessage}/>
       <ErrorBox message={error}/>
-      <button type="submit" className="record-button justify-center" disabled={busy || recording || Boolean(policyMessage) || !sectorId || !catalogs.data?.ayuda.length || (emergencyMode && selectedNeeds.length === 0)}>{busy ? 'Guardando…' : online ? emergencyMode ? 'Publicar pedido de emergencia' : t('publish') : emergencyMode ? 'Guardar pendiente de envío' : t('later')}<Icon name={online ? 'arrow' : 'wifiOff'}/></button>
+      <button type="submit" className="record-button justify-center" disabled={busy || recording || Boolean(policyMessage) || !sectorId || !helpCategories.length || (emergencyMode && selectedNeeds.length === 0)}>{busy ? 'Guardando…' : online ? emergencyMode ? 'Publicar pedido de emergencia' : t('publish') : emergencyMode ? 'Guardar pendiente de envío' : t('later')}<Icon name={online ? 'arrow' : 'wifiOff'}/></button>
     </form>
   </Modal>;
 }

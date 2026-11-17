@@ -8,7 +8,7 @@ export const mapSymbols = {
   home: { label: 'Hogar', paths: '<path d="m3 11 9-8 9 8M5 10v11h14V10M9 21v-7h6v7"/>' },
   learning: { label: 'Clases y aprendizaje', paths: '<path d="M12 5C8 2 4 3 2 4v15c3-2 7-2 10 0 3-2 7-2 10 0V4c-2-1-6-2-10 1Zm0 0v14M5 8h4M15 8h4M5 12h4M15 12h4"/>' },
   donation: { label: 'Donación', paths: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/>' },
-  exchange: { label: 'Préstamo o intercambio', paths: '<path d="M4 7h16l-4-4M20 17H4l4 4M20 7l-4 4M4 17l4-4"/>' },
+  exchange: { label: 'Préstamo de objetos', paths: '<path d="M4 7h16l-4-4M20 17H4l4 4M20 7l-4 4M4 17l4-4"/>' },
   urgent: { label: 'Ayuda urgente', paths: '<path d="m12 3 10 18H2L12 3ZM12 9v5M12 17h.01"/>' },
   bicycle: { label: 'Bicicletas', paths: '<circle cx="5" cy="16" r="4"/><circle cx="19" cy="16" r="4"/><path d="m5 16 5-9 5 9H5l6-6M8 7h4M16 4h3l2 7"/>' },
   technology: { label: 'Tecnología', paths: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M6 7h4M6 11h7"/>' },
@@ -27,7 +27,7 @@ export function listingSymbol(item: { categoria?: string; titulo?: string; urgen
   if (/\b(tecnologia|computador\w*|laptop\w*|celular\w*)\b/.test(topic)) return 'technology';
   if (/\b(hogar|mueble\w*|limpieza|mudanza\w*|mudarse|traslado\w*)\b/.test(topic)) return 'home';
   if (/\b(donacion\w*|donar|regalo\w*)\b/.test(topic)) return 'donation';
-  if (/\b(prestamo\w*|intercambio\w*)\b/.test(topic)) return 'exchange';
+  if (/\b(prestamo\w*)\b/.test(topic)) return 'exchange';
   return kind;
 }
 export const kindLabels: Record<MapKind, string> = { product: 'Producto', service: 'Servicio', help: 'Ayuda' };

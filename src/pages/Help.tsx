@@ -10,6 +10,7 @@ import { ListingsMap } from '../ServicesMap';
 import CommunityMap from '../components/CommunityMap';
 import { googleMapsUrl, mapPoint } from '../lib/location';
 import { listingSymbol, mapSymbols } from '../lib/map-symbols';
+import { visibleHelpCategories } from '../lib/help-categories';
 import { blockedRequestReason, displayRequestTitle } from '../lib/request-policy';
 
 export default function Help({ onAsk, onLocation, detailId, initialTab }: { onAsk: () => void; onLocation: () => void; detailId?: string; initialTab?: 'mios' }) {
@@ -27,6 +28,7 @@ export default function Help({ onAsk, onLocation, detailId, initialTab }: { onAs
   if (categoryId) params.set('categoriaId', categoryId);
   const requests = useRemote<HelpRequest[]>(tab === 'recursos' ? null : `/solicitudes?${params}`, user?.id || 'public');
   const visibleRequests = requests.data?.filter(request => tab !== 'todos' || request.solicitanteId !== user?.id);
+  const helpCategories = visibleHelpCategories(catalogs.data?.ayuda);
   const hasFilters = Boolean(search || categoryId);
   function clearFilters() { setSearch(''); setCategoryId(''); }
   function selectTab(value: string) { if ((value === 'mios' || value === 'aportes') && !requireUser()) return; setTab(value); }
@@ -38,7 +40,7 @@ export default function Help({ onAsk, onLocation, detailId, initialTab }: { onAs
       {tab === 'todos' && <div className="help-map-controls"><div className="help-map-top-row"><button type="button" className="outline-btn" onClick={onLocation}><Icon name="pin" size={17}/>{area.coordinates ? 'Cambiar punto de búsqueda' : 'Elegir mi ubicación'}</button><button type="button" className="outline-btn" aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>{showMap ? 'Ocultar mapa' : 'Ver mapa'}</button></div><div className="action-row help-radius-row">{[1000,1500,2000].map(radius => <button type="button" className={`radius-btn ${area.radius === radius ? 'active' : ''}`} aria-pressed={area.radius === radius} key={radius} onClick={() => area.coordinates ? setArea({ ...area, radius }) : onLocation()}>{radius / 1000} km</button>)}</div></div>}
       <div className="help-filters" aria-label="Filtrar pedidos de ayuda">
         <label className="help-filter-search"><span>Buscar</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Ej. necesito una escalera" aria-label="Buscar por palabra"/></label>
-        <label><span>Categoría</span><select value={categoryId} onChange={event => setCategoryId(event.target.value)}><option value="">Todas las categorías</option>{catalogs.data?.ayuda.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
+        <label><span>Categoría</span><select value={categoryId} onChange={event => setCategoryId(event.target.value)}><option value="">Todas las categorías</option>{helpCategories.map(category => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
         {hasFilters && <button type="button" className="help-filter-clear" onClick={clearFilters}>Limpiar filtros</button>}
       </div>
       <RemoteState {...requests}/>
