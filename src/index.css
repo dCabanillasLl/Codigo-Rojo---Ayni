@@ -3305,17 +3305,17 @@ select:focus-visible {
   max-height: min(92dvh, 66rem);
 }
 .modal-dialog:has(.location-picker) {
-  width: min(100% - 2rem, 87rem);
-  max-width: 87rem;
+  width: min(100% - 2rem, 58rem);
+  max-width: 58rem;
   max-height: min(92dvh, 66rem);
 }
 .modal-dialog:has(.auth-registration-form) .modal-header { padding: 1.5rem 1.75rem; }
 .modal-dialog:has(.auth-registration-form) .modal-header h2 { font-size: clamp(1.8rem, 4vw, 2.475rem); }
 .modal-dialog:has(.auth-registration-form) .modal-content { max-height: calc(min(92dvh, 66rem) - 6rem); padding: clamp(1.5rem, 4vw, 2.25rem); }
-.modal-dialog:has(.location-picker) .modal-header { padding: 1.5rem 1.75rem; }
-.modal-dialog:has(.location-picker) .modal-header h2 { font-size: clamp(1.8rem, 4vw, 2.475rem); }
-.modal-dialog:has(.location-picker) .modal-content { max-height: calc(min(92dvh, 66rem) - 6rem); padding: clamp(1.5rem, 4vw, 2.25rem); }
-.modal-dialog:has(.location-picker) .form-intro { margin-bottom: .5rem; font-size: 1.35rem; line-height: 1.5; }
+.modal-dialog:has(.location-picker) .modal-header { padding: 1.1rem 1.35rem; gap: .75rem; }
+.modal-dialog:has(.location-picker) .modal-header h2 { font-size: clamp(1.25rem, 3vw, 1.65rem); line-height: 1.3; }
+.modal-dialog:has(.location-picker) .modal-content { max-height: none; padding: clamp(1rem, 3vw, 1.5rem); }
+.modal-dialog:has(.location-picker) .form-intro { margin-bottom: .75rem; font-size: 1rem; line-height: 1.5; }
 .modal-dialog:has(.auth-registration-form) .modal-header .eyebrow,
 .modal-dialog:has(.location-picker) .modal-header .eyebrow { font-size: .82rem; }
 .modal-dialog:has(.auth-registration-form) .modal-header .icon-button,
@@ -3361,3 +3361,18 @@ select:focus-visible {
 .publication-share-link { display: grid; gap: 6px; margin-top: 14px; font-size: 12px; color: #52675b; }
 .publication-share-link input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #cbd8cc; border-radius: 8px; background: #fffef9; font-size: 13px; }
 @media (max-width: 440px) { .publication-share-actions { grid-template-columns: minmax(0, 1fr); } }
+
+/* Keep long publication headings and expanded actions inside one scroll area. */
+.modal-dialog[open] { display: flex; flex-direction: column; }
+.modal-dialog .modal-header { flex: 0 0 auto; align-items: flex-start; }
+.modal-header > div { min-width: 0; }
+.modal-header h2 { overflow-wrap: anywhere; }
+.modal-dialog .modal-header .icon-button { flex-shrink: 0; width: 44px; height: 44px; padding: 0; }
+.modal-dialog .modal-content { min-height: 0; max-height: none; flex: 1 1 auto; }
+.publication-share-actions > .publication-share-toggle { background: transparent; }
+.publication-share-indicator { margin-left: auto; font-size: 20px; line-height: 1; }
+.publication-share-panel { padding: 16px; background: #f5f7f2; border-radius: 12px; }
+.publication-share-panel h3 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.4; }
+.publication-share-panel .publication-share-actions { grid-template-columns: minmax(0, 1fr); margin-top: 12px; gap: 8px; }
+.publication-share-panel .publication-share-actions > a,
+.publication-share-panel .publication-share-actions > button { justify-content: flex-start; padding-inline: 14px; }

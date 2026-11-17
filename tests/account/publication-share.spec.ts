@@ -8,6 +8,7 @@ for (const mobile of [false, true]) {
       const response = await route.fetch();
       const data = await response.json();
       data.data.telefonoContacto = '+51 999 888 777';
+      data.data.titulo = 'Mudanza en el sector El Boquerón, distrito de Huanchaco, Trujillo, La Libertad';
       await route.fulfill({ json: data });
     });
     await page.addInitScript(() => {
@@ -21,11 +22,17 @@ for (const mobile of [false, true]) {
     const toggle = dialog.getByRole('button', { name: 'Compartir publicación', exact: true });
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await dialog.getByRole('button', { name: 'Copiar enlace' }).click();
-    await expect(dialog.getByRole('status')).toContainText('Enlace copiado');
-    expect(await page.evaluate(() => (window as any).__copied)).toMatch(/#cerca\/11$/);
+    await expect(dialog.getByRole('button', { name: 'Copiar enlace' })).toHaveCount(0);
+    await expect(dialog.getByRole('link', { name: 'Compartir por WhatsApp' })).not.toHaveAttribute('href', /localhost|127\.0\.0\.1/);
     await dialog.getByRole('button', { name: 'Otras aplicaciones' }).click();
-    expect(await page.evaluate(() => (window as any).__shared.url)).toMatch(/#cerca\/11$/);
+    expect(await page.evaluate(() => (window as any).__shared.url)).toBeUndefined();
+    expect(await page.evaluate(() => (window as any).__shared.text)).toContain('Contacto: +51999888777');
+    const close = await dialog.getByRole('button', { name: 'Cerrar', exact: true }).boundingBox();
+    expect(close!.width).toBe(close!.height);
+    expect(close!.width).toBeGreaterThanOrEqual(44);
+    const content = await dialog.locator('.modal-content').boundingBox();
+    const bounds = await dialog.boundingBox();
+    expect(content!.y + content!.height).toBeLessThanOrEqual(bounds!.y + bounds!.height);
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     await dialog.screenshot({ path: test.info().outputPath('compartir.png') });
     await toggle.click();
