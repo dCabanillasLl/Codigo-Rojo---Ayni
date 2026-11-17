@@ -3,6 +3,7 @@ import { apiAssetUrl } from '../lib/api';
 import { ErrorBox } from './UI';
 import Icon from './Icon';
 import { Modal } from './UI';
+import { useLanguage } from '../lib/language';
 
 const CROP_SIZE = 300;
 const OUTPUT_SIZE = 512;
@@ -16,6 +17,8 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
   value: string | null | undefined; currentUrl?: string | null;
   onChange: (photo: string | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean; label?: string; variant?: 'default' | 'avatar';
 }) {
+  const { language } = useLanguage();
+  const quechua = language === 'qu';
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
@@ -93,17 +96,17 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
     {variant === 'avatar' ? <div className="photo-picker-avatar-layout">
       <input ref={input} id={id} type="file" accept="image/jpeg,image/png,image/webp" aria-describedby={`${id}-hint`} disabled={disabled || reading} onChange={event => void choose(event)}/>
       <span className="photo-picker-avatar-control">
-        <button type="button" className="photo-picker-avatar-button" aria-label={preview ? 'Ver foto de perfil en grande' : 'Elegir foto de perfil'} disabled={reading || (!preview && disabled)} onClick={() => preview ? setViewerOpen(true) : input.current?.click()}>
+        <button type="button" className="photo-picker-avatar-button" aria-label={preview ? (quechua ? 'Perfil siq’ita hatun rikuy' : 'Ver foto de perfil en grande') : (quechua ? 'Perfil siq’ita akllay' : 'Elegir foto de perfil')} disabled={reading || (!preview && disabled)} onClick={() => preview ? setViewerOpen(true) : input.current?.click()}>
           <span className="photo-picker-avatar-image">{previewUrl ? <img src={previewUrl} crossOrigin={preview?.startsWith('data:') ? undefined : 'use-credentials'} alt=""/> : <Icon name="user" size={32}/>}</span>
         </button>
-        <label htmlFor={id} className="photo-picker-avatar-badge" aria-label="Elegir otra foto"><Icon name="plus" size={14}/></label>
+        <label htmlFor={id} className="photo-picker-avatar-badge" aria-label={quechua ? 'Huk siq’ita akllay' : 'Elegir otra foto'}><Icon name="plus" size={14}/></label>
       </span>
       <div className="photo-picker-avatar-copy">
-        <b>{label}</b><span className="photo-picker-optional">Opcional, pero ayuda a que tus vecinos te reconozcan.</span>
+        <b>{label}</b><span className="photo-picker-optional">{quechua ? 'Munaspalla; llaqtamasiykikuna riqsisunaykipaq yanapan.' : 'Opcional, pero ayuda a que tus vecinos te reconozcan.'}</span>
         <p id={`${id}-hint`} className="form-hint">JPG, PNG o WebP · Máximo 5 MB</p>
         <div className="photo-picker-avatar-actions">
-          <label htmlFor={id} className={`photo-picker-select ${disabled || reading ? 'is-disabled' : ''}`}>{reading ? 'Preparando…' : preview ? 'Cambiar foto' : 'Elegir foto'}</label>
-          {preview && <button type="button" className="photo-picker-remove" disabled={disabled || reading} onClick={removePhoto}><Icon name="close" size={14}/>Quitar</button>}
+          <label htmlFor={id} className={`photo-picker-select ${disabled || reading ? 'is-disabled' : ''}`}>{reading ? (quechua ? 'Wakichichkan…' : 'Preparando…') : preview ? (quechua ? 'Siq’ita tikray' : 'Cambiar foto') : (quechua ? 'Siq’ita akllay' : 'Elegir foto')}</label>
+          {preview && <button type="button" className="photo-picker-remove" disabled={disabled || reading} onClick={removePhoto}><Icon name="close" size={14}/>{quechua ? 'Qichuy' : 'Quitar'}</button>}
         </div>
       </div>
     </div> : <>
@@ -113,7 +116,7 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
     {reading && <p className="form-hint" role="status">Preparando vista previa…</p>}
     {previewUrl && <div className="photo-preview"><img src={previewUrl} crossOrigin={preview?.startsWith('data:') ? undefined : 'use-credentials'} alt="Vista previa de la foto seleccionada"/><button type="button" className="outline-btn" disabled={disabled || reading} onClick={() => { sequence.current++; onChange(null); setError(''); if (input.current) input.current.value = ''; }}><Icon name="close" size={16}/>Quitar foto</button></div>}
     </>}
-    {reading && variant === 'avatar' && <p className="form-hint photo-picker-reading" role="status">Preparando tu foto…</p>}
+    {reading && variant === 'avatar' && <p className="form-hint photo-picker-reading" role="status">{quechua ? 'Siq’iykita wakichichkan…' : 'Preparando tu foto…'}</p>}
     {cropSource && <Modal title="Ajusta tu foto de perfil" onClose={() => setCropSource(null)}>
       <p className="photo-crop-instructions">Arrastra la foto para acomodarla y usa el control para acercar o alejar.</p>
       <div ref={cropStage} className="photo-crop-stage" onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, offset: cropOffset }; }} onPointerMove={moveCrop} onPointerUp={finishCrop} onPointerCancel={finishCrop}>
@@ -122,7 +125,7 @@ export default function PhotoPicker({ value, currentUrl, onChange, onBusyChange,
       <label className="photo-crop-zoom"><span>Alejar</span><input type="range" min="1" max="3" step="0.01" value={cropZoom} onChange={event => updateZoom(Number(event.target.value))}/><span>Acercar</span></label>
       <div className="photo-crop-actions"><button type="button" className="outline-btn" onClick={() => setCropSource(null)}>Cancelar</button><button type="button" className="record-button" disabled={!cropDimensions} onClick={applyCrop}>Usar esta foto</button></div>
     </Modal>}
-    {viewerOpen && previewUrl && <Modal title="Tu foto de perfil" onClose={() => setViewerOpen(false)}>
+    {viewerOpen && previewUrl && <Modal title={quechua ? 'Perfil siq’iyki' : 'Tu foto de perfil'} onClose={() => setViewerOpen(false)}>
       <div className="photo-viewer"><img src={previewUrl} crossOrigin={preview?.startsWith('data:') ? undefined : 'use-credentials'} alt="Foto de perfil ampliada"/></div>
     </Modal>}
     <ErrorBox message={error}/>

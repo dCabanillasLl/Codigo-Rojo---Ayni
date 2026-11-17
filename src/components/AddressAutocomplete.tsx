@@ -4,6 +4,7 @@ import { COMMUNITY_CENTER } from '../lib/location';
 import type { Coordinates } from '../types';
 import Icon from './Icon';
 import { ErrorBox } from './UI';
+import { localize, useLanguage } from '../lib/language';
 
 export type AddressSuggestion = { id: string; nombre: string; latitud: number; longitud: number };
 export default function AddressAutocomplete({ value, onChange, onSelect, online, disabled = false, label, name, required = false, bias, showSearchButton = true, onBusyChange, autoSearch = false }: {
@@ -11,6 +12,7 @@ export default function AddressAutocomplete({ value, onChange, onSelect, online,
   online: boolean; disabled?: boolean; label: string; name?: string; required?: boolean;
   bias?: Coordinates | null; showSearchButton?: boolean; onBusyChange?: (busy: boolean) => void; autoSearch?: boolean;
 }) {
+  const { language } = useLanguage();
   const id = useId();
   const [typed, setTyped] = useState('');
   const [version, setVersion] = useState(0);
@@ -57,7 +59,7 @@ export default function AddressAutocomplete({ value, onChange, onSelect, online,
   return <div className="address-autocomplete form-field" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) { setFocused(false); setOpen(false); } }}>
     <label className="location-address-label" htmlFor={id}>{label}</label>
     <div className="location-search">
-      <input id={id} name={name} value={value} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined} aria-busy={loading} required={required} minLength={required ? 3 : undefined} maxLength={255} autoComplete="off" placeholder="Escribe una calle o dirección" disabled={disabled} onFocus={() => setFocused(true)}
+      <input id={id} name={name} value={value} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined} aria-busy={loading} required={required} minLength={required ? 3 : undefined} maxLength={255} autoComplete="off" placeholder={localize(language,'Escribe una calle o dirección','Enter a street or address','Calle nisqata utaq wasiykita qillqay')} disabled={disabled} onFocus={() => setFocused(true)}
         onChange={event => { setTyped(event.target.value); setResults([]); setOpen(false); setActive(-1); setError(''); onChange(event.target.value); }}
         onKeyDown={event => {
           if (event.key === 'ArrowDown' && results.length) { event.preventDefault(); setOpen(true); setActive(index => (index + 1) % results.length); }
@@ -66,10 +68,10 @@ export default function AddressAutocomplete({ value, onChange, onSelect, online,
           else if (event.key === 'Enter' && showSearchButton) { event.preventDefault(); setTyped(value); setFocused(true); setVersion(current => current + 1); }
           else if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); setTyped(''); }
         }}/>
-      {showSearchButton && <button type="button" className="small-primary" disabled={disabled || !online || value.trim().length < 3 || value.trim().length > 200} onClick={() => { setTyped(value); setFocused(true); setVersion(current => current + 1); }}>Buscar</button>}
+      {showSearchButton && <button type="button" className="small-primary" disabled={disabled || !online || value.trim().length < 3 || value.trim().length > 200} onClick={() => { setTyped(value); setFocused(true); setVersion(current => current + 1); }}>{localize(language,'Buscar','Search','Maskay')}</button>}
     </div>
-    {open && <ul id={`${id}-results`} role="listbox" className="address-suggestions" aria-label="Sugerencias de direcciones">{results.map((place, index) => <li key={place.id} id={`${id}-option-${index}`} role="option" aria-selected={index === active} className={index === active ? 'active' : ''} onPointerDown={event => event.preventDefault()} onClick={() => select(place)}><Icon name="pin" size={16}/><span>{place.nombre}</span></li>)}</ul>}
-    {loading && <small className="form-hint" role="status">Buscando sugerencias…</small>}
+    {open && <ul id={`${id}-results`} role="listbox" className="address-suggestions" aria-label={localize(language,'Sugerencias de direcciones','Address suggestions','Wasiykunapa yuyaychayninkuna')}>{results.map((place, index) => <li key={place.id} id={`${id}-option-${index}`} role="option" aria-selected={index === active} className={index === active ? 'active' : ''} onPointerDown={event => event.preventDefault()} onClick={() => select(place)}><Icon name="pin" size={16}/><span>{place.nombre}</span></li>)}</ul>}
+    {loading && <small className="form-hint" role="status">{localize(language,'Buscando sugerencias…','Searching suggestions…','Yuyaychaykunata maskachkan…')}</small>}
     <ErrorBox message={error}/>
   </div>;
 }

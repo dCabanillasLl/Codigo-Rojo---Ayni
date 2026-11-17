@@ -3,6 +3,7 @@ import type { Notice } from '../types';
 import { apiAssetUrl } from './api';
 import { googleMapsUrl, mapPoint } from './location';
 import { noticeStatus, noticeVisible } from './notices';
+import { localize, type Language } from './language';
 
 export type PreparedNoticeFlyer = { file: File; nativeUri?: string };
 const maxFlyerBytes = 5 * 1024 * 1024;
@@ -40,6 +41,28 @@ export function noticeShareMessage(item: Notice): string {
     ...(noticeStatus(item).key !== 'active' ? [`Estado: ${noticeStatus(item).label}.`] : []),
     ...(point ? ['', `Ver ubicación: ${googleMapsUrl(point)}`] : []),
     ...(link ? ['', `Ver el aviso${noticeVisible(item) ? ' y confirmar asistencia' : ''} en AYNI: ${link}`] : []),
+  ].join('\n');
+}
+
+export function noticeShareMessageLocalized(item: Notice, language: Language): string {
+  if (language === 'es') return noticeShareMessage(item);
+  const point = mapPoint({ mapaLatitud: item.latitudActividad, mapaLongitud: item.longitudActividad });
+  const place = item.direccionActividad?.trim() || localize(language, point ? 'el lugar indicado en el mapa' : 'lugar por confirmar', point ? 'the place shown on the map' : 'location to be confirmed', point ? 'mapapi rikuchisqa kay' : 'kaymi qhipaman takyachisqa kanqa');
+  const date = item.fechaEvento ? new Date(item.fechaEvento) : null;
+  const formatted = date && !Number.isNaN(date.getTime()) ? new Intl.DateTimeFormat(language === 'qu' ? 'qu-PE' : 'en-US', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Lima',
+  }).format(date) : null;
+  const link = noticePublicUrl(item.id);
+  const status = noticeStatus(item);
+  const statusLabel = ({ cancelled: ['CANCELLED', 'SAYACHISQA'], draft: ['DRAFT', 'QILLQASQA'], expired: ['EXPIRED', 'PACHAS TUKUSQA'], postponed: ['POSTPONED', 'QHIPAMAN SAQISQA'], rescheduled: ['RESCHEDULED', 'MUSUQ PACHA CHURASQA'], updated: ['UPDATED', 'MUSUQYACHISQA'], active: ['UPCOMING', 'HAMUQ'] } as Record<string, [string, string]>)[status.key]?.[language === 'en' ? 0 : 1] || status.label;
+  return [
+    localize(language, '', `See this NOTICE: "${item.titulo}", posted on AYNI.`, `Kay WILLKUYTA qhaway: "${item.titulo}", AYNI-pi willarisqa.`),
+    '',
+    formatted ? localize(language, '', `${noticeVisible(item) ? 'It will take place on' : 'Activity date:'} ${formatted} (Lima time).`, `${noticeVisible(item) ? 'Rurasqa kanqa' : 'Ruraypa pacha:'} ${formatted} (Lima pachapi).`) : localize(language, '', 'Date to be confirmed.', 'Pacha qhipaman takyachisqa kanqa.'),
+    localize(language, '', `At ${place}.`, `${place} nisqapi.`),
+    ...(status.key !== 'active' ? [localize(language, '', `Status: ${statusLabel}.`, `Imayna kasqan: ${statusLabel}.`)] : []),
+    ...(point ? ['', localize(language, '', `View location: ${googleMapsUrl(point)}`, `Kayta qhaway: ${googleMapsUrl(point)}`)] : []),
+    ...(link ? ['', localize(language, '', `View the notice${noticeVisible(item) ? ' and confirm attendance' : ''} on AYNI: ${link}`, `AYNI-pi willakuyta${noticeVisible(item) ? ', asistenciaykitapas takyachiy' : ''} qhaway: ${link}`)] : []),
   ].join('\n');
 }
 

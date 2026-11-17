@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import Icon from './Icon';
+import { localize, useLanguage } from '../lib/language';
 
 const modalScrollLocks = new Set<symbol>();
 let originalBodyOverflow = '';
 
 export function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+  const { language } = useLanguage();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const closeRef = useRef(onClose); closeRef.current = onClose;
@@ -23,7 +25,7 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
     };
   }, []);
   return <dialog ref={ref} className={`help-modal modal-dialog ${wide ? 'modal-wide' : ''}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); closeRef.current(); }} onClick={event => { if (event.target === event.currentTarget) closeRef.current(); }}>
-    <div className="modal-header"><div><p className="eyebrow">AYNI · TU BARRIO TE ACOMPAÑA</p><h2 id={titleId} className="font-display">{title}</h2></div><button type="button" className="icon-button" aria-label="Cerrar" onClick={onClose}><Icon name="close" /></button></div>
+    <div className="modal-header"><div><p className="eyebrow">{localize(language,'AYNI · TU BARRIO TE ACOMPAÑA','AYNI · YOUR NEIGHBORHOOD IS HERE FOR YOU','AYNI · LLAQTAYKI QAYLLAPIYANMI')}</p><h2 id={titleId} className="font-display">{title}</h2></div><button type="button" className="icon-button" aria-label={localize(language,'Cerrar','Close','Wisq’ay')} onClick={onClose}><Icon name="close" /></button></div>
     <div className="modal-content">{children}</div>
   </dialog>;
 }
@@ -32,10 +34,12 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 export function ErrorBox({ message }: { message?: string }) { return message ? <p className="error-box" role="alert"><Icon name="alert" size={18}/><span>{message}</span></p> : null; }
 export function RemoteState({ loading, error, cachedAt, reload }: { loading: boolean; error: string; cachedAt?: string | null; reload: () => void }) {
+  const { language } = useLanguage();
+  const formattedCacheDate = cachedAt ? new Intl.DateTimeFormat(language === 'qu' ? 'qu-PE' : language === 'en' ? 'en-US' : 'es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(cachedAt)) : '';
   return <>
-    {loading && <p className="loading-message" role="status">Consultando a tu barrio…</p>}
-    {cachedAt && <p className="offline-banner" role="status"><Icon name="wifiOff" size={18}/>Ves información guardada el {formatDate(cachedAt)}. Puede haber cambiado.</p>}
-    {error && !loading && <div className="error-box" role="alert"><span>{error}</span><button type="button" onClick={reload} className="text-action">Reintentar</button></div>}
+    {loading && <p className="loading-message" role="status">{localize(language,'Consultando a tu barrio…','Checking your neighborhood…','Llaqtaykita qhawaykachkan…')}</p>}
+    {cachedAt && <p className="offline-banner" role="status"><Icon name="wifiOff" size={18}/>{localize(language,'Ves información guardada el','You are viewing information saved on','Kay p’unchaw waqaychasqa willayta qhawachkanki')} {formattedCacheDate}{localize(language,'. Puede haber cambiado.','. It may have changed.','. Hukman tikrasqa ichapas kanman.')}</p>}
+    {error && !loading && <div className="error-box" role="alert"><span>{error}</span><button type="button" onClick={reload} className="text-action">{localize(language,'Reintentar','Retry','Yapamanta ruray')}</button></div>}
   </>;
 }
 export function Empty({ title, text }: { title: string; text: string }) { return <div className="empty-state"><Icon name="hands" size={34}/><h3 className="font-display">{title}</h3><p>{text}</p></div>; }
